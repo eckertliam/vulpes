@@ -1,0 +1,19 @@
+enum Color
+    Red
+    Green
+    Blue
+
+struct Point
+    x: int
+    y: int
+
+struct Rectangle
+    width: int
+    height: int
+
+fn add(a: int, b: int) -> int
+    return a + b
+
+fn main() -> int
+    return add(1, 2)
+
