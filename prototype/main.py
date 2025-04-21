@@ -12,23 +12,33 @@ cuss_grammar = r"""
     
     ?start: [_NL] program
     
-    ?program: statement_list | 
+    ?program: definition_list
+    
+    ?definition_list: definition _NL definition_list | definition [_NL]
+    
+    ?definition: fn_def
+                | enum_def
+                | struct_def
+                | type_alias
     
     ?statement_list: statement _NL statement_list | statement [_NL]
     
     statement: fn_def
-             | expr
-             | enum
-             | struct
+             | expr -> expr_stmt
+             | enum_def
+             | struct_def
              | "return" expr -> return_stmt
-             
-    fn_def: "fn" IDENT LPAR [param_list] RPAR "->" type_annotation _NL _INDENT statement_list _DEDENT
+             | type_alias
+    
+    type_alias: ["pub"] "type" IDENT "=" type_annotation
+
+    fn_def: ["pub"] "fn" IDENT LPAR param_list RPAR "->" type_annotation _NL _INDENT statement_list _DEDENT
     
     param_list: [param ("," param)*]
     
     param: IDENT ":" type_annotation
     
-    enum: ["pub"] "enum" IDENT _NL enum_variant_list
+    enum_def: ["pub"] "enum" IDENT _NL enum_variant_list
     
     ?enum_variant_list: [_INDENT (enum_variant _NL)* _DEDENT]
     
@@ -44,7 +54,7 @@ cuss_grammar = r"""
         | enum_unit_variant -> unit
         | enum_struct_variant -> struct
 
-    struct: ["pub"] "struct" IDENT _NL struct_field_list
+    struct_def: ["pub"] "struct" IDENT _NL struct_field_list
     
     ?struct_field_list: [_INDENT (struct_field _NL)* _DEDENT]
     
@@ -130,8 +140,9 @@ class Program:
         self.declarations.append(declaration)
         
 class Declaration:
-    def __init__(self, kind: str) -> None:
-        self.kind = None
+    def __init__(self, kind: str, pub: bool = False) -> None:
+        self.kind = kind
+        self.pub = pub
         
 class TypeAnnotation:
     pass
@@ -154,14 +165,60 @@ class FunctionType(TypeAnnotation):
         self.ret_type = ret_type
         
 class FnDecl(Declaration):
-    def __init__(self, name: str, params: list['Param'], ret_type: TypeAnnotation) -> None:
-        super().__init__("fn_del")
+    def __init__(self, pub: bool, name: str, params: list['Param'], ret_type: TypeAnnotation) -> None:
+        super().__init__("fn_decl", pub)
         self.name = name
         self.params = params
         self.ret_type = ret_type
         
 class Param:
     def __init__(self, name: str, type: TypeAnnotation) -> None:
+        self.name = name
+        self.type = type
+        
+    
+class StructDecl(Declaration):
+    def __init__(self, pub: bool, name: str, fields: list['StructField']) -> None:
+        super().__init__("struct_decl", pub)
+        self.name = name
+        self.fields = fields
+        
+class StructField:
+    def __init__(self, name: str, type: TypeAnnotation) -> None:
+        self.name = name
+        self.type = type
+        
+class EnumDecl(Declaration):
+    def __init__(self, pub: bool, name: str, variants: list['EnumVariant']) -> None:
+        super().__init__("enum_decl", pub)
+        self.name = name
+        self.variants = variants
+        
+class EnumVariant:
+    pass
+
+class EnumUnitVariant(EnumVariant):
+    def __init__(self, name: str) -> None:
+        self.name = name
+        
+class EnumTupleVariant(EnumVariant):
+    def __init__(self, name: str, types: list[TypeAnnotation]) -> None:
+        self.name = name
+        self.types = types
+        
+class EnumStructVariant(EnumVariant):
+    def __init__(self, name: str, fields: list['EnumStructField']) -> None:
+        self.name = name
+        self.fields = fields
+        
+class EnumStructField:
+    def __init__(self, name: str, type: TypeAnnotation) -> None:
+        self.name = name
+        self.type = type
+        
+class TypeAliasDecl(Declaration):
+    def __init__(self, pub: bool, name: str, type: TypeAnnotation) -> None:
+        super().__init__("type_alias_decl", pub)
         self.name = name
         self.type = type
         
