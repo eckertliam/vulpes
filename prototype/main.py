@@ -1,3 +1,4 @@
+from typing import Optional, Union
 from lark import Lark, Tree, Token
 from lark.indenter import Indenter
 
@@ -30,6 +31,11 @@ cuss_grammar = r"""
              | struct_def
              | "return" expr -> return_stmt
              | type_alias
+             | const_def
+             | let_def
+    
+    const_def: "const" IDENT [":" type_annotation] "=" expr
+    let_def: "let" IDENT [":" type_annotation] "=" expr
     
     type_alias: ["pub"] "type" IDENT "=" type_annotation
 
@@ -162,17 +168,20 @@ class TupleType(TypeAnnotation):
     def __init__(self, elem_types: list[TypeAnnotation]) -> None:
         self.elem_types = elem_types
         
+Statement = Union['Expr', 'FnDecl', 'EnumDecl', 'StructDecl', 'TypeAliasDecl', 'VarDecl']
+        
 class FunctionType(TypeAnnotation):
     def __init__(self, params: list[TypeAnnotation], ret_type: TypeAnnotation) -> None:
         self.params = params
         self.ret_type = ret_type
         
 class FnDecl(Declaration):
-    def __init__(self, pub: bool, name: str, params: list['Param'], ret_type: TypeAnnotation) -> None:
+    def __init__(self, pub: bool, name: str, params: list['Param'], ret_type: TypeAnnotation, body: list[Statement]) -> None:
         super().__init__("fn_decl", pub)
         self.name = name
         self.params = params
         self.ret_type = ret_type
+        self.body = body
         
 class Param:
     def __init__(self, name: str, type: TypeAnnotation) -> None:
@@ -218,13 +227,23 @@ class EnumStructField:
     def __init__(self, name: str, type: TypeAnnotation) -> None:
         self.name = name
         self.type = type
-        
+
 class TypeAliasDecl(Declaration):
     def __init__(self, pub: bool, name: str, type: TypeAnnotation) -> None:
         super().__init__("type_alias_decl", pub)
         self.name = name
         self.type = type
         
+class VarDecl(Declaration):
+    def __init__(self, mutable: bool, name: str, type: Optional[TypeAnnotation] = None) -> None:
+        if mutable:
+            super().__init__("let_decl", False)
+        else:
+            super().__init__("const_decl", False)
+        self.name = name
+        self.type = type
+        
+
 class Expr:
     def __init__(self, kind: str) -> None:
         self.kind = kind
@@ -332,10 +351,41 @@ def parse_fn_def(lark_ast: Tree) -> FnDecl:
     pub: bool = lark_ast.children[offset].data == "pub"
     if pub: offset += 1
     name: str = lark_ast.children[offset].value
+    offset += 1
     
-    # TODO: Implement fn_def parsing
-    pass
+    #  skip the LPAR
+    offset += 1
     
+    params: list[Param] = parse_param_list(lark_ast.children[offset])
+    offset += 1
+    
+    # skip the RPAR
+    offset += 1
+    
+    ret_type: TypeAnnotation = parse_type_annotation(lark_ast.children[offset])
+    offset += 1
+    
+    body: list[Statement] = []
+    
+    for child in lark_ast.children[offset].children:
+        body.append(parse_statement(child))
+        
+    return FnDecl(pub, name, params, ret_type, body)
+
+def parse_param_list(lark_ast: Tree) -> Param:
+    assert lark_ast.data == "param_list"
+    
+    params: list[Param] = []
+    
+    for child in lark_ast.children:
+        assert child.data == "param"
+        name: str = child.children[0].value
+        type: TypeAnnotation = parse_type_annotation(child.children[1])
+        params.append(Param(name, type))
+        
+    return params
+            
+
 def parse_enum_def(lark_ast: Tree) -> EnumDecl:
     assert lark_ast.data == "enum_def"
     
@@ -435,7 +485,11 @@ def parse_type_alias(lark_ast: Tree) -> TypeAliasDecl:
     
     return TypeAliasDecl(pub, name, type)
 
-
+def parse_statement(lark_ast: Tree) -> Statement:
+    assert lark_ast.data == "statement"
+    
+    # TODO: Implement statement parsing
+    pass
 
 if __name__ == "__main__":
     parser = Lark(cuss_grammar, parser='lalr', postlex=CussIndenter())
@@ -444,7 +498,7 @@ if __name__ == "__main__":
             content = f.read()
             if not content.strip():
                 print("Warning: example.cuss is empty. Parsing empty file.")
-            print(parser.parse(content).children[1].children[0].children[1].children[0])
+            print(parser.parse(content).children[1].children[1].children[5:])
     except FileNotFoundError:
         print("Error: example.cuss file not found")
     except Exception as e:

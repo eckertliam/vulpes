@@ -7,13 +7,7 @@ struct Point
     x: int
     y: int
 
-struct Rectangle
-    width: int
-    height: int
-
-fn add(a: int, b: int) -> int
-    return a + b
-
-fn main() -> int
-    return add(1, 2)
-
+fn minus_and_square(a: int, b: int) -> int
+    const diff = a - b
+    const square = diff * diff
+    return square
