@@ -1,6 +1,7 @@
-from lark import Lark
+from lark import Lark, Tree, Token
 from lark.indenter import Indenter
 
+# TODO: add support for impls
 cuss_grammar = r"""
     %import common.INT
     %import common.FLOAT 
@@ -60,10 +61,12 @@ cuss_grammar = r"""
     
     struct_field: ["pub"] IDENT ":" type_annotation
     
-    type_annotation: IDENT
-        | "[" type_annotation "]" -> array
-        | "(" [type_annotation ("," type_annotation)*] ")" -> tuple_type
-        | "(" type_annotation ")" "->" type_annotation -> function_type
+    type_annotation: IDENT -> named_type
+        | LSQB type_annotation RSQB -> array_type
+        | LPAR [type_annotation ("," type_annotation)*] RPAR -> tuple_type
+        | function_type -> function_type
+    
+    function_type: LPAR [type_annotation ("," type_annotation)*] RPAR "->" type_annotation
     
     ?expr: logical_or
         | call
@@ -131,7 +134,7 @@ class CussIndenter(Indenter):
     DEDENT_type = '_DEDENT'
     tab_len = 4
     
-# Ast
+# Expressive AST we convert the Lark ast into
 class Program:
     def __init__(self) -> None:
         self.declarations = []
@@ -285,22 +288,163 @@ class CallAttr(Expr):
         self.obj = obj
         self.attr = attr
         self.args = args
+  
+class BinaryOp(Expr):
+    def __init__(self, op: str, lhs: Expr, rhs: Expr) -> None:
+        super().__init__("binary_op")
+        self.op = op
+        self.lhs = lhs
+        self.rhs = rhs
+        
+class UnaryOp(Expr):
+    def __init__(self, op: str, operand: Expr) -> None:
+        super().__init__("unary_op")
+        self.op = op
+        self.operand = operand
+        
+# Lark to inhouse AST
+def lark_to_ast(lark_ast: Tree) -> Program:
+    assert isinstance(lark_ast, Tree)
+    # right now top level is always a definition list
+    assert lark_ast.data == "definition_list"
+    program = Program()
+    
+    for child in lark_ast.children:
+        match child.data:
+            case "fn_def":
+                program.push(parse_fn_def(child))
+            case "enum_def":
+                program.push(parse_enum_def(child))
+            case "struct_def":
+                program.push(parse_struct_def(child))
+            case "type_alias":
+                program.push(parse_type_alias(child))
+            case _:
+                raise ValueError(f"Unknown definition type: {child.data}")
+                
+    return program
+
+def parse_fn_def(lark_ast: Tree) -> FnDecl:
+    assert lark_ast.data == "fn_def"
+    
+    offset: int = 0
+    
+    pub: bool = lark_ast.children[offset].data == "pub"
+    if pub: offset += 1
+    name: str = lark_ast.children[offset].value
+    
+    # TODO: Implement fn_def parsing
+    pass
+    
+def parse_enum_def(lark_ast: Tree) -> EnumDecl:
+    assert lark_ast.data == "enum_def"
+    
+    offset: int = 0
+    
+    pub: bool = lark_ast.children[offset].data == "pub"
+    if pub: offset += 1
+    name: str = lark_ast.children[offset].value
+    
+    offset += 1
+    
+    variants: list[EnumVariant] = []
+    
+    for child in lark_ast.children[offset].children:
+        match child.data:
+            case "enum_tuple_variant":
+                # TODO: Implement tuple variant parsing
+                pass
+            case "enum_unit_variant":
+                variants.append(EnumUnitVariant(child.value))
+            case "enum_struct_variant":
+                # TODO: Implement struct variant parsing
+                pass
+            case _:
+                raise ValueError(f"Unknown variant type: {child.data}")
+
+    return EnumDecl(pub, name, variants)
+
+def parse_struct_def(lark_ast: Tree) -> StructDecl:
+    assert lark_ast.data == "struct_def"
+    
+    offset: int = 0
+    
+    pub: bool = lark_ast.children[offset].data == "pub"
+    if pub: offset += 1
+    name: str = lark_ast.children[offset].value
+    
+    offset += 1
+    
+    fields: list[StructField] = []
+    
+    for child in lark_ast.children[offset].children:
+        if child.data == "struct_field":
+            fields.append(parse_struct_field(child))
+        else:
+            raise ValueError(f"Unknown field type: {child.data}")
+    
+    return StructDecl(pub, name, fields)
+   
+def parse_struct_field(lark_ast: Tree) -> StructField:
+    assert lark_ast.data == "struct_field"
+    
+    offset: int = 0
+    
+    pub: bool = lark_ast.children[offset].data == "pub"
+    if pub: offset += 1
+    name: str = lark_ast.children[offset].value
+    
+    offset += 1
+    
+    type: TypeAnnotation = parse_type_annotation(lark_ast.children[offset])
+    
+    return StructField(name, type)
+
+def parse_type_annotation(lark_ast: Tree) -> TypeAnnotation:
+    assert lark_ast.data == "type_annotation"
+    
+    match lark_ast.children[0].data:
+        case "named_type":
+            return NamedType(lark_ast.children[0].value)
+        case "array_type":
+            return ArrayType(parse_type_annotation(lark_ast.children[0]))
+        case "tuple_type":
+            types: list[TypeAnnotation] = []
+            for child in lark_ast.children[0].children:
+                types.append(parse_type_annotation(child))
+            return TupleType(types)
+        case "function_type":
+            # TODO: Implement function type parsing
+            pass
+        case _:
+            raise ValueError(f"Unknown type annotation: {lark_ast.children[0].data}")
+            
+
+def parse_type_alias(lark_ast: Tree) -> TypeAliasDecl:
+    assert lark_ast.data == "type_alias"
+    
+    offset: int = 0
+    
+    pub: bool = lark_ast.children[offset].data == "pub"
+    if pub: offset += 1
+    name: str = lark_ast.children[offset].value
+    
+    offset += 1
+    
+    type: TypeAnnotation = parse_type_annotation(lark_ast.children[offset])
+    
+    return TypeAliasDecl(pub, name, type)
+
+
 
 if __name__ == "__main__":
     parser = Lark(cuss_grammar, parser='lalr', postlex=CussIndenter())
     try:
-        # Check if example.cuss exists, create a basic one if it doesn't
-        import os
-        if not os.path.exists("example.cuss"):
-            with open("example.cuss", "w") as f:
-                f.write("true")
-            print("Created example.cuss with a simple 'true' value")
-            
         with open("example.cuss", "r") as f:
             content = f.read()
             if not content.strip():
                 print("Warning: example.cuss is empty. Parsing empty file.")
-            print(parser.parse(content))
+            print(parser.parse(content).children[1].children[0].children[1].children[0])
     except FileNotFoundError:
         print("Error: example.cuss file not found")
     except Exception as e:
