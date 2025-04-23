@@ -2,7 +2,6 @@ from typing import Optional, Union
 from lark import Lark, Tree, Token
 from lark.indenter import Indenter
 
-# TODO: add support for impls
 cuss_grammar = r"""
     %import common.INT
     %import common.FLOAT 
@@ -23,7 +22,7 @@ cuss_grammar = r"""
                 | struct_def
                 | type_alias
     
-    ?statement_list: statement _NL statement_list | statement [_NL]
+    ?statement_list: statement (_NL statement)* [_NL]
     
     statement: fn_def
              | expr -> expr_stmt
@@ -33,19 +32,20 @@ cuss_grammar = r"""
              | type_alias
              | const_def
              | let_def
+             | impl_def
     
     const_def: "const" IDENT [":" type_annotation] "=" expr
     let_def: "let" IDENT [":" type_annotation] "=" expr
     
-    type_alias: ["pub"] "type" IDENT "=" type_annotation
+    type_alias: [PUB] "type" IDENT "=" type_annotation
 
-    fn_def: ["pub"] "fn" IDENT LPAR param_list RPAR "->" type_annotation _NL _INDENT statement_list _DEDENT
+    fn_def: [PUB] "fn" IDENT "(" param_list ")" "->" type_annotation _NL _INDENT statement_list _DEDENT
     
     param_list: [param ("," param)*]
     
     param: IDENT ":" type_annotation
     
-    enum_def: ["pub"] "enum" IDENT _NL enum_variant_list
+    enum_def: [PUB] "enum" IDENT _NL enum_variant_list
     
     ?enum_variant_list: [_INDENT (enum_variant _NL)* _DEDENT]
     
@@ -61,23 +61,26 @@ cuss_grammar = r"""
         | enum_unit_variant -> unit
         | enum_struct_variant -> struct
 
-    struct_def: ["pub"] "struct" IDENT _NL struct_field_list
+    struct_def: [PUB] "struct" IDENT _NL struct_field_list
     
     ?struct_field_list: [_INDENT (struct_field _NL)* _DEDENT]
     
-    struct_field: ["pub"] IDENT ":" type_annotation
+    struct_field: [PUB] IDENT ":" type_annotation
+    
+    impl_def: "impl" IDENT _NL _INDENT method_list _DEDENT
+    
+    method_list: (method _NL)* method [_NL]
+    
+    method: fn_def
     
     type_annotation: IDENT -> named_type
-        | LSQB type_annotation RSQB -> array_type
-        | LPAR [type_annotation ("," type_annotation)*] RPAR -> tuple_type
+        | "[" type_annotation "]" -> array_type
+        | "(" [type_annotation ("," type_annotation)*] ")" -> tuple_type
         | function_type -> function_type
     
-    function_type: LPAR [type_annotation ("," type_annotation)*] RPAR "->" type_annotation
+    function_type: "(" [type_annotation ("," type_annotation)*] ")" "->" type_annotation
     
     ?expr: logical_or
-        | call
-
-    call: IDENT LPAR [arglist] RPAR -> call_expr
 
     ?logical_or: logical_and
         | logical_or "or" logical_and -> or_
@@ -120,6 +123,7 @@ cuss_grammar = r"""
 
     arglist: [expr ("," expr)*]
     
+    PUB: "pub"
     LPAR: "("
     RPAR: ")"
     LSQB: "["
@@ -235,14 +239,19 @@ class TypeAliasDecl(Declaration):
         self.type = type
         
 class VarDecl(Declaration):
-    def __init__(self, mutable: bool, name: str, type: Optional[TypeAnnotation] = None) -> None:
+    def __init__(self, mutable: bool, name: str, type: Optional[TypeAnnotation] = None, expr: Optional['Expr'] = None) -> None:
         if mutable:
             super().__init__("let_decl", False)
         else:
             super().__init__("const_decl", False)
         self.name = name
         self.type = type
-        
+        self.expr = expr
+class ImplDecl(Declaration):
+    def __init__(self, name: str, methods: list[FnDecl]) -> None:
+        super().__init__("impl_decl", False)
+        self.name = name
+        self.methods = methods
 
 class Expr:
     def __init__(self, kind: str) -> None:
@@ -338,6 +347,9 @@ def lark_to_ast(lark_ast: Tree) -> Program:
                 program.push(parse_struct_def(child))
             case "type_alias":
                 program.push(parse_type_alias(child))
+            case "impl_def":
+                # TODO: Implement impl def parsing
+                raise NotImplementedError("Impl def parsing not implemented")
             case _:
                 raise ValueError(f"Unknown definition type: {child.data}")
                 
@@ -348,24 +360,20 @@ def parse_fn_def(lark_ast: Tree) -> FnDecl:
     
     offset: int = 0
     
-    pub: bool = lark_ast.children[offset].data == "pub"
+    pub: bool = lark_ast.children[offset].value == "pub"
     if pub: offset += 1
     name: str = lark_ast.children[offset].value
     offset += 1
     
-    #  skip the LPAR
-    offset += 1
-    
     params: list[Param] = parse_param_list(lark_ast.children[offset])
-    offset += 1
-    
-    # skip the RPAR
     offset += 1
     
     ret_type: TypeAnnotation = parse_type_annotation(lark_ast.children[offset])
     offset += 1
     
     body: list[Statement] = []
+    
+    assert lark_ast.children[offset].data == "statement_list"
     
     for child in lark_ast.children[offset].children:
         body.append(parse_statement(child))
@@ -403,12 +411,12 @@ def parse_enum_def(lark_ast: Tree) -> EnumDecl:
         match child.data:
             case "enum_tuple_variant":
                 # TODO: Implement tuple variant parsing
-                pass
+                raise NotImplementedError("Tuple variants not implemented")
             case "enum_unit_variant":
                 variants.append(EnumUnitVariant(child.value))
             case "enum_struct_variant":
                 # TODO: Implement struct variant parsing
-                pass
+                raise NotImplementedError("Struct variants not implemented")
             case _:
                 raise ValueError(f"Unknown variant type: {child.data}")
 
@@ -453,19 +461,21 @@ def parse_struct_field(lark_ast: Tree) -> StructField:
 def parse_type_annotation(lark_ast: Tree) -> TypeAnnotation:
     assert lark_ast.data == "type_annotation"
     
-    match lark_ast.children[0].data:
+    match lark_ast.data:
         case "named_type":
             return NamedType(lark_ast.children[0].value)
         case "array_type":
+            # TODO: make sure this is correct with some examples
             return ArrayType(parse_type_annotation(lark_ast.children[0]))
         case "tuple_type":
+            # TODO: make sure this is correct with some examples
             types: list[TypeAnnotation] = []
             for child in lark_ast.children[0].children:
                 types.append(parse_type_annotation(child))
             return TupleType(types)
         case "function_type":
             # TODO: Implement function type parsing
-            pass
+            raise NotImplementedError("Function types not implemented")
         case _:
             raise ValueError(f"Unknown type annotation: {lark_ast.children[0].data}")
             
@@ -488,8 +498,40 @@ def parse_type_alias(lark_ast: Tree) -> TypeAliasDecl:
 def parse_statement(lark_ast: Tree) -> Statement:
     assert lark_ast.data == "statement"
     
-    # TODO: Implement statement parsing
-    pass
+    # TODO: add support for impls, expression statements, and return statements
+    match lark_ast.children[0].data:
+        case "const_def" | "let_def":
+            return parse_var_def(lark_ast)
+        case "fn_def":
+            return parse_fn_def(lark_ast)
+        case "enum_def":
+            return parse_enum_def(lark_ast)
+        case "struct_def":
+            return parse_struct_def(lark_ast)
+        case "type_alias":
+            return parse_type_alias(lark_ast)
+        case _:
+            raise ValueError(f"Unknown statement type: {lark_ast.children[0].data}")
+    
+def parse_var_def(lark_ast: Tree) -> VarDecl:
+    assert lark_ast.data == "const_def" or lark_ast.data == "let_def"
+    
+    mutable: bool = lark_ast.data == "let_def"
+    name: str = lark_ast.children[0].value
+    
+    type: Optional[TypeAnnotation] = None
+    if lark_ast.children[1] != None:
+        type = parse_type_annotation(lark_ast.children[1])
+        
+    expr: Expr = parse_expr(lark_ast.children[2])
+
+    return VarDecl(mutable, name, type, expr)
+
+def parse_expr(lark_ast: Tree) -> Expr:
+    assert lark_ast.data == "expr"
+    
+    # TODO: Implement expression parsing
+    raise NotImplementedError("Expression parsing not implemented")
 
 if __name__ == "__main__":
     parser = Lark(cuss_grammar, parser='lalr', postlex=CussIndenter())
@@ -498,7 +540,7 @@ if __name__ == "__main__":
             content = f.read()
             if not content.strip():
                 print("Warning: example.cuss is empty. Parsing empty file.")
-            print(parser.parse(content).children[1].children[1].children[5:])
+            print(parser.parse(content).children[1].children[1])
     except FileNotFoundError:
         print("Error: example.cuss file not found")
     except Exception as e:

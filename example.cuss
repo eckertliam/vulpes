@@ -7,7 +7,7 @@ struct Point
     x: int
     y: int
 
-fn minus_and_square(a: int, b: int) -> int
+pub fn minus_and_square(a: int, b: int) -> int
     const diff = a - b
     const square = diff * diff
     return square
