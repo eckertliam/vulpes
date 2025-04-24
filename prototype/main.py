@@ -159,190 +159,200 @@ class Program:
         
     def push(self, declaration: 'Declaration'):
         self.declarations.append(declaration)
-        
-class Declaration:
-    def __init__(self, kind: str, pub: bool = False) -> None:
+
+class Node:
+    def __init__(self, kind: str, line: int) -> None:
         self.kind = kind
-        self.pub = pub
-        
-class TypeAnnotation:
+        self.line = line
+
+Declaration = Union['FnDecl', 'EnumDecl', 'StructDecl', 'TypeAliasDecl']
+
+Statement = Union['Expr', 'FnDecl', 'EnumDecl', 'StructDecl', 'TypeAliasDecl', 'VarDecl', 'Assign']
+
+class TypeAnnotation(Node):
     pass
 
 class NamedType(TypeAnnotation):
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str, line: int) -> None:
+        super().__init__("named_type", line)
         self.name = name
         
 class ArrayType(TypeAnnotation):
-    def __init__(self, elem_type: TypeAnnotation) -> None:
+    def __init__(self, elem_type: TypeAnnotation, line: int) -> None:
+        super().__init__("array_type", line)
         self.elem_type = elem_type
         
 class TupleType(TypeAnnotation):
-    def __init__(self, elem_types: list[TypeAnnotation]) -> None:
+    def __init__(self, elem_types: list[TypeAnnotation], line: int) -> None:
+        super().__init__("tuple_type", line)
         self.elem_types = elem_types
         
-Statement = Union['Expr', 'FnDecl', 'EnumDecl', 'StructDecl', 'TypeAliasDecl', 'VarDecl', 'Assign']
-        
 class FunctionType(TypeAnnotation):
-    def __init__(self, params: list[TypeAnnotation], ret_type: TypeAnnotation) -> None:
+    def __init__(self, params: list[TypeAnnotation], ret_type: TypeAnnotation, line: int) -> None:
+        super().__init__("function_type", line)
         self.params = params
         self.ret_type = ret_type
         
-class FnDecl(Declaration):
-    def __init__(self, pub: bool, name: str, params: list['Param'], ret_type: TypeAnnotation, body: list[Statement]) -> None:
-        super().__init__("fn_decl", pub)
+class FnDecl(Node):
+    def __init__(self, pub: bool, name: str, params: list['Param'], ret_type: TypeAnnotation, body: list[Statement], line: int) -> None:
+        super().__init__("fn_decl", line)
+        self.pub = pub
         self.name = name
         self.params = params
         self.ret_type = ret_type
         self.body = body
         
 class Param:
-    def __init__(self, name: str, type: TypeAnnotation) -> None:
+    def __init__(self, name: str, type: TypeAnnotation, line: int) -> None:
         self.name = name
         self.type = type
-        
+        self.line = line
     
-class StructDecl(Declaration):
-    def __init__(self, pub: bool, name: str, fields: list['StructField']) -> None:
-        super().__init__("struct_decl", pub)
+class StructDecl(Node):
+    def __init__(self, pub: bool, name: str, fields: list['StructField'], line: int) -> None:
+        super().__init__("struct_decl", line)
+        self.pub = pub
         self.name = name
         self.fields = fields
         
-class StructField:
-    def __init__(self, pub: bool, name: str, type: TypeAnnotation) -> None:
+class StructField(Node):
+    def __init__(self, pub: bool, name: str, type: TypeAnnotation, line: int) -> None:
+        super().__init__("struct_field", line)
         self.pub = pub
         self.name = name
         self.type = type
         
-class EnumDecl(Declaration):
-    def __init__(self, pub: bool, name: str, variants: list['EnumVariant']) -> None:
-        super().__init__("enum_decl", pub)
+class EnumDecl(Node):
+    def __init__(self, pub: bool, name: str, variants: list['EnumVariant'], line: int) -> None:
+        super().__init__("enum_decl", line)
+        self.pub = pub
         self.name = name
         self.variants = variants
         
-class EnumVariant:
-    pass
+class EnumVariant(Node):
+    def __init__(self, kind: str, name: str, line: int) -> None:
+        super().__init__(kind, line)
+        self.name = name
 
 class EnumUnitVariant(EnumVariant):
-    def __init__(self, name: str) -> None:
-        self.name = name
+    def __init__(self, name: str, line: int) -> None:
+        super().__init__("enum_unit_variant", name, line)
         
 class EnumTupleVariant(EnumVariant):
-    def __init__(self, name: str, types: list[TypeAnnotation]) -> None:
-        self.name = name
+    def __init__(self, name: str, types: list[TypeAnnotation], line: int) -> None:
+        super().__init__("enum_tuple_variant", name, line)
         self.types = types
         
 class EnumStructVariant(EnumVariant):
-    def __init__(self, name: str, fields: list['EnumStructField']) -> None:
-        self.name = name
+    def __init__(self, name: str, fields: list['EnumStructField'], line: int) -> None:
+        super().__init__("enum_struct_variant", name, line)
         self.fields = fields
         
-class EnumStructField:
-    def __init__(self, name: str, type: TypeAnnotation) -> None:
+class EnumStructField(Node):
+    def __init__(self, name: str, type: TypeAnnotation, line: int) -> None:
+        super().__init__("enum_struct_field", line)
         self.name = name
         self.type = type
 
-class TypeAliasDecl(Declaration):
-    def __init__(self, pub: bool, name: str, type: TypeAnnotation) -> None:
-        super().__init__("type_alias_decl", pub)
+class TypeAliasDecl(Node):
+    def __init__(self, pub: bool, name: str, type: TypeAnnotation, line: int) -> None:
+        super().__init__("type_alias_decl", line)
+        self.pub = pub
         self.name = name
         self.type = type
         
-class VarDecl(Declaration):
-    def __init__(self, mutable: bool, name: str, type: Optional[TypeAnnotation] = None, expr: Optional['Expr'] = None) -> None:
-        if mutable:
-            super().__init__("let_decl", False)
-        else:
-            super().__init__("const_decl", False)
+class VarDecl(Node):
+    def __init__(self, mutable: bool, name: str, type: Optional[TypeAnnotation], expr: 'Expr', line: int) -> None:
+        kind = "let_decl" if mutable else "const_decl"
+        super().__init__(kind, line)
         self.name = name
         self.type = type
         self.expr = expr
         
-class Assign(Declaration):
-    def __init__(self, name: str, expr: 'Expr') -> None:
-        super().__init__("assign_decl", False)
+class Assign(Node):
+    def __init__(self, name: str, expr: 'Expr', line: int) -> None:
+        super().__init__("assign_decl", line)
         self.name = name
         self.expr = expr
 
-class ImplDecl(Declaration):
-    def __init__(self, name: str, methods: list[FnDecl]) -> None:
-        super().__init__("impl_decl", False)
+class ImplDecl(Node):
+    def __init__(self, name: str, methods: list[FnDecl], line: int) -> None:
+        super().__init__("impl_decl", line)
         self.name = name
         self.methods = methods
 
-class Expr:
-    def __init__(self, kind: str) -> None:
-        self.kind = kind
+Expr = Union['Integer', 'Float', 'String', 'Char', 'Bool', 'Array', 'Ident', 'Call', 'GetIndex', 'GetAttr', 'CallAttr', 'BinaryOp', 'UnaryOp']
 
-class Integer(Expr):
-    def __init__(self, value: int) -> None:
-        super().__init__("integer")
+class Integer(Node):
+    def __init__(self, value: int, line: int) -> None:
+        super().__init__("integer", line)
         self.value = value
         
-class Float(Expr):
-    def __init__(self, value: float) -> None:
-        super().__init__("float")
+class Float(Node):
+    def __init__(self, value: float, line: int) -> None:
+        super().__init__("float", line)
         self.value = value
         
-class String(Expr):
-    def __init__(self, value: str) -> None:
-        super().__init__("string")
+class String(Node):
+    def __init__(self, value: str, line: int) -> None:
+        super().__init__("string", line)
         self.value = value
         
-class Char(Expr):
-    def __init__(self, value: str) -> None:
-        super().__init__("char")
+class Char(Node):
+    def __init__(self, value: str, line: int) -> None:
+        super().__init__("char", line)
         self.value = value
         
-class Bool(Expr):
-    def __init__(self, value: bool) -> None:
-        super().__init__("bool")
+class Bool(Node):
+    def __init__(self, value: bool, line: int) -> None:
+        super().__init__("bool", line)
         self.value = value
         
-class List(Expr):
-    def __init__(self, elems: list[Expr]) -> None:
-        super().__init__("list")
+class Array(Node):
+    def __init__(self, elems: list[Expr], line: int) -> None:
+        super().__init__("array", line)
         self.elems = elems
         
-class Ident(Expr):
-    def __init__(self, name: str) -> None:
-        super().__init__("ident")
+class Ident(Node):
+    def __init__(self, name: str, line: int) -> None:
+        super().__init__("ident", line)
         self.name = name
         
-class Call(Expr):
-    def __init__(self, name: str, args: list[Expr]) -> None:
-        super().__init__("call")
+class Call(Node):
+    def __init__(self, name: str, args: list[Expr], line: int) -> None:
+        super().__init__("call", line)
         self.name = name
         self.args = args
         
-class GetIndex(Expr):
-    def __init__(self, obj: Expr, index: Expr) -> None:
-        super().__init__("getindex")
+class GetIndex(Node):
+    def __init__(self, obj: Expr, index: Expr, line: int) -> None:
+        super().__init__("getindex", line)
         self.obj = obj
         self.index = index
         
-class GetAttr(Expr):
-    def __init__(self, obj: Expr, attr: str) -> None:
-        super().__init__("getattr")
+class GetAttr(Node):
+    def __init__(self, obj: Expr, attr: str, line: int) -> None:
+        super().__init__("getattr", line)
         self.obj = obj
         self.attr = attr
         
-class CallAttr(Expr):
-    def __init__(self, obj: Expr, attr: str, args: list[Expr]) -> None:
-        super().__init__("callattr")
+class CallAttr(Node):
+    def __init__(self, obj: Expr, attr: str, args: list[Expr], line: int) -> None:
+        super().__init__("callattr", line)
         self.obj = obj
         self.attr = attr
         self.args = args
   
-class BinaryOp(Expr):
-    def __init__(self, op: str, lhs: Expr, rhs: Expr) -> None:
-        super().__init__("binary_op")
+class BinaryOp(Node):
+    def __init__(self, op: str, lhs: Expr, rhs: Expr, line: int) -> None:
+        super().__init__("binary_op", line)
         self.op = op
         self.lhs = lhs
         self.rhs = rhs
         
-class UnaryOp(Expr):
-    def __init__(self, op: str, operand: Expr) -> None:
-        super().__init__("unary_op")
+class UnaryOp(Node):
+    def __init__(self, op: str, operand: Expr, line: int) -> None:
+        super().__init__("unary_op", line)
         self.op = op
         self.operand = operand
         
@@ -366,23 +376,23 @@ class ASTTransformer(Transformer):
 
     # ---------- type annotations ----------
     def named_type(self, items):
-        return NamedType(items[0].value)
+        return NamedType(items[0].value, items[0].line)
 
     def array_type(self, items):
         (elem_type,) = items
-        return ArrayType(elem_type)
+        return ArrayType(elem_type, elem_type.line)
 
     def tuple_type(self, items):
-        return TupleType(items)
+        return TupleType(items, items[0].line)
 
     def function_type(self, items):
         *params, ret = items
-        return FunctionType(params, ret)
+        return FunctionType(params, ret, ret.line)
 
     # ---------- parameters / fields ----------
     def param(self, items):
         name_tok, type_ann = items
-        return Param(name_tok.value, type_ann)
+        return Param(name_tok.value, type_ann, type_ann.line)
 
     def param_list(self, items):
         return items          # already Param objects
@@ -392,12 +402,12 @@ class ASTTransformer(Transformer):
         pub = items[idx] != None and items[idx].type == "PUB"; idx += 1
         name_tok = items[idx]; idx += 1
         type_ann = items[idx]
-        return StructField(pub, name_tok.value, type_ann)
+        return StructField(pub, name_tok.value, type_ann, type_ann.line)
 
     # ---------- enum helpers ----------
     def enum_struct_field(self, items):
         name_tok, type_ann = items
-        return EnumStructField(name_tok.value, type_ann)
+        return EnumStructField(name_tok.value, type_ann, type_ann.line)
 
     def enum_variant_list(self, items):
         return [it for it in items if not isinstance(it, Token)]
@@ -411,17 +421,17 @@ class ASTTransformer(Transformer):
         assert isinstance(items[0], Tree)
         assert len(items[0].children) == 1
         assert isinstance(items[0].children[0], Token)
-        return EnumUnitVariant(items[0].children[0].value)
+        return EnumUnitVariant(items[0].children[0].value, items[0].children[0].line)
 
     def tuple_enum_variant(self, items):
         # items: IDENT, type_annotation...
         name_tok, *type_list = items
-        return EnumTupleVariant(name_tok.value, type_list)
+        return EnumTupleVariant(name_tok.value, type_list, name_tok.line)
 
     def struct_enum_variant(self, items):
         # items: IDENT, struct_field...
         name_tok, *fields = items
-        return EnumStructVariant(name_tok.value, fields)
+        return EnumStructVariant(name_tok.value, fields, name_tok.line)
 
     # ---------- declarations ----------
     def fn_def(self, items):
@@ -431,21 +441,21 @@ class ASTTransformer(Transformer):
         params   = items[idx]; idx += 1
         ret_type = items[idx]; idx += 1
         body     = items[idx]
-        return FnDecl(pub, name_tok.value, params, ret_type, body)
+        return FnDecl(pub, name_tok.value, params, ret_type, body, name_tok.line)
 
     def struct_def(self, items):
         idx = 0
         pub = items[idx] != None and items[idx].type == "PUB"; idx += 1
         name_tok = items[idx]; idx += 1
         fields = items[idx] if len(items) > idx else []
-        return StructDecl(pub, name_tok.value, fields)
+        return StructDecl(pub, name_tok.value, fields, name_tok.line)
 
     def enum_def(self, items):
         idx = 0
         pub = items[idx] != None and items[idx].type == "PUB"; idx += 1
         name_tok = items[idx]; idx += 1
         variants = items[idx] if len(items) > idx else []
-        return EnumDecl(pub, name_tok.value, variants)
+        return EnumDecl(pub, name_tok.value, variants, name_tok.line)
 
     def type_alias(self, items):
         idx = 0
@@ -455,7 +465,7 @@ class ASTTransformer(Transformer):
             idx += 1
         name_tok = items[idx]; idx += 1
         type_ann = items[idx]
-        return TypeAliasDecl(pub, name_tok.value, type_ann)
+        return TypeAliasDecl(pub, name_tok.value, type_ann, name_tok.line)
 
     # ---------- statements ----------
     def statement(self, items):
@@ -471,7 +481,7 @@ class ASTTransformer(Transformer):
             type_ann, expr = rest
         else:
             type_ann, expr = None, rest[0]
-        return VarDecl(False, name_tok.value, type_ann, expr)
+        return VarDecl(False, name_tok.value, type_ann, expr, name_tok.line)
 
     def let_def(self, items):
         name_tok, *rest = items
@@ -479,20 +489,20 @@ class ASTTransformer(Transformer):
             type_ann, expr = rest
         else:
             type_ann, expr = None, rest[0]
-        return VarDecl(True, name_tok.value, type_ann, expr)
+        return VarDecl(True, name_tok.value, type_ann, expr, name_tok.line)
 
     def assign_stmt(self, items):
         name_tok, expr = items
-        return Assign(name_tok.value, expr)
+        return Assign(name_tok.value, expr, name_tok.line)
 
     # ---------- expressions ----------
-    def ident(self, items):        return Ident(items[0].value)
-    def int(self, items):          return Integer(int(items[0].value))
-    def float(self, items):        return Float(float(items[0].value))
-    def string(self, items):       return String(items[0][1:-1])
-    def char(self, items):         return Char(items[0].value)
-    def true(self, _):             return Bool(True)
-    def false(self, _):            return Bool(False)
+    def ident(self, items):        return Ident(items[0].value, items[0].line)
+    def int(self, items):          return Integer(int(items[0].value), items[0].line)
+    def float(self, items):        return Float(float(items[0].value), items[0].line)
+    def string(self, items):       return String(items[0][1:-1], items[0].line)
+    def char(self, items):         return Char(items[0].value, items[0].line)
+    def true(self, _items):             return Bool(True, _items[0].line)
+    def false(self, _items):            return Bool(False, _items[0].line)
     
     
 # Internal Type Representation
@@ -734,6 +744,21 @@ class TypeVar(Type):
     
     def __hash__(self) -> int:
         return hash(("typevar", self.name))
+    
+# Error handling
+class CussError(Exception):
+    def __init__(self, message: str, line: int) -> None:
+        super().__init__(f"[Line {line}] {message}")
+        self.line = line
+
+# Type mismatch etc        
+class TypeError(CussError): pass
+# Syntax errors
+class SyntaxError(CussError): pass
+# Attempting to mutate a constant 
+class MutabilityError(CussError): pass
+# Attempting to use an undefined name
+class NameError(CussError): pass
 
 # Track type and mutability of variables
 class VarBinding:
@@ -788,6 +813,9 @@ class Context:
             self.impl_bindings[name] = {}
         self.impl_bindings[name][method_name] = FunctionType(params, ret_type)
         
+    def get_impl(self, name: str, method_name: str) -> Optional[FunctionType]:
+        return self.impl_bindings.get(name, {}).get(method_name, None)
+
         
 
 if __name__ == "__main__":
