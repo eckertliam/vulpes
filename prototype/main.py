@@ -167,7 +167,7 @@ class Node:
 
 Declaration = Union['FnDecl', 'EnumDecl', 'StructDecl', 'TypeAliasDecl']
 
-Statement = Union['Expr', 'FnDecl', 'EnumDecl', 'StructDecl', 'TypeAliasDecl', 'VarDecl', 'Assign']
+Statement = Union['Expr', 'FnDecl', 'EnumDecl', 'StructDecl', 'TypeAliasDecl', 'VarDecl', 'Assign', 'Return']
 
 class TypeAnnotation(Node):
     pass
@@ -280,8 +280,13 @@ class ImplDecl(Node):
         super().__init__("impl_decl", line)
         self.name = name
         self.methods = methods
+        
+class Return(Node):
+    def __init__(self, expr: 'Expr', line: int) -> None:
+        super().__init__("return", line)
+        self.expr = expr
 
-Expr = Union['Integer', 'Float', 'String', 'Char', 'Bool', 'Array', 'Ident', 'Call', 'GetIndex', 'GetAttr', 'CallAttr', 'BinaryOp', 'UnaryOp']
+Expr = Union['Integer', 'Float', 'String', 'Char', 'Bool', 'Array', 'Ident', 'Call', 'GetIndex', 'GetAttr', 'CallAttr', 'BinaryOp', 'UnaryOp', 'Return']
 
 class Integer(Node):
     def __init__(self, value: int, line: int) -> None:
@@ -395,7 +400,7 @@ class ASTTransformer(Transformer):
         return Param(name_tok.value, type_ann, type_ann.line)
 
     def param_list(self, items):
-        return items          # already Param objects
+        return items
 
     def struct_field(self, items):
         idx = 0
@@ -469,7 +474,6 @@ class ASTTransformer(Transformer):
 
     # ---------- statements ----------
     def statement(self, items):
-        # Unwrap single child produced by each statement rule
         return items[0]
 
     def statement_list(self, items):
