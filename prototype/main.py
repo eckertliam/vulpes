@@ -749,8 +749,21 @@ class TypeVar(Type):
 class CussError(Exception):
     def __init__(self, message: str, line: int) -> None:
         super().__init__(f"[Line {line}] {message}")
+        self.message = message
         self.line = line
+        
+    def __str__(self) -> str:
+        return f"[Line {self.line}] {self.message}"
+    
+    def report(self, source: str) -> None:
+        lines = source.splitlines()
+        print(self)
+        # print the line with the error
+        print(lines[self.line - 1])
+        # print the error line
+        print(" " * (len(str(self.line)) + 2) + "^")
 
+    
 # Type mismatch etc        
 class TypeError(CussError): pass
 # Syntax errors
@@ -816,7 +829,54 @@ class Context:
     def get_impl(self, name: str, method_name: str) -> Optional[FunctionType]:
         return self.impl_bindings.get(name, {}).get(method_name, None)
 
+
+# Type checking
+class TypeChecker:
+    def __init__(self) -> None:
+        self.context = Context()
         
+    def check_program(self, program: Program, source: str) -> None:
+        errors: list[CussError] = []
+        for decl in program.declarations:
+            try:
+                self.check_declaration(decl)
+            except CussError as e:
+                errors.append(e)
+        if errors:
+            for error in errors:
+                error.report(source)
+            exit(1)
+            
+
+    def check_declaration(self, decl: Declaration) -> None:
+        match decl.kind:
+            case "fn_decl":
+                self.check_fn_decl(decl)
+            case "struct_decl":
+                self.check_struct_decl(decl)
+            case "enum_decl":
+                self.check_enum_decl(decl)
+            case "type_alias_decl":
+                self.check_type_alias_decl(decl)
+            case _:
+                raise RuntimeError(f"Unknown declaration kind: {decl.kind}")
+            
+    def check_fn_decl(self, decl: FnDecl) -> None:
+        # TODO: implement function declaration checking
+        raise NotImplementedError("Function declaration checking not implemented")
+    
+    def check_struct_decl(self, decl: StructDecl) -> None:
+        # TODO: implement struct declaration checking
+        raise NotImplementedError("Struct declaration checking not implemented")
+    
+    def check_enum_decl(self, decl: EnumDecl) -> None:
+        # TODO: implement enum declaration checking
+        raise NotImplementedError("Enum declaration checking not implemented")
+    
+    def check_type_alias_decl(self, decl: TypeAliasDecl) -> None:
+        # TODO: implement type alias declaration checking
+        raise NotImplementedError("Type alias declaration checking not implemented")
+
 
 if __name__ == "__main__":
     parser = Lark(cuss_grammar, 
