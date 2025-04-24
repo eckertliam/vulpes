@@ -1,5 +1,10 @@
-from typing import Optional, Union
-from lark import Lark, Tree, Token
+# This is a messy prototype of a Cuss compiler.
+# It is a loose example of what the final C++ compiler will look like.
+# It is not intended to be a full implementation of the language.
+# It is only intended to be a minimal proof of concept.
+
+from typing import Dict, Optional, Union, List
+from lark import Lark, Tree, Token, Transformer
 from lark.indenter import Indenter
 
 cuss_grammar = r"""
@@ -15,13 +20,14 @@ cuss_grammar = r"""
     
     ?program: definition_list
     
-    ?definition_list: definition _NL definition_list | definition [_NL]
+    ?definition_list: definition (_NL definition_list)?
     
     ?definition: fn_def
                 | enum_def
                 | struct_def
                 | type_alias
-    
+                | impl_def
+                
     ?statement_list: statement (_NL statement)* [_NL]
     
     statement: fn_def
@@ -33,9 +39,11 @@ cuss_grammar = r"""
              | const_def
              | let_def
              | impl_def
+             | assign_stmt
     
     const_def: "const" IDENT [":" type_annotation] "=" expr
     let_def: "let" IDENT [":" type_annotation] "=" expr
+    assign_stmt: IDENT "=" expr
     
     type_alias: [PUB] "type" IDENT "=" type_annotation
 
@@ -57,9 +65,9 @@ cuss_grammar = r"""
 
     enum_struct_field: IDENT ":" type_annotation
 
-    enum_variant: enum_tuple_variant -> tuple
-        | enum_unit_variant -> unit
-        | enum_struct_variant -> struct
+    enum_variant: enum_tuple_variant -> tuple_enum_variant
+        | enum_unit_variant -> unit_enum_variant
+        | enum_struct_variant -> struct_enum_variant
 
     struct_def: [PUB] "struct" IDENT _NL struct_field_list
     
@@ -172,7 +180,7 @@ class TupleType(TypeAnnotation):
     def __init__(self, elem_types: list[TypeAnnotation]) -> None:
         self.elem_types = elem_types
         
-Statement = Union['Expr', 'FnDecl', 'EnumDecl', 'StructDecl', 'TypeAliasDecl', 'VarDecl']
+Statement = Union['Expr', 'FnDecl', 'EnumDecl', 'StructDecl', 'TypeAliasDecl', 'VarDecl', 'Assign']
         
 class FunctionType(TypeAnnotation):
     def __init__(self, params: list[TypeAnnotation], ret_type: TypeAnnotation) -> None:
@@ -200,7 +208,8 @@ class StructDecl(Declaration):
         self.fields = fields
         
 class StructField:
-    def __init__(self, name: str, type: TypeAnnotation) -> None:
+    def __init__(self, pub: bool, name: str, type: TypeAnnotation) -> None:
+        self.pub = pub
         self.name = name
         self.type = type
         
@@ -247,6 +256,13 @@ class VarDecl(Declaration):
         self.name = name
         self.type = type
         self.expr = expr
+        
+class Assign(Declaration):
+    def __init__(self, name: str, expr: 'Expr') -> None:
+        super().__init__("assign_decl", False)
+        self.name = name
+        self.expr = expr
+
 class ImplDecl(Declaration):
     def __init__(self, name: str, methods: list[FnDecl]) -> None:
         super().__init__("impl_decl", False)
@@ -331,216 +347,461 @@ class UnaryOp(Expr):
         self.operand = operand
         
 # Lark to inhouse AST
-def lark_to_ast(lark_ast: Tree) -> Program:
-    assert isinstance(lark_ast, Tree)
-    # right now top level is always a definition list
-    assert lark_ast.data == "definition_list"
-    program = Program()
-    
-    for child in lark_ast.children:
-        match child.data:
-            case "fn_def":
-                program.push(parse_fn_def(child))
-            case "enum_def":
-                program.push(parse_enum_def(child))
-            case "struct_def":
-                program.push(parse_struct_def(child))
-            case "type_alias":
-                program.push(parse_type_alias(child))
-            case "impl_def":
-                # TODO: Implement impl def parsing
-                raise NotImplementedError("Impl def parsing not implemented")
-            case _:
-                raise ValueError(f"Unknown definition type: {child.data}")
-                
-    return program
+class ASTTransformer(Transformer):
+    """
+    Bottom‑up conversion from the raw Lark parse tree to the strongly‑typed
+    CUSS AST defined below.  Every method corresponds to a grammar rule.
+    """
 
-def parse_fn_def(lark_ast: Tree) -> FnDecl:
-    assert lark_ast.data == "fn_def"
-    
-    offset: int = 0
-    
-    pub: bool = lark_ast.children[offset].value == "pub"
-    if pub: offset += 1
-    name: str = lark_ast.children[offset].value
-    offset += 1
-    
-    params: list[Param] = parse_param_list(lark_ast.children[offset])
-    offset += 1
-    
-    ret_type: TypeAnnotation = parse_type_annotation(lark_ast.children[offset])
-    offset += 1
-    
-    body: list[Statement] = []
-    
-    assert lark_ast.children[offset].data == "statement_list"
-    
-    for child in lark_ast.children[offset].children:
-        body.append(parse_statement(child))
-        
-    return FnDecl(pub, name, params, ret_type, body)
+    # ---------- entry points ----------
+    def start(self, items):
+        # start : [_NL] program
+        return items[-1]
 
-def parse_param_list(lark_ast: Tree) -> Param:
-    assert lark_ast.data == "param_list"
-    
-    params: list[Param] = []
-    
-    for child in lark_ast.children:
-        assert child.data == "param"
-        name: str = child.children[0].value
-        type: TypeAnnotation = parse_type_annotation(child.children[1])
-        params.append(Param(name, type))
-        
-    return params
-            
+    def definition_list(self, defs):
+        program = Program()
+        for d in defs:
+            program.push(d)
+        return program
 
-def parse_enum_def(lark_ast: Tree) -> EnumDecl:
-    assert lark_ast.data == "enum_def"
-    
-    offset: int = 0
-    
-    pub: bool = lark_ast.children[offset].data == "pub"
-    if pub: offset += 1
-    name: str = lark_ast.children[offset].value
-    
-    offset += 1
-    
-    variants: list[EnumVariant] = []
-    
-    for child in lark_ast.children[offset].children:
-        match child.data:
-            case "enum_tuple_variant":
-                # TODO: Implement tuple variant parsing
-                raise NotImplementedError("Tuple variants not implemented")
-            case "enum_unit_variant":
-                variants.append(EnumUnitVariant(child.value))
-            case "enum_struct_variant":
-                # TODO: Implement struct variant parsing
-                raise NotImplementedError("Struct variants not implemented")
-            case _:
-                raise ValueError(f"Unknown variant type: {child.data}")
+    # ---------- type annotations ----------
+    def named_type(self, items):
+        return NamedType(items[0].value)
 
-    return EnumDecl(pub, name, variants)
+    def array_type(self, items):
+        (elem_type,) = items
+        return ArrayType(elem_type)
 
-def parse_struct_def(lark_ast: Tree) -> StructDecl:
-    assert lark_ast.data == "struct_def"
-    
-    offset: int = 0
-    
-    pub: bool = lark_ast.children[offset].data == "pub"
-    if pub: offset += 1
-    name: str = lark_ast.children[offset].value
-    
-    offset += 1
-    
-    fields: list[StructField] = []
-    
-    for child in lark_ast.children[offset].children:
-        if child.data == "struct_field":
-            fields.append(parse_struct_field(child))
+    def tuple_type(self, items):
+        return TupleType(items)
+
+    def function_type(self, items):
+        *params, ret = items
+        return FunctionType(params, ret)
+
+    # ---------- parameters / fields ----------
+    def param(self, items):
+        name_tok, type_ann = items
+        return Param(name_tok.value, type_ann)
+
+    def param_list(self, items):
+        return items          # already Param objects
+
+    def struct_field(self, items):
+        idx = 0
+        pub = items[idx] != None and items[idx].type == "PUB"; idx += 1
+        name_tok = items[idx]; idx += 1
+        type_ann = items[idx]
+        return StructField(pub, name_tok.value, type_ann)
+
+    # ---------- enum helpers ----------
+    def enum_struct_field(self, items):
+        name_tok, type_ann = items
+        return EnumStructField(name_tok.value, type_ann)
+
+    def enum_variant_list(self, items):
+        return [it for it in items if not isinstance(it, Token)]
+
+    def struct_field_list(self, items):
+        return [it for it in items if not isinstance(it, Token)]
+
+    def unit_enum_variant(self, items):
+        # the only item should be a tree with a single IDENT child
+        assert len(items) == 1
+        assert isinstance(items[0], Tree)
+        assert len(items[0].children) == 1
+        assert isinstance(items[0].children[0], Token)
+        return EnumUnitVariant(items[0].children[0].value)
+
+    def tuple_enum_variant(self, items):
+        # items: IDENT, type_annotation...
+        name_tok, *type_list = items
+        return EnumTupleVariant(name_tok.value, type_list)
+
+    def struct_enum_variant(self, items):
+        # items: IDENT, struct_field...
+        name_tok, *fields = items
+        return EnumStructVariant(name_tok.value, fields)
+
+    # ---------- declarations ----------
+    def fn_def(self, items):
+        idx = 0
+        pub = items[idx] != None and items[idx].type == "PUB"; idx += 1
+        name_tok = items[idx]; idx += 1
+        params   = items[idx]; idx += 1
+        ret_type = items[idx]; idx += 1
+        body     = items[idx]
+        return FnDecl(pub, name_tok.value, params, ret_type, body)
+
+    def struct_def(self, items):
+        idx = 0
+        pub = items[idx] != None and items[idx].type == "PUB"; idx += 1
+        name_tok = items[idx]; idx += 1
+        fields = items[idx] if len(items) > idx else []
+        return StructDecl(pub, name_tok.value, fields)
+
+    def enum_def(self, items):
+        idx = 0
+        pub = items[idx] != None and items[idx].type == "PUB"; idx += 1
+        name_tok = items[idx]; idx += 1
+        variants = items[idx] if len(items) > idx else []
+        return EnumDecl(pub, name_tok.value, variants)
+
+    def type_alias(self, items):
+        idx = 0
+        pub = False
+        if isinstance(items[idx], Token) and items[idx].type == "PUB":
+            pub = True
+            idx += 1
+        name_tok = items[idx]; idx += 1
+        type_ann = items[idx]
+        return TypeAliasDecl(pub, name_tok.value, type_ann)
+
+    # ---------- statements ----------
+    def statement(self, items):
+        # Unwrap single child produced by each statement rule
+        return items[0]
+
+    def statement_list(self, items):
+        return items
+
+    def const_def(self, items):
+        name_tok, *rest = items
+        if len(rest) == 2:
+            type_ann, expr = rest
         else:
-            raise ValueError(f"Unknown field type: {child.data}")
-    
-    return StructDecl(pub, name, fields)
-   
-def parse_struct_field(lark_ast: Tree) -> StructField:
-    assert lark_ast.data == "struct_field"
-    
-    offset: int = 0
-    
-    pub: bool = lark_ast.children[offset].data == "pub"
-    if pub: offset += 1
-    name: str = lark_ast.children[offset].value
-    
-    offset += 1
-    
-    type: TypeAnnotation = parse_type_annotation(lark_ast.children[offset])
-    
-    return StructField(name, type)
+            type_ann, expr = None, rest[0]
+        return VarDecl(False, name_tok.value, type_ann, expr)
 
-def parse_type_annotation(lark_ast: Tree) -> TypeAnnotation:
-    assert lark_ast.data == "type_annotation"
-    
-    match lark_ast.data:
-        case "named_type":
-            return NamedType(lark_ast.children[0].value)
-        case "array_type":
-            # TODO: make sure this is correct with some examples
-            return ArrayType(parse_type_annotation(lark_ast.children[0]))
-        case "tuple_type":
-            # TODO: make sure this is correct with some examples
-            types: list[TypeAnnotation] = []
-            for child in lark_ast.children[0].children:
-                types.append(parse_type_annotation(child))
-            return TupleType(types)
-        case "function_type":
-            # TODO: Implement function type parsing
-            raise NotImplementedError("Function types not implemented")
-        case _:
-            raise ValueError(f"Unknown type annotation: {lark_ast.children[0].data}")
-            
+    def let_def(self, items):
+        name_tok, *rest = items
+        if len(rest) == 2:
+            type_ann, expr = rest
+        else:
+            type_ann, expr = None, rest[0]
+        return VarDecl(True, name_tok.value, type_ann, expr)
 
-def parse_type_alias(lark_ast: Tree) -> TypeAliasDecl:
-    assert lark_ast.data == "type_alias"
-    
-    offset: int = 0
-    
-    pub: bool = lark_ast.children[offset].data == "pub"
-    if pub: offset += 1
-    name: str = lark_ast.children[offset].value
-    
-    offset += 1
-    
-    type: TypeAnnotation = parse_type_annotation(lark_ast.children[offset])
-    
-    return TypeAliasDecl(pub, name, type)
+    def assign_stmt(self, items):
+        name_tok, expr = items
+        return Assign(name_tok.value, expr)
 
-def parse_statement(lark_ast: Tree) -> Statement:
-    assert lark_ast.data == "statement"
+    # ---------- expressions ----------
+    def ident(self, items):        return Ident(items[0].value)
+    def int(self, items):          return Integer(int(items[0].value))
+    def float(self, items):        return Float(float(items[0].value))
+    def string(self, items):       return String(items[0][1:-1])
+    def char(self, items):         return Char(items[0].value)
+    def true(self, _):             return Bool(True)
+    def false(self, _):            return Bool(False)
     
-    # TODO: add support for impls, expression statements, and return statements
-    match lark_ast.children[0].data:
-        case "const_def" | "let_def":
-            return parse_var_def(lark_ast)
-        case "fn_def":
-            return parse_fn_def(lark_ast)
-        case "enum_def":
-            return parse_enum_def(lark_ast)
-        case "struct_def":
-            return parse_struct_def(lark_ast)
-        case "type_alias":
-            return parse_type_alias(lark_ast)
-        case _:
-            raise ValueError(f"Unknown statement type: {lark_ast.children[0].data}")
     
-def parse_var_def(lark_ast: Tree) -> VarDecl:
-    assert lark_ast.data == "const_def" or lark_ast.data == "let_def"
+# Internal Type Representation
+class Type:
+    def __str__(self) -> str:
+        raise NotImplementedError("Subclasses must implement __str__")
     
-    mutable: bool = lark_ast.data == "let_def"
-    name: str = lark_ast.children[0].value
+    def __eq__(self, other: 'Type') -> bool:
+        raise NotImplementedError("Subclasses must implement __eq__")
     
-    type: Optional[TypeAnnotation] = None
-    if lark_ast.children[1] != None:
-        type = parse_type_annotation(lark_ast.children[1])
+    def __ne__(self, other: 'Type') -> bool:
+        raise NotImplementedError("Subclasses must implement __ne__")
+    
+    def __hash__(self) -> int:
+        raise NotImplementedError("Subclasses must implement __hash__")
+    
+def resolve_type_alias(type: Type) -> Type:
+    while isinstance(type, TypeAliasType):
+        type = type.target_type
+    return type
+    
+class IntType(Type):
+    def __str__(self) -> str:
+        return "int"
+    
+    def __eq__(self, other: 'Type') -> bool:
+        return isinstance(resolve_type_alias(other), IntType)
+    
+    def __ne__(self, other: 'Type') -> bool:
+        return not isinstance(resolve_type_alias(other), IntType)
+    
+    def __hash__(self) -> int:
+        return hash("int")
+    
+class FloatType(Type):
+    def __str__(self) -> str:
+        return "float"
+    
+    def __eq__(self, other: 'Type') -> bool:
+        return isinstance(resolve_type_alias(other), FloatType)
+    
+    def __ne__(self, other: 'Type') -> bool:
+        return not isinstance(resolve_type_alias(other), FloatType)
+    
+    def __hash__(self) -> int:
+        return hash("float")
+    
+class StringType(Type):
+    def __str__(self) -> str:
+        return "string"
+    
+    def __eq__(self, other: 'Type') -> bool:
+        return isinstance(resolve_type_alias(other), StringType)
+    
+    def __ne__(self, other: 'Type') -> bool:
+        return not isinstance(resolve_type_alias(other), StringType)
+    
+    def __hash__(self) -> int:
+        return hash("string")
+    
+class BoolType(Type):
+    def __str__(self) -> str:
+        return "bool"
+    
+    def __eq__(self, other: 'Type') -> bool:
+        return isinstance(resolve_type_alias(other), BoolType)
+    
+    def __ne__(self, other: 'Type') -> bool:
+        return not isinstance(resolve_type_alias(other), BoolType)
+    
+    def __hash__(self) -> int:
+        return hash("bool")
+    
+class CharType(Type):
+    def __str__(self) -> str:
+        return "char"
+    
+    def __eq__(self, other: 'Type') -> bool:
+        return isinstance(resolve_type_alias(other), CharType)
+    
+    def __ne__(self, other: 'Type') -> bool:
+        return not isinstance(resolve_type_alias(other), CharType)
+    
+    def __hash__(self) -> int:
+        return hash("char")
+    
+class ArrayType(Type):
+    def __init__(self, elem_type: Type) -> None:
+        self.elem_type = elem_type
         
-    expr: Expr = parse_expr(lark_ast.children[2])
-
-    return VarDecl(mutable, name, type, expr)
-
-def parse_expr(lark_ast: Tree) -> Expr:
-    assert lark_ast.data == "expr"
+    def __str__(self) -> str:
+        return f"[{self.elem_type}]"
     
-    # TODO: Implement expression parsing
-    raise NotImplementedError("Expression parsing not implemented")
+    def __eq__(self, other: 'Type') -> bool:
+        return isinstance(resolve_type_alias(other), ArrayType) and self.elem_type == resolve_type_alias(other).elem_type
+    
+    def __ne__(self, other: 'Type') -> bool:
+        return not isinstance(resolve_type_alias(other), ArrayType) or self.elem_type != resolve_type_alias(other).elem_type
+    
+    def __hash__(self) -> int:
+        return hash(("array", hash(self.elem_type)))
+    
+class TupleType(Type):
+    def __init__(self, elem_types: list[Type]) -> None:
+        self.elem_types = elem_types
+        
+    def __str__(self) -> str:
+        return f"({', '.join(str(t) for t in self.elem_types)})"
+    
+    def __eq__(self, other: 'Type') -> bool:
+        return isinstance(resolve_type_alias(other), TupleType) and self.elem_types == resolve_type_alias(other).elem_types
+    
+    def __ne__(self, other: 'Type') -> bool:
+        return not isinstance(resolve_type_alias(other), TupleType) or self.elem_types != resolve_type_alias(other).elem_types
+    
+    def __hash__(self) -> int:
+        return hash(("tuple", tuple(hash(t) for t in self.elem_types)))
+    
+class FunctionType(Type):
+    def __init__(self, params: list[Type], ret_type: Type) -> None:
+        self.params = params
+        self.ret_type = ret_type
+        
+    def __str__(self) -> str:
+        return f"({', '.join(str(t) for t in self.params)}) -> {self.ret_type}"
+    
+    def __eq__(self, other: 'Type') -> bool:
+        return isinstance(resolve_type_alias(other), FunctionType) and self.params == resolve_type_alias(other).params and self.ret_type == resolve_type_alias(other).ret_type
+    
+    def __ne__(self, other: 'Type') -> bool:
+        return not isinstance(resolve_type_alias(other), FunctionType) or self.params != resolve_type_alias(other).params or self.ret_type != resolve_type_alias(other).ret_type
+    
+    def __hash__(self) -> int:
+        return hash(("fn", tuple(hash(t) for t in self.params), hash(self.ret_type)))
+
+# Struct Type
+class StructType(Type):
+    def __init__(self, name: str, fields: Dict[str, Type]) -> None:
+        self.name = name
+        self.fields = fields
+        
+    def __str__(self) -> str:
+        return f"{self.name} {{ {', '.join(f'{k}: {v}' for k, v in self.fields.items())} }}"
+    
+    def __eq__(self, other: 'Type') -> bool:
+        return isinstance(resolve_type_alias(other), StructType) and self.name == resolve_type_alias(other).name and self.fields == resolve_type_alias(other).fields
+    
+    def __ne__(self, other: 'Type') -> bool:
+        return not isinstance(resolve_type_alias(other), StructType) or self.name != resolve_type_alias(other).name or self.fields != resolve_type_alias(other).fields
+    
+    def __hash__(self) -> int:
+        return hash(("struct", self.name, tuple(sorted((k, hash(v)) for k, v in self.fields.items()))))
+
+# Handling enum variant types
+class EnumVariantType:
+    def __init__(self, name: str) -> None:
+        self.name = name
+    
+    def __str__(self) -> str: return self.name
+    
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, EnumVariantType) and self.name == other.name and self.__dict__ == other.__dict__
+    
+    def __ne__(self, other: object) -> bool:
+        return not isinstance(other, EnumVariantType) or self.name != other.name or self.__dict__ != other.__dict__
+    
+    def __hash__(self) -> int:
+        return hash((self.__class__.__name__, self.name, tuple(sorted(self.__dict__.items()))))
+    
+class EnumUnitVariantType(EnumVariantType):
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
+        
+
+class EnumTupleVariantType(EnumVariantType):
+    def __init__(self, name: str, types: list[Type]) -> None:
+        super().__init__(name)
+        self.types = types
+        
+    def __str__(self) -> str:
+        return f"{self.name} ({', '.join(str(t) for t in self.types)})"
+    
+    
+class EnumStructVariantType(EnumVariantType):
+    def __init__(self, name: str, fields: Dict[str, Type]) -> None:
+        super().__init__(name)
+        self.fields = fields
+        
+    def __str__(self) -> str:
+        return f"{self.name} {{ {', '.join(f'{k}: {v}' for k, v in self.fields.items())} }}"
+    
+    
+
+# Enum Type
+class EnumType(Type):
+    def __init__(self, name: str, variants: list[EnumVariantType]) -> None:
+        self.name = name
+        self.variants: Dict[str, EnumVariantType] = {v.name: v for v in variants}
+        
+    def __str__(self) -> str:
+        return f"{self.name} {{ {', '.join(str(v) for v in self.variants.values())} }}"
+    
+    def __eq__(self, other: 'Type') -> bool:
+        return isinstance(resolve_type_alias(other), EnumType) and self.name == resolve_type_alias(other).name and self.variants == resolve_type_alias(other).variants
+    
+    def __ne__(self, other: 'Type') -> bool:
+        return not isinstance(resolve_type_alias(other), EnumType) or self.name != resolve_type_alias(other).name or self.variants != resolve_type_alias(other).variants
+    
+    def __hash__(self) -> int:
+        return hash(("enum", self.name, tuple(sorted((k, hash(v)) for k, v in self.variants.items()))))
+
+class TypeAliasType(Type):
+    def __init__(self, name: str, target_type: Type) -> None:
+        self.name = name
+        self.target_type = target_type
+        
+    def __str__(self) -> str:
+        return f"{self.name} = {self.target_type}"
+    
+    def __eq__(self, other: 'Type') -> bool:
+        return isinstance(resolve_type_alias(other), TypeAliasType) and self.name == resolve_type_alias(other).name and self.target_type == resolve_type_alias(other).target_type
+    
+    def __ne__(self, other: 'Type') -> bool:
+        return not isinstance(resolve_type_alias(other), TypeAliasType) or self.name != resolve_type_alias(other).name or self.target_type != resolve_type_alias(other).target_type
+
+# For type inference
+class TypeVar(Type):
+    def __init__(self, name: str) -> None:
+        self.name = name
+        
+    def __str__(self) -> str:
+        return self.name
+    
+    def __eq__(self, other: 'Type') -> bool:
+        return isinstance(resolve_type_alias(other), TypeVar) and self.name == resolve_type_alias(other).name
+    
+    def __ne__(self, other: 'Type') -> bool:
+        return not isinstance(resolve_type_alias(other), TypeVar) or self.name != resolve_type_alias(other).name
+    
+    def __hash__(self) -> int:
+        return hash(("typevar", self.name))
+
+# Track type and mutability of variables
+class VarBinding:
+    def __init__(self, mutable: bool, type: Type) -> None:
+        self.mutable = mutable
+        self.type = type
+
+# Context for type checking, type inference, etc.
+class Context:
+    def __init__(self) -> None:
+        # top level type scope
+        self.named_types: Dict[str, Type] = {}
+        # track type bindings over scopes
+        self.var_bindings: list[Dict[str, VarBinding]] = [{}]
+        # function bindings
+        self.fn_bindings: Dict[str, FunctionType] = {}
+        # impl bindings struct -> method -> function type
+        self.impl_bindings: Dict[str, Dict[str, FunctionType]] = {}
+
+    def enter_scope(self) -> None:
+        self.var_bindings.append({})
+        
+    def exit_scope(self) -> None:
+        if len(self.var_bindings) > 1:
+            self.var_bindings.pop()
+        else:
+            raise RuntimeError("Cannot exit top scope")
+        
+    def bind_var(self, name: str, mutable: bool, type: Type) -> None:
+        self.var_bindings[-1][name] = VarBinding(mutable, type)
+        
+    def get_var(self, name: str) -> Optional[VarBinding]:
+        for scope in reversed(self.var_bindings):
+            if name in scope:
+                return scope[name]
+        return None
+    
+    def add_type(self, name: str, type: Type) -> None:
+        self.named_types[name] = type
+        
+    def get_type(self, name: str) -> Optional[Type]:
+        return self.named_types.get(name)
+    
+    def bind_fn(self, name: str, params: list[Type], ret_type: Type) -> None:
+        self.fn_bindings[name] = FunctionType(params, ret_type)
+        
+    def get_fn(self, name: str) -> Optional[FunctionType]:
+        return self.fn_bindings.get(name)
+    
+    def bind_impl(self, name: str, method_name: str, params: list[Type], ret_type: Type) -> None:
+        if name not in self.impl_bindings:
+            self.impl_bindings[name] = {}
+        self.impl_bindings[name][method_name] = FunctionType(params, ret_type)
+        
+        
 
 if __name__ == "__main__":
-    parser = Lark(cuss_grammar, parser='lalr', postlex=CussIndenter())
+    parser = Lark(cuss_grammar, 
+                  parser='lalr', 
+                  postlex=CussIndenter(),
+                  transformer=ASTTransformer())
     try:
         with open("example.cuss", "r") as f:
             content = f.read()
             if not content.strip():
                 print("Warning: example.cuss is empty. Parsing empty file.")
-            print(parser.parse(content).children[1].children[1])
+            ast = parser.parse(content)
+            print(ast)
     except FileNotFoundError:
         print("Error: example.cuss file not found")
     except Exception as e:
