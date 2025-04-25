@@ -10,4 +10,7 @@ struct Point
 pub fn minus_and_square(a: int, b: int) -> int
     const diff = a - b
     const square = diff * diff
-    return square
+    if square > 100
+        return square
+    else
+        return 0
