@@ -16,11 +16,11 @@ cuss_grammar = r"""
     %ignore WS_INLINE
     %declare _INDENT _DEDENT
     
-    ?start: [_NL] program
+    ?start: [_NL*] program
     
     ?program: definition_list
     
-    ?definition_list: definition (_NL definition)* [_NL]
+    ?definition_list: definition (_NL* definition)* [_NL*]
     
     ?definition: fn_def
                 | enum_def
@@ -28,7 +28,7 @@ cuss_grammar = r"""
                 | type_alias
                 | impl_def
                 
-    ?statement_list: statement (_NL statement)* [_NL]
+    ?statement_list: statement (_NL* statement)* [_NL*]
     
     statement: fn_def
              | expr -> expr_stmt
@@ -82,11 +82,7 @@ cuss_grammar = r"""
     
     struct_field: [PUB] IDENT ":" type_annotation
     
-    impl_def: "impl" IDENT _NL _INDENT method_list _DEDENT
-    
-    method_list: (method _NL)* method [_NL]
-    
-    method: fn_def
+    impl_def: "impl" IDENT _NL _INDENT fn_def (_NL* fn_def)* [_NL*] _DEDENT
     
     type_annotation: IDENT -> named_type
         | "[" type_annotation "]" -> array_type
@@ -115,26 +111,37 @@ cuss_grammar = r"""
         | sum "+" product -> add
         | sum "-" product -> sub
 
-    ?product: molecule
-        | product "*" molecule -> mul
-        | product "/" molecule -> div
+    ?product: unary
+        | product "*" unary -> mul
+        | product "/" unary -> div
+        
+    ?unary: "-" unary -> neg
+        | "!" unary -> not_
+        | molecule
 
     ?molecule: atom
-        | molecule LSQB expr RSQB -> getindex
-        | molecule LPAR arglist RPAR -> call
+        | molecule "[" expr "]" -> getindex
+        | molecule "(" arglist ")" -> call
         | molecule "." IDENT -> getattr
-        | molecule "." IDENT LPAR arglist RPAR -> callattr
-
+        | molecule "." IDENT "(" arglist ")" -> callattr
+        
     ?atom: IDENT -> ident
         | FLOAT -> float
         | INT -> int
         | STRING -> string
         | CHAR -> char
-        | LPAR expr RPAR -> paren_expr
-        | LSQB [expr ("," expr)*] RSQB -> list_expr
-        | LBRACE [expr ":" expr ("," expr ":" expr)*] RBRACE -> dict_expr
+        | "(" expr ")" -> paren_expr
         | "true" -> true
         | "false" -> false
+        | "[" expr ("," expr)* "]" -> array_expr
+        | IDENT "{" field_init_list "}" -> struct_expr
+        | IDENT "::" IDENT "{" field_init_list "}" -> enum_struct_expr
+        | IDENT "::" IDENT "(" [expr ("," expr)*] ")" -> enum_tuple_expr
+        | IDENT "::" IDENT -> enum_unit_expr
+        
+    field_init_list: [ field_init ("," field_init)* ]
+    field_init: IDENT ":" expr
+        
 
     arglist: [expr ("," expr)*]
     
@@ -171,9 +178,13 @@ class Program:
 
 
 class Node:
+    _next_id = 0  # class variable to track the next available ID
+
     def __init__(self, kind: str, line: int) -> None:
         self.kind = kind
         self.line = line
+        self.id = Node._next_id
+        Node._next_id += 1
 
 
 Declaration = Union["FnDecl", "EnumDecl", "StructDecl", "TypeAliasDecl"]
@@ -187,11 +198,11 @@ Statement = Union[
     "VarDecl",
     "Assign",
     "Return",
-    "IfStmt",
-    "WhileStmt",
-    "LoopStmt",
-    "BreakStmt",
-    "ContinueStmt",
+    "If",
+    "While",
+    "Loop",
+    "Break",
+    "Continue",
 ]
 
 
@@ -348,7 +359,7 @@ class ImplDecl(Node):
 
 
 class Return(Node):
-    def __init__(self, expr: "Expr", line: int) -> None:
+    def __init__(self, expr: Optional["Expr"], line: int) -> None:
         super().__init__("return", line)
         self.expr = expr
 
@@ -405,6 +416,10 @@ Expr = Union[
     "BinaryOp",
     "UnaryOp",
     "Return",
+    "StructExpr",
+    "EnumStructExpr",
+    "EnumTupleExpr",
+    "EnumUnitExpr",
 ]
 
 
@@ -443,6 +458,35 @@ class Array(Node):
         super().__init__("array", line)
         self.elems = elems
 
+class FieldInit(Node):
+    def __init__(self, name: str, expr: Expr, line: int) -> None:
+        super().__init__("field_init", line)
+        self.name = name
+        self.expr = expr
+
+class StructExpr(Node):
+    def __init__(self, name: str, fields: list[FieldInit], line: int) -> None:
+        super().__init__("struct_expr", line)
+        self.name = name
+        self.fields = fields
+
+class EnumStructExpr(Node):
+    def __init__(self, name: str, fields: list[FieldInit], line: int) -> None:
+        super().__init__("enum_struct_expr", line)
+        self.name = name
+        self.fields = fields
+
+class EnumTupleExpr(Node):
+    def __init__(self, name: str, elems: list[Expr], line: int) -> None:
+        super().__init__("enum_tuple_expr", line)
+        self.name = name
+        self.elems = elems
+
+class EnumUnitExpr(Node):
+    def __init__(self, name: str, unit: str, line: int) -> None:
+        super().__init__("enum_unit_expr", line)
+        self.name = name
+        self.unit = unit
 
 class Ident(Node):
     def __init__(self, name: str, line: int) -> None:
@@ -492,6 +536,8 @@ class UnaryOp(Node):
         super().__init__("unary_op", line)
         self.op = op
         self.operand = operand
+        
+
 
 
 # Lark to inhouse AST
@@ -614,6 +660,11 @@ class ASTTransformer(Transformer):
         type_ann = items[idx]
         return TypeAliasDecl(pub, name_tok.value, type_ann, name_tok.line)
 
+    def impl_def(self, items):
+        name_tok = items[0]
+        methods = items[1]
+        return ImplDecl(name_tok.value, methods, name_tok.line)
+
     # ---------- statements ----------
     def statement(self, items):
         return items[0]
@@ -649,7 +700,7 @@ class ASTTransformer(Transformer):
         cond = items[0]
         body = items[1]
         else_body = items[2] if len(items) > 2 else None
-        return If(cond, body, else_body, items[0].meta.line)
+        return If(cond, body, else_body, items[0].line)
 
     def while_stmt(self, items):
         cond = items[0]
@@ -665,15 +716,82 @@ class ASTTransformer(Transformer):
 
     def continue_stmt(self, items):
         return Continue(items[0].meta.line)
+    
+    def expr_stmt(self, items):
+        return items[0]
 
     # ---------- expressions ----------
-    # TODO: add support for array indexing
-    # TODO: add support for function calls
-    # TODO: add support for attribute access
-    # TODO: add support for method calls
-    # TODO: add support for field access
-    # TODO: add support for binary operations
-    # TODO: add support for unary operations
+    def getindex(self, items):
+        obj, index = items
+        return GetIndex(obj, index, obj.line)
+
+    def call(self, items):
+        name, args = items
+        return Call(name, args, name.line)
+    
+    def callattr(self, items):
+        obj, attr, args = items
+        return CallAttr(obj, attr, args, obj.line)
+
+    def getattr(self, items):
+        obj, attr = items
+        return GetAttr(obj, attr, obj.line)
+    
+    def or_(self, items):
+        lhs, rhs = items
+        return BinaryOp("or", lhs, rhs, lhs.line)
+    
+    def and_(self, items):
+        lhs, rhs = items
+        return BinaryOp("and", lhs, rhs, lhs.line)
+    
+    def eq(self, items):
+        lhs, rhs = items
+        return BinaryOp("==", lhs, rhs, lhs.line)
+    
+    def ne(self, items):
+        lhs, rhs = items
+        return BinaryOp("!=", lhs, rhs, lhs.line)
+    
+    def lt(self, items):
+        lhs, rhs = items
+        return BinaryOp("<", lhs, rhs, lhs.line)
+    
+    def le(self, items):
+        lhs, rhs = items
+        return BinaryOp("<=", lhs, rhs, lhs.line)
+    
+    def gt(self, items):
+        lhs, rhs = items
+        return BinaryOp(">", lhs, rhs, lhs.line)
+    
+    def ge(self, items):
+        lhs, rhs = items
+        return BinaryOp(">=", lhs, rhs, lhs.line)
+    
+    def add(self, items):
+        lhs, rhs = items
+        return BinaryOp("+", lhs, rhs, lhs.line)
+    
+    def sub(self, items):
+        lhs, rhs = items
+        return BinaryOp("-", lhs, rhs, lhs.line)
+    
+    def mul(self, items):
+        lhs, rhs = items
+        return BinaryOp("*", lhs, rhs, lhs.line)
+    
+    def div(self, items):
+        lhs, rhs = items
+        return BinaryOp("/", lhs, rhs, lhs.line)
+    
+    def neg(self, items):
+        operand = items[0]
+        return UnaryOp("-", operand, operand.line)
+    
+    def not_(self, items):
+        operand = items[0]
+        return UnaryOp("!", operand, operand.line)
     
     def ident(self, items):
         return Ident(items[0].value, items[0].line)
@@ -695,7 +813,38 @@ class ASTTransformer(Transformer):
 
     def false(self, _items):
         return Bool(False, _items[0].line)
+    
+    def paren_expr(self, items):
+        return items[0]
 
+    def array_expr(self, items):
+        return Array(items[1], items[0].line)
+    
+    def field_init(self, items):
+        name_tok, expr = items
+        return FieldInit(name_tok.value, expr, name_tok.line)
+    
+    def field_init_list(self, items):
+        return items
+    
+    def struct_expr(self, items):
+        name_tok, *fields = items
+        return StructExpr(name_tok.value, fields, name_tok.line)
+    
+    def enum_struct_expr(self, items):
+        name_tok, *fields = items
+        return EnumStructExpr(name_tok.value, fields, name_tok.line)
+    
+    def enum_tuple_expr(self, items):
+        name_tok, *elems = items
+        return EnumTupleExpr(name_tok.value, elems, name_tok.line)
+    
+    def enum_unit_expr(self, items):
+        name_tok = items[0]
+        unit_tok = items[1]
+        return EnumUnitExpr(name_tok.value, unit_tok.value, name_tok.line)
+    
+    
 
 # Internal Type Representation
 class Type:
@@ -1221,4 +1370,9 @@ if __name__ == "__main__":
     except FileNotFoundError:
         print("Error: example.cuss file not found")
     except Exception as e:
+        # traceback
+        import traceback
+        tb = traceback.extract_tb(e.__traceback__)
+        last_frame = tb[-1]
         print(f"Error parsing: {e}")
+        print(f"File: {last_frame.filename}, Line: {last_frame.lineno}")
