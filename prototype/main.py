@@ -16,11 +16,9 @@ cuss_grammar = r"""
     %ignore WS_INLINE
     %declare _INDENT _DEDENT
     
-    ?start: [_NL*] program
+    start: [_NL*] definition_list
     
-    ?program: definition_list
-    
-    ?definition_list: definition (_NL* definition)* [_NL*]
+    definition_list: (definition (_NL* definition)* [_NL*])?
     
     ?definition: fn_def
                 | enum_def
@@ -28,7 +26,7 @@ cuss_grammar = r"""
                 | type_alias
                 | impl_def
                 
-    ?statement_list: statement (_NL* statement)* [_NL*]
+    statement_list: (statement (_NL* statement)* [_NL*])?
     
     statement: fn_def
              | expr -> expr_stmt
@@ -458,11 +456,13 @@ class Array(Node):
         super().__init__("array", line)
         self.elems = elems
 
+
 class FieldInit(Node):
     def __init__(self, name: str, expr: Expr, line: int) -> None:
         super().__init__("field_init", line)
         self.name = name
         self.expr = expr
+
 
 class StructExpr(Node):
     def __init__(self, name: str, fields: list[FieldInit], line: int) -> None:
@@ -470,11 +470,13 @@ class StructExpr(Node):
         self.name = name
         self.fields = fields
 
+
 class EnumStructExpr(Node):
     def __init__(self, name: str, fields: list[FieldInit], line: int) -> None:
         super().__init__("enum_struct_expr", line)
         self.name = name
         self.fields = fields
+
 
 class EnumTupleExpr(Node):
     def __init__(self, name: str, elems: list[Expr], line: int) -> None:
@@ -482,11 +484,13 @@ class EnumTupleExpr(Node):
         self.name = name
         self.elems = elems
 
+
 class EnumUnitExpr(Node):
     def __init__(self, name: str, unit: str, line: int) -> None:
         super().__init__("enum_unit_expr", line)
         self.name = name
         self.unit = unit
+
 
 class Ident(Node):
     def __init__(self, name: str, line: int) -> None:
@@ -536,8 +540,6 @@ class UnaryOp(Node):
         super().__init__("unary_op", line)
         self.op = op
         self.operand = operand
-        
-
 
 
 # Lark to inhouse AST
@@ -549,8 +551,7 @@ class ASTTransformer(Transformer):
 
     # ---------- entry points ----------
     def start(self, items):
-        # start : [_NL] program
-        return items[-1]
+        return items[0] if items else Program()
 
     def definition_list(self, defs):
         program = Program()
@@ -670,7 +671,12 @@ class ASTTransformer(Transformer):
         return items[0]
 
     def statement_list(self, items):
-        return items
+        # items may be [] (empty), or a list of statements, or a single statement
+        if not items:
+            return []
+        if isinstance(items[0], list):
+            return items[0]
+        return [items[0]]
 
     def const_def(self, items):
         name_tok, *rest = items
@@ -716,7 +722,7 @@ class ASTTransformer(Transformer):
 
     def continue_stmt(self, items):
         return Continue(items[0].meta.line)
-    
+
     def expr_stmt(self, items):
         return items[0]
 
@@ -728,7 +734,7 @@ class ASTTransformer(Transformer):
     def call(self, items):
         name, args = items
         return Call(name, args, name.line)
-    
+
     def callattr(self, items):
         obj, attr, args = items
         return CallAttr(obj, attr, args, obj.line)
@@ -736,63 +742,63 @@ class ASTTransformer(Transformer):
     def getattr(self, items):
         obj, attr = items
         return GetAttr(obj, attr, obj.line)
-    
+
     def or_(self, items):
         lhs, rhs = items
         return BinaryOp("or", lhs, rhs, lhs.line)
-    
+
     def and_(self, items):
         lhs, rhs = items
         return BinaryOp("and", lhs, rhs, lhs.line)
-    
+
     def eq(self, items):
         lhs, rhs = items
         return BinaryOp("==", lhs, rhs, lhs.line)
-    
+
     def ne(self, items):
         lhs, rhs = items
         return BinaryOp("!=", lhs, rhs, lhs.line)
-    
+
     def lt(self, items):
         lhs, rhs = items
         return BinaryOp("<", lhs, rhs, lhs.line)
-    
+
     def le(self, items):
         lhs, rhs = items
         return BinaryOp("<=", lhs, rhs, lhs.line)
-    
+
     def gt(self, items):
         lhs, rhs = items
         return BinaryOp(">", lhs, rhs, lhs.line)
-    
+
     def ge(self, items):
         lhs, rhs = items
         return BinaryOp(">=", lhs, rhs, lhs.line)
-    
+
     def add(self, items):
         lhs, rhs = items
         return BinaryOp("+", lhs, rhs, lhs.line)
-    
+
     def sub(self, items):
         lhs, rhs = items
         return BinaryOp("-", lhs, rhs, lhs.line)
-    
+
     def mul(self, items):
         lhs, rhs = items
         return BinaryOp("*", lhs, rhs, lhs.line)
-    
+
     def div(self, items):
         lhs, rhs = items
         return BinaryOp("/", lhs, rhs, lhs.line)
-    
+
     def neg(self, items):
         operand = items[0]
         return UnaryOp("-", operand, operand.line)
-    
+
     def not_(self, items):
         operand = items[0]
         return UnaryOp("!", operand, operand.line)
-    
+
     def ident(self, items):
         return Ident(items[0].value, items[0].line)
 
@@ -813,38 +819,52 @@ class ASTTransformer(Transformer):
 
     def false(self, _items):
         return Bool(False, _items[0].line)
-    
+
     def paren_expr(self, items):
         return items[0]
 
     def array_expr(self, items):
         return Array(items[1], items[0].line)
-    
+
     def field_init(self, items):
         name_tok, expr = items
         return FieldInit(name_tok.value, expr, name_tok.line)
-    
+
     def field_init_list(self, items):
         return items
-    
+
     def struct_expr(self, items):
         name_tok, *fields = items
         return StructExpr(name_tok.value, fields, name_tok.line)
-    
+
     def enum_struct_expr(self, items):
         name_tok, *fields = items
         return EnumStructExpr(name_tok.value, fields, name_tok.line)
-    
+
     def enum_tuple_expr(self, items):
         name_tok, *elems = items
         return EnumTupleExpr(name_tok.value, elems, name_tok.line)
-    
+
     def enum_unit_expr(self, items):
         name_tok = items[0]
         unit_tok = items[1]
         return EnumUnitExpr(name_tok.value, unit_tok.value, name_tok.line)
-    
-    
+
+
+parser = Lark(
+    cuss_grammar,
+    parser="lalr",
+    postlex=CussIndenter(),
+    transformer=ASTTransformer(),
+)
+
+
+def parse(source: str) -> Program:
+    program: Optional[Program] = parser.parse(source)
+    if program is None:
+        return Program()
+    return program
+
 
 # Internal Type Representation
 class Type:
@@ -1353,12 +1373,6 @@ class SemanticAnalyzer:
 
 
 if __name__ == "__main__":
-    parser = Lark(
-        cuss_grammar,
-        parser="lalr",
-        postlex=CussIndenter(),
-        transformer=ASTTransformer(),
-    )
     try:
         with open("example.cuss", "r") as f:
             content = f.read()
@@ -1372,6 +1386,7 @@ if __name__ == "__main__":
     except Exception as e:
         # traceback
         import traceback
+
         tb = traceback.extract_tb(e.__traceback__)
         last_frame = tb[-1]
         print(f"Error parsing: {e}")
