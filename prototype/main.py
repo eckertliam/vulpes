@@ -671,12 +671,7 @@ class ASTTransformer(Transformer):
         return items[0]
 
     def statement_list(self, items):
-        # items may be [] (empty), or a list of statements, or a single statement
-        if not items:
-            return []
-        if isinstance(items[0], list):
-            return items[0]
-        return [items[0]]
+        return items
 
     def const_def(self, items):
         name_tok, *rest = items

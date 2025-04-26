@@ -1,4 +1,4 @@
-from main import parse, Program, FnDecl, Statement, Return, Integer
+from main import BinaryOp, EnumDecl, Ident, If, StructDecl, VarDecl, parse, Program, FnDecl, Statement, Return, Integer
 import pytest
 import textwrap
 
@@ -27,3 +27,98 @@ def test_simple_fn_decl():
     expr = return_stmt.expr
     assert isinstance(expr, Integer)
     assert expr.value == 0
+    
+def test_fn_w_params():
+    source = textwrap.dedent('''
+    fn add(a: int, b: int) -> int
+        return a + b
+    ''')
+    program = parse(source)
+    assert isinstance(program, Program)
+    assert len(program.declarations) == 1
+    fn_decl = program.declarations[0]
+    assert isinstance(fn_decl, FnDecl)
+    assert fn_decl.pub == False
+    assert fn_decl.name == "add"
+    assert len(fn_decl.params) == 2
+    assert fn_decl.params[0].name == "a" and fn_decl.params[0].type.name == "int"
+    assert fn_decl.params[1].name == "b" and fn_decl.params[1].type.name == "int"
+    assert fn_decl.ret_type.name == "int"
+    assert len(fn_decl.body) == 1
+    return_stmt = fn_decl.body[0]
+    assert isinstance(return_stmt, Return)
+    expr = return_stmt.expr
+    assert isinstance(expr, BinaryOp)
+    assert expr.op == "+"
+    assert isinstance(expr.lhs, Ident)
+    assert expr.lhs.name == "a"
+    assert isinstance(expr.rhs, Ident)
+    assert expr.rhs.name == "b"
+    
+def test_struct_decl():
+    source = textwrap.dedent('''
+    struct Point
+        x: int
+        y: int
+    ''')
+    program = parse(source)
+    assert isinstance(program, Program)
+    assert len(program.declarations) == 1
+    struct_decl = program.declarations[0]
+    assert isinstance(struct_decl, StructDecl)
+    assert struct_decl.name == "Point"
+    assert len(struct_decl.fields) == 2
+    assert struct_decl.fields[0].name == "x" and struct_decl.fields[0].type.name == "int"
+    assert struct_decl.fields[1].name == "y" and struct_decl.fields[1].type.name == "int"
+    
+    
+def test_simple_enum_decl():
+    source = textwrap.dedent('''
+    enum Color
+        Red
+        Green
+        Blue
+    ''')
+    program = parse(source)
+    assert isinstance(program, Program)
+    assert len(program.declarations) == 1
+    enum_decl = program.declarations[0]
+    assert isinstance(enum_decl, EnumDecl)
+    assert enum_decl.name == "Color"
+    assert len(enum_decl.variants) == 3
+    assert enum_decl.variants[0].name == "Red"
+    assert enum_decl.variants[1].name == "Green"
+    assert enum_decl.variants[2].name == "Blue"
+    
+def test_if_stmt():
+    source = textwrap.dedent('''
+    fn main() -> int
+        const a = 10
+        const b = 20
+        if a > b
+            return a
+        else if a < b
+            return b
+        else
+            return 0
+    ''')
+    program = parse(source)
+    fn_body = program.declarations[0].body
+    const_a = fn_body[0]
+    assert isinstance(const_a, VarDecl)
+    assert const_a.name == "a"
+    assert isinstance(const_a.expr, Integer)
+    assert const_a.expr.value == 10
+    const_b = fn_body[1]
+    assert isinstance(const_b, VarDecl)
+    assert const_b.name == "b"
+    assert isinstance(const_b.expr, Integer)
+    assert const_b.expr.value == 20
+    if_stmt = fn_body[2]
+    assert isinstance(if_stmt, If)
+    assert isinstance(if_stmt.cond, BinaryOp)
+    assert if_stmt.cond.op == ">"
+    ret_on_true = if_stmt.body[0]
+    assert isinstance(ret_on_true, Return)
+    # TODO: test the else if and else branches
+    
