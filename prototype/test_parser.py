@@ -1,4 +1,4 @@
-from main import BinaryOp, EnumDecl, Ident, If, StructDecl, VarDecl, parse, Program, FnDecl, Statement, Return, Integer
+from main import Assign, BinaryOp, Break, EnumDecl, Ident, If, Loop, StructDecl, VarDecl, While, parse, Program, FnDecl, Statement, Return, Integer
 import pytest
 import textwrap
 
@@ -120,5 +120,74 @@ def test_if_stmt():
     assert if_stmt.cond.op == ">"
     ret_on_true = if_stmt.body[0]
     assert isinstance(ret_on_true, Return)
-    # TODO: test the else if and else branches
+    assert isinstance(if_stmt.else_body, If)
+    else_if_stmt = if_stmt.else_body
+    assert isinstance(else_if_stmt.cond, BinaryOp)
+    assert else_if_stmt.cond.op == "<"
+    ret_on_else_if = else_if_stmt.body[0]
+    assert isinstance(ret_on_else_if, Return)
+    assert isinstance(else_if_stmt.else_body, list)
+    ret_on_else = else_if_stmt.else_body[0]
+    assert isinstance(ret_on_else, Return)
+    assert isinstance(ret_on_else.expr, Integer)
+    assert ret_on_else.expr.value == 0
     
+def test_while_stmt():
+    source = textwrap.dedent('''
+    fn main() -> int
+        let a = 10
+        while a > 0
+            a = a - 1
+        return a
+    ''')
+    program = parse(source)
+    fn_body = program.declarations[0].body
+    while_stmt = fn_body[1]
+    assert isinstance(while_stmt, While)
+    assert isinstance(while_stmt.cond, BinaryOp)
+    assert while_stmt.cond.op == ">"
+    assert isinstance(while_stmt.body, list)
+    assert len(while_stmt.body) == 1
+    assert isinstance(while_stmt.body[0], Assign)
+    assert isinstance(fn_body[2], Return)
+    
+def test_assigns():
+    source = textwrap.dedent('''
+    fn main() -> int
+        let a = 10
+        a = a + 1
+        const b = a
+        a = b + 1
+        return a
+    ''')
+    program = parse(source)
+    fn_body = program.declarations[0].body
+    assert isinstance(fn_body[0], VarDecl)
+    assert fn_body[0].name == "a"
+    assert isinstance(fn_body[0].expr, Integer)
+    assert fn_body[0].expr.value == 10
+    assert isinstance(fn_body[1], Assign)
+    assert isinstance(fn_body[2], VarDecl)
+    assert isinstance(fn_body[3], Assign)
+    
+def test_loop():
+    source = textwrap.dedent('''
+    fn main() -> int
+        let a = 10
+        loop
+            a = a - 1
+            if a == 0
+                break
+        return a
+    ''')
+    program = parse(source)
+    fn_body = program.declarations[0].body
+    assert isinstance(fn_body[0], VarDecl)
+    assert isinstance(fn_body[1], Loop)
+    loop_body = fn_body[1].body
+    assert isinstance(loop_body[0], Assign)
+    assert isinstance(loop_body[1], If)
+    if_stmt = loop_body[1]
+    assert isinstance(if_stmt.cond, BinaryOp)
+    assert isinstance(if_stmt.body[0], Break)
+    assert isinstance(fn_body[2], Return)

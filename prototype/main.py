@@ -43,8 +43,8 @@ cuss_grammar = r"""
     if_stmt: "if" expr _NL _INDENT statement_list _DEDENT ["else" (if_stmt | _NL _INDENT statement_list _DEDENT)] -> if_stmt
     while_stmt: "while" expr _NL _INDENT statement_list _DEDENT -> while_stmt
     loop_stmt: "loop" _NL _INDENT statement_list _DEDENT -> loop_stmt
-    break_stmt: "break" -> break_stmt
-    continue_stmt: "continue" -> continue_stmt
+    break_stmt: BREAK -> break_stmt
+    continue_stmt: CONTINUE -> continue_stmt
     
     const_def: "const" IDENT [":" type_annotation] "=" expr
     let_def: "let" IDENT [":" type_annotation] "=" expr
@@ -143,6 +143,8 @@ cuss_grammar = r"""
 
     arglist: [expr ("," expr)*]
     
+    BREAK: "break"
+    CONTINUE: "continue"
     PUB: "pub"
     LPAR: "("
     RPAR: ")"
@@ -710,13 +712,13 @@ class ASTTransformer(Transformer):
 
     def loop_stmt(self, items):
         body = items[0]
-        return Loop(body, items[0].line)
+        return Loop(body, body[0].line)
 
     def break_stmt(self, items):
-        return Break(items[0].meta.line)
+        return Break(items[0].line)
 
     def continue_stmt(self, items):
-        return Continue(items[0].meta.line)
+        return Continue(items[0].line)
 
     def expr_stmt(self, items):
         return items[0]
