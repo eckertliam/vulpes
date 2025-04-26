@@ -293,14 +293,23 @@ def test_impl():
     impl Animal
         fn make_sound() -> str
             return "Woof"
+
+        fn move() -> void
+            print("Moving")
     ''')
     program = parse(source)
     impl_decl = program.declarations[0]
     assert isinstance(impl_decl, ImplDecl)
     assert impl_decl.name == "Animal"
-    assert len(impl_decl.methods) == 1
+    assert len(impl_decl.methods) == 2
     method = impl_decl.methods[0]
     assert isinstance(method, FnDecl)
     assert method.name == "make_sound"
     assert method.ret_type.name == "str"
+    method = impl_decl.methods[1]
+    assert isinstance(method, FnDecl)
+    assert method.name == "move"
+    assert method.ret_type.name == "void"
+    
+    
     
