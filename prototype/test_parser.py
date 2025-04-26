@@ -1,4 +1,4 @@
-from main import Assign, BinaryOp, Break, Continue, EnumDecl, Ident, If, Loop, StructDecl, VarDecl, While, parse, Program, FnDecl, Statement, Return, Integer
+from main import Array, Assign, BinaryOp, Break, Continue, EnumDecl, GetIndex, Ident, If, Loop, StructDecl, VarDecl, While, parse, Program, FnDecl, Statement, Return, Integer
 import pytest
 import textwrap
 
@@ -207,3 +207,28 @@ def test_loop():
     assert isinstance(if_stmt.body[0], Break)
     assert isinstance(fn_body[2], Return)
 
+def test_array_expr():
+    source = textwrap.dedent('''
+    fn main() -> int
+        const a = [1, 2, 3]
+        return a[0]
+    ''')
+    program = parse(source)
+    fn_body = program.declarations[0].body
+    assert isinstance(fn_body[0], VarDecl)
+    const_a = fn_body[0]
+    assert isinstance(const_a.expr, Array)
+    assert len(const_a.expr.elems) == 3
+    assert isinstance(const_a.expr.elems[0], Integer)
+    assert const_a.expr.elems[0].value == 1
+    assert isinstance(const_a.expr.elems[1], Integer)
+    assert const_a.expr.elems[1].value == 2
+    assert isinstance(const_a.expr.elems[2], Integer)
+    assert const_a.expr.elems[2].value == 3
+    assert isinstance(fn_body[1], Return)
+    return_stmt = fn_body[1]
+    assert isinstance(return_stmt.expr, GetIndex)
+    assert isinstance(return_stmt.expr.obj, Ident)
+    assert return_stmt.expr.obj.name == "a"
+    assert isinstance(return_stmt.expr.index, Integer)
+    assert return_stmt.expr.index.value == 0

@@ -821,7 +821,7 @@ class ASTTransformer(Transformer):
         return items[0]
 
     def array_expr(self, items):
-        return Array(items[1], items[0].line)
+        return Array(items, items[0].line)
 
     def field_init(self, items):
         name_tok, expr = items
