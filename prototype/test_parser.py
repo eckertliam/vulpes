@@ -1,4 +1,4 @@
-from main import Assign, BinaryOp, Break, EnumDecl, Ident, If, Loop, StructDecl, VarDecl, While, parse, Program, FnDecl, Statement, Return, Integer
+from main import Assign, BinaryOp, Break, Continue, EnumDecl, Ident, If, Loop, StructDecl, VarDecl, While, parse, Program, FnDecl, Statement, Return, Integer
 import pytest
 import textwrap
 
@@ -150,7 +150,22 @@ def test_while_stmt():
     assert len(while_stmt.body) == 1
     assert isinstance(while_stmt.body[0], Assign)
     assert isinstance(fn_body[2], Return)
+
+def test_continue_stmt():
+    source = textwrap.dedent('''
+    fn main() -> int
+        loop
+            continue
+        return 0
+    ''')
+    program = parse(source)
+    fn_body = program.declarations[0].body
+    assert isinstance(fn_body[0], Loop)
+    loop_body = fn_body[0].body
+    assert isinstance(loop_body[0], Continue)
     
+    
+
 def test_assigns():
     source = textwrap.dedent('''
     fn main() -> int
@@ -191,3 +206,4 @@ def test_loop():
     assert isinstance(if_stmt.cond, BinaryOp)
     assert isinstance(if_stmt.body[0], Break)
     assert isinstance(fn_body[2], Return)
+
