@@ -665,7 +665,7 @@ class ASTTransformer(Transformer):
 
     def impl_def(self, items):
         name_tok = items[0]
-        methods = items[1]
+        methods = items[1:]
         return ImplDecl(name_tok.value, methods, name_tok.line)
 
     # ---------- statements ----------

@@ -1,4 +1,4 @@
-from main import Array, Assign, BinaryOp, Break, Continue, EnumDecl, GetIndex, Ident, If, Loop, StructDecl, VarDecl, While, parse, Program, FnDecl, Statement, Return, Integer
+from main import Array, Assign, BinaryOp, Break, Continue, EnumDecl, GetIndex, Ident, If, ImplDecl, Loop, StructDecl, VarDecl, While, parse, Program, FnDecl, Statement, Return, Integer
 import pytest
 import textwrap
 
@@ -232,3 +232,75 @@ def test_array_expr():
     assert return_stmt.expr.obj.name == "a"
     assert isinstance(return_stmt.expr.index, Integer)
     assert return_stmt.expr.index.value == 0
+
+
+def test_binary_expr_chaining():
+    source = textwrap.dedent('''
+    fn main() -> int
+        const result = 1 + 2 * 3
+        return result
+    ''')
+    program = parse(source)
+    fn_body = program.declarations[0].body
+    const_result = fn_body[0]
+    assert isinstance(const_result, VarDecl)
+    expr = const_result.expr
+    assert isinstance(expr, BinaryOp)
+    assert expr.op == "+"
+    assert isinstance(expr.lhs, Integer)
+    assert expr.lhs.value == 1
+    assert isinstance(expr.rhs, BinaryOp)
+    assert expr.rhs.op == "*"
+    assert isinstance(expr.rhs.lhs, Integer)
+    assert expr.rhs.lhs.value == 2
+    assert isinstance(expr.rhs.rhs, Integer)
+    assert expr.rhs.rhs.value == 3
+    return_stmt = fn_body[1]
+    assert isinstance(return_stmt, Return)
+    assert isinstance(return_stmt.expr, Ident)
+    assert return_stmt.expr.name == "result"
+
+ 
+
+def test_paren_expr_binding():
+    source = textwrap.dedent('''
+    fn main() -> int
+        const result = (1 + 2) * 3
+        return result
+    ''')
+    program = parse(source)
+    fn_body = program.declarations[0].body
+    const_result = fn_body[0]
+    assert isinstance(const_result, VarDecl)
+    expr = const_result.expr
+    assert isinstance(expr, BinaryOp)
+    assert expr.op == "*"
+    assert isinstance(expr.lhs, BinaryOp)
+    assert expr.lhs.op == "+"
+    assert isinstance(expr.lhs.lhs, Integer)
+    assert expr.lhs.lhs.value == 1
+    assert isinstance(expr.lhs.rhs, Integer)
+    assert expr.lhs.rhs.value == 2
+    assert isinstance(expr.rhs, Integer)
+    assert expr.rhs.value == 3
+    return_stmt = fn_body[1]
+    assert isinstance(return_stmt, Return)
+    assert isinstance(return_stmt.expr, Ident)
+    assert return_stmt.expr.name == "result"
+    
+def test_impl():
+    source = textwrap.dedent('''
+    impl Animal
+        fn make_sound() -> str
+            return "Woof"
+    ''')
+    program = parse(source)
+    impl_decl = program.declarations[0]
+    assert isinstance(impl_decl, ImplDecl)
+    assert impl_decl.name == "Animal"
+    assert len(impl_decl.methods) == 1
+    method = impl_decl.methods[0]
+    assert isinstance(method, FnDecl)
+    assert method.name == "make_sound"
+    assert method.ret_type.name == "str"
+    
