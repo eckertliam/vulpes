@@ -94,6 +94,7 @@ def test_if_stmt():
     source = textwrap.dedent('''
     fn main() -> int
         const a = 10
+        
         const b = 20
         if a > b
             return a

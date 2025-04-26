@@ -154,7 +154,7 @@ cuss_grammar = r"""
     RBRACE: "}"
     IDENT: /[a-zA-Z_][a-zA-Z0-9_]*/
     CHAR: /'(\\.|[^\\'])'/
-    _NL: /\r?\n[\t ]*/
+    _NL: /(\r?\n[ \t]*)+/
 """
 
 
