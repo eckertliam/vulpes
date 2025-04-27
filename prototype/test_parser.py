@@ -13,6 +13,7 @@ from main import (
     FieldInit,
     GetIndex,
     GetAttr,
+    String,
     StructExpr,
     StructField,
     TypeAliasDecl,
@@ -497,7 +498,8 @@ def test_fn_calls():
     assert isinstance(fn_body[0], Return)
     assert isinstance(fn_body[0].expr, Call)
     call = fn_body[0].expr
-    assert call.name == "add"
+    assert isinstance(call.callee, Ident)
+    assert call.callee.name == "add"
     assert len(call.args) == 2
     assert isinstance(call.args[0], Integer)
     assert call.args[0].value == 1
@@ -541,3 +543,30 @@ def test_expr_stmt():
     assert binary_op.lhs.lhs.name == "a"
     assert binary_op.lhs.rhs.name == "b"
     assert binary_op.rhs.name == "c"
+
+
+# test a function that returns a function and is called
+def test_fn_ret_fn():
+    source = textwrap.dedent(
+        """
+    fn main() -> int
+        return macro_fn("+")(1, 2)
+    """
+    )
+    program = parse(source)
+    fn_body = program.declarations[0].body
+    assert isinstance(fn_body[0], Return)
+    assert isinstance(fn_body[0].expr, Call)
+    outer_call = fn_body[0].expr
+    assert isinstance(outer_call.callee, Call)
+    inner_call = outer_call.callee
+    assert isinstance(inner_call.callee, Ident)
+    assert inner_call.callee.name == "macro_fn"
+    assert len(inner_call.args) == 1
+    assert isinstance(inner_call.args[0], String)
+    assert inner_call.args[0].value == "+"
+    assert len(outer_call.args) == 2
+    assert isinstance(outer_call.args[0], Integer)
+    assert outer_call.args[0].value == 1
+    assert isinstance(outer_call.args[1], Integer)
+    assert outer_call.args[1].value == 2

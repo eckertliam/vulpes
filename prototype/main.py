@@ -124,7 +124,7 @@ cuss_grammar = r"""
         | getattr
         | callattr
         
-    call: IDENT "(" arglist ")"
+    call: molecule "(" arglist ")"
     callattr: molecule "." IDENT "(" arglist ")"
     getindex: molecule "[" expr "]"
     getattr: molecule "." IDENT
@@ -518,9 +518,9 @@ class Ident(Node):
 
 
 class Call(Node):
-    def __init__(self, name: str, args: list[Expr], line: int) -> None:
+    def __init__(self, callee: Expr, args: list[Expr], line: int) -> None:
         super().__init__("call", line)
-        self.name = name
+        self.callee = callee
         self.args = args
 
 
@@ -747,8 +747,8 @@ class ASTTransformer(Transformer):
         return GetIndex(obj, index, obj.line)
 
     def call(self, items):
-        name, args = items
-        return Call(name, args, name.line)
+        callee, args = items
+        return Call(callee, args, callee.line)
 
     def callattr(self, items):
         obj, attr, args = items
