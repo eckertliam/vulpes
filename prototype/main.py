@@ -176,11 +176,35 @@ class CussIndenter(Indenter):
 
 # Expressive AST we convert the Lark ast into
 class Program:
-    def __init__(self) -> None:
+    def __init__(self, source: str) -> None:
         self.declarations = []
+        self.source = source
+        # memoize nodes by id to improve perf when grabbing nodes by id a lot
+        self.nodes: Dict[int, Node] = {}
 
     def push(self, declaration: "Declaration"):
         self.declarations.append(declaration)
+
+    # get a node by id
+    def get_node(self, id: int) -> Optional["Node"]:
+        # check memoized nodes first
+        if id in self.nodes:
+            return self.nodes[id]
+
+        # check all declarations
+        for declaration in self.declarations:
+            node = declaration.get_node(id)
+            if node is not None:
+                self.nodes[id] = node
+                return node
+        return None
+
+    # get the top level declaration that contains the node id
+    def get_decl(self, id: int) -> Optional["Declaration"]:
+        for declaration in self.declarations:
+            if declaration.get_node(id) is not None:
+                return declaration
+        return None
 
 
 class Node:
@@ -191,6 +215,15 @@ class Node:
         self.line = line
         self.id = Node._next_id
         Node._next_id += 1
+
+    def get_node(self, id: int) -> Optional["Node"]:
+        if self.id == id:
+            return self
+        else:
+            return None
+
+    def get_span(self) -> tuple[int, int]:
+        return (self.line, self.line)
 
 
 Declaration = Union["FnDecl", "EnumDecl", "StructDecl", "TypeAliasDecl"]
@@ -227,11 +260,27 @@ class ArrayTypeAnnotation(TypeAnnotation):
         super().__init__("array_type", line)
         self.elem_type = elem_type
 
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        else:
+            return self.elem_type.get_node(id)
+
 
 class TupleTypeAnnotation(TypeAnnotation):
     def __init__(self, elem_types: list[TypeAnnotation], line: int) -> None:
         super().__init__("tuple_type", line)
         self.elem_types = elem_types
+
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        else:
+            for elem_type in self.elem_types:
+                node = elem_type.get_node(id)
+                if node is not None:
+                    return node
+            return None
 
 
 class FunctionTypeAnnotation(TypeAnnotation):
@@ -241,6 +290,15 @@ class FunctionTypeAnnotation(TypeAnnotation):
         super().__init__("function_type", line)
         self.params = params
         self.ret_type = ret_type
+
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        for param in self.params:
+            node = param.get_node(id)
+            if node is not None:
+                return node
+        return self.ret_type.get_node(id)
 
 
 class FnDecl(Node):
@@ -260,12 +318,54 @@ class FnDecl(Node):
         self.ret_type = ret_type
         self.body = body
 
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        for param in self.params:
+            node = param.get_node(id)
+            if node is not None:
+                return node
+        node = self.ret_type.get_node(id)
+        if node is not None:
+            return node
+        for stmt in self.body:
+            node = stmt.get_node(id)
+            if node is not None:
+                return node
+        return None
 
-class Param:
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+
+        for param in self.params:
+            pmin, pmax = param.get_span()
+            min_line = min(min_line, pmin)
+            max_line = max(max_line, pmax)
+
+        ret_min, ret_max = self.ret_type.get_span()
+        min_line = min(min_line, ret_min)
+        max_line = max(max_line, ret_max)
+
+        for stmt in self.body:
+            smin, smax = stmt.get_span()
+            min_line = min(min_line, smin)
+            max_line = max(max_line, smax)
+
+        return (min_line, max_line)
+
+
+class Param(Node):
     def __init__(self, name: str, type: TypeAnnotation, line: int) -> None:
+        super().__init__("param", line)
         self.name = name
         self.type = type
         self.line = line
+
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        return self.type.get_node(id)
 
 
 class StructDecl(Node):
@@ -277,7 +377,25 @@ class StructDecl(Node):
         self.name = name
         self.fields = fields
 
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        for field in self.fields:
+            node = field.get_node(id)
+            if node is not None:
+                return node
+        return None
 
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        for field in self.fields:
+            fmin, fmax = field.get_span()
+            min_line = min(min_line, fmin)
+            max_line = max(max_line, fmax)
+        return (min_line, max_line)
+    
+    
 class StructField(Node):
     def __init__(self, pub: bool, name: str, type: TypeAnnotation, line: int) -> None:
         super().__init__("struct_field", line)
@@ -285,6 +403,14 @@ class StructField(Node):
         self.name = name
         self.type = type
 
+    def get_node(self, id: int) -> Optional["Node"]:
+        if self.id == id:
+            return self
+        return self.type.get_node(id)
+    
+    def get_span(self) -> tuple[int, int]:
+        tmin, tmax = self.type.get_span()
+        return (self.line, max(self.line, tmax))
 
 class EnumDecl(Node):
     def __init__(
@@ -295,6 +421,23 @@ class EnumDecl(Node):
         self.name = name
         self.variants = variants
 
+    def get_node(self, id: int) -> Optional["Node"]:
+        if self.id == id:
+            return self
+        for variant in self.variants:
+            node = variant.get_node(id)
+            if node is not None:
+                return node
+        return None
+
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        for variant in self.variants:
+            vmin, vmax = variant.get_span()
+            min_line = min(min_line, vmin)
+            max_line = max(max_line, vmax)
+        return (min_line, max_line)
 
 class EnumVariant(Node):
     def __init__(self, kind: str, name: str, line: int) -> None:
@@ -312,11 +455,38 @@ class EnumTupleVariant(EnumVariant):
         super().__init__("enum_tuple_variant", name, line)
         self.types = types
 
+    def get_node(self, id: int) -> Optional["Node"]:
+        if self.id == id:
+            return self
+        for type in self.types:
+            node = type.get_node(id)
+            if node is not None:
+                return node
+        return None
+
 
 class EnumStructVariant(EnumVariant):
     def __init__(self, name: str, fields: list["EnumStructField"], line: int) -> None:
         super().__init__("enum_struct_variant", name, line)
         self.fields = fields
+
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        for field in self.fields:
+            node = field.get_node(id)
+            if node is not None:
+                return node
+        return None
+    
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        for field in self.fields:
+            fmin, fmax = field.get_span()
+            min_line = min(min_line, fmin)
+            max_line = max(max_line, fmax)
+        return (min_line, max_line)
 
 
 class EnumStructField(Node):
@@ -325,6 +495,15 @@ class EnumStructField(Node):
         self.name = name
         self.type = type
 
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        return self.type.get_node(id)
+
+    def get_span(self) -> tuple[int, int]:
+        tmin, tmax = self.type.get_span()
+        return (self.line, max(self.line, tmax))
+
 
 class TypeAliasDecl(Node):
     def __init__(self, pub: bool, name: str, type: TypeAnnotation, line: int) -> None:
@@ -332,6 +511,15 @@ class TypeAliasDecl(Node):
         self.pub = pub
         self.name = name
         self.type = type
+
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        return self.type.get_node(id)
+
+    def get_span(self) -> tuple[int, int]:
+        tmin, tmax = self.type.get_span()
+        return (self.line, max(self.line, tmax))
 
 
 class VarDecl(Node):
@@ -349,16 +537,38 @@ class VarDecl(Node):
         self.type = type
         self.expr = expr
 
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        if self.type is not None:
+            node = self.type.get_node(id)
+            if node is not None:
+                return node
+        return self.expr.get_node(id)
+
+    def get_span(self) -> tuple[int, int]:
+        expr_min, expr_max = self.expr.get_span()
+        return (self.line, max(self.line, expr_max))
+
 
 Assignable = Union["Ident", "GetIndex", "GetAttr"]
 
 
-# TODO: rewrite to support field assignments, and array assignments
 class Assign(Node):
     def __init__(self, lhs: Assignable, rhs: "Expr", line: int) -> None:
         super().__init__("assign", line)
         self.lhs = lhs
         self.rhs = rhs
+
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        return self.lhs.get_node(id) or self.rhs.get_node(id)
+    
+    def get_span(self) -> tuple[int, int]:
+        lhs_min, lhs_max = self.lhs.get_span()
+        rhs_min, rhs_max = self.rhs.get_span()
+        return (min(lhs_min, rhs_min), max(lhs_max, rhs_max))
 
 
 class ImplDecl(Node):
@@ -367,11 +577,39 @@ class ImplDecl(Node):
         self.name = name
         self.methods = methods
 
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        for method in self.methods:
+            node = method.get_node(id)
+            if node is not None:
+                return node
+        return None
+    
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        for method in self.methods:
+            mmin, mmax = method.get_span()
+            min_line = min(min_line, mmin)
+            max_line = max(max_line, mmax)
+        return (min_line, max_line)
+
 
 class Return(Node):
     def __init__(self, expr: Optional["Expr"], line: int) -> None:
         super().__init__("return", line)
         self.expr = expr
+
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        return self.expr.get_node(id) if self.expr is not None else None
+    
+    def get_span(self) -> tuple[int, int]:
+        if self.expr is None:
+            return (self.line, self.line)
+        return self.expr.get_span()
 
 
 class If(Node):
@@ -387,6 +625,38 @@ class If(Node):
         self.body = body
         self.else_body = else_body
 
+    # get node by id
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        node = self.cond.get_node(id)
+        if node is not None:
+            return node
+        for stmt in self.body:
+            node = stmt.get_node(id)
+            if node is not None:
+                return node
+        if self.else_body is not None:
+            for stmt in self.else_body:
+                node = stmt.get_node(id)
+                if node is not None:
+                    return node
+        return None
+    
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        for stmt in self.body:
+            smin, smax = stmt.get_span()
+            min_line = min(min_line, smin)
+            max_line = max(max_line, smax)
+        if self.else_body is not None:
+            for stmt in self.else_body:
+                smin, smax = stmt.get_span()
+                min_line = min(min_line, smin)
+                max_line = max(max_line, smax)
+        return (min_line, max_line)
+
 
 class While(Node):
     def __init__(self, cond: "Expr", body: list[Statement], line: int) -> None:
@@ -394,11 +664,50 @@ class While(Node):
         self.cond = cond
         self.body = body
 
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        node = self.cond.get_node(id)
+        if node is not None:
+            return node
+        for stmt in self.body:
+            node = stmt.get_node(id)
+            if node is not None:
+                return node
+        return None
+    
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        for stmt in self.body:
+            smin, smax = stmt.get_span()
+            min_line = min(min_line, smin)
+            max_line = max(max_line, smax)
+        return (min_line, max_line)
+
 
 class Loop(Node):
     def __init__(self, body: list[Statement], line: int) -> None:
         super().__init__("loop", line)
         self.body = body
+
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        for stmt in self.body:
+            node = stmt.get_node(id)
+            if node is not None:
+                return node
+        return None
+
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        for stmt in self.body:
+            smin, smax = stmt.get_span()
+            min_line = min(min_line, smin)
+            max_line = max(max_line, smax)
+        return (min_line, max_line)
 
 
 class Break(Node):
@@ -468,18 +777,63 @@ class Array(Node):
         super().__init__("array", line)
         self.elems = elems
 
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        for elem in self.elems:
+            node = elem.get_node(id)
+            if node is not None:
+                return node
+        return None
+
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        for elem in self.elems:
+            emin, emax = elem.get_span()
+            min_line = min(min_line, emin)
+            max_line = max(max_line, emax)
+        return (min_line, max_line)
 
 class Tuple(Node):
     def __init__(self, elems: list[Expr], line: int) -> None:
         super().__init__("tuple", line)
         self.elems = elems
 
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        for elem in self.elems:
+            node = elem.get_node(id)
+            if node is not None:
+                return node
+        return None
+
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        for elem in self.elems:
+            emin, emax = elem.get_span()
+            min_line = min(min_line, emin)
+            max_line = max(max_line, emax)
+        return (min_line, max_line)
 
 class FieldInit(Node):
     def __init__(self, name: str, expr: Expr, line: int) -> None:
         super().__init__("field_init", line)
         self.name = name
         self.expr = expr
+
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        return self.expr.get_node(id)
+
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        expr_min, expr_max = self.expr.get_span()
+        return (min(min_line, expr_min), max(max_line, expr_max))
 
 
 class StructExpr(Node):
@@ -488,6 +842,23 @@ class StructExpr(Node):
         self.name = name
         self.fields = fields
 
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        for field in self.fields:
+            node = field.get_node(id)
+            if node is not None:
+                return node
+        return None
+
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        for field in self.fields:
+            smin, smax = field.get_span()
+            min_line = min(min_line, smin)
+            max_line = max(max_line, smax)
+        return (min_line, max_line)
 
 class EnumStructExpr(Node):
     def __init__(
@@ -498,6 +869,23 @@ class EnumStructExpr(Node):
         self.unit = unit
         self.fields = fields
 
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        for field in self.fields:
+            node = field.get_node(id)
+            if node is not None:
+                return node
+        return None
+    
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        for field in self.fields:
+            smin, smax = field.get_span()
+            min_line = min(min_line, smin)
+            max_line = max(max_line, smax)
+        return (min_line, max_line)
 
 class EnumTupleExpr(Node):
     def __init__(self, name: str, unit: str, elems: list[Expr], line: int) -> None:
@@ -506,6 +894,23 @@ class EnumTupleExpr(Node):
         self.unit = unit
         self.elems = elems
 
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        for elem in self.elems:
+            node = elem.get_node(id)
+            if node is not None:
+                return node
+        return None
+
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        for elem in self.elems:
+            emin, emax = elem.get_span()
+            min_line = min(min_line, emin)
+            max_line = max(max_line, emax)
+        return (min_line, max_line)
 
 class EnumUnitExpr(Node):
     def __init__(self, name: str, unit: str, line: int) -> None:
@@ -526,6 +931,29 @@ class Call(Node):
         self.callee = callee
         self.args = args
 
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        node = self.callee.get_node(id)
+        if node is not None:
+            return node
+        for arg in self.args:
+            node = arg.get_node(id)
+            if node is not None:
+                return node
+        return None
+
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        callee_min, callee_max = self.callee.get_span()
+        min_line = min(min_line, callee_min)
+        max_line = max(max_line, callee_max)
+        for arg in self.args:
+            arg_min, arg_max = arg.get_span()
+            min_line = min(min_line, arg_min)
+            max_line = max(max_line, arg_max)
+        return (min_line, max_line)
 
 class GetIndex(Node):
     def __init__(self, obj: Expr, index: Expr, line: int) -> None:
@@ -533,6 +961,27 @@ class GetIndex(Node):
         self.obj = obj
         self.index = index
 
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        node = self.obj.get_node(id)
+        if node is not None:
+            return node
+        node = self.index.get_node(id)
+        if node is not None:
+            return node
+        return None
+
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        obj_min, obj_max = self.obj.get_span()
+        min_line = min(min_line, obj_min)
+        max_line = max(max_line, obj_max)
+        index_min, index_max = self.index.get_span()
+        min_line = min(min_line, index_min)
+        max_line = max(max_line, index_max)
+        return (min_line, max_line)
 
 class GetAttr(Node):
     def __init__(self, obj: Expr, attr: str, line: int) -> None:
@@ -540,6 +989,21 @@ class GetAttr(Node):
         self.obj = obj
         self.attr = attr
 
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        node = self.obj.get_node(id)
+        if node is not None:
+            return node
+        return None
+
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        obj_min, obj_max = self.obj.get_span()
+        min_line = min(min_line, obj_min)
+        max_line = max(max_line, obj_max)
+        return (min_line, max_line)
 
 class CallAttr(Node):
     def __init__(self, obj: Expr, attr: str, args: list[Expr], line: int) -> None:
@@ -548,7 +1012,30 @@ class CallAttr(Node):
         self.attr = attr
         self.args = args
 
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        node = self.obj.get_node(id)
+        if node is not None:
+            return node
+        for arg in self.args:
+            node = arg.get_node(id)
+            if node is not None:
+                return node
+        return None
 
+    def get_span(self) -> tuple[int, int]: 
+        min_line = self.line
+        max_line = self.line
+        obj_min, obj_max = self.obj.get_span()
+        min_line = min(min_line, obj_min)
+        max_line = max(max_line, obj_max)
+        for arg in self.args:
+            arg_min, arg_max = arg.get_span()
+            min_line = min(min_line, arg_min)
+            max_line = max(max_line, arg_max)
+        return (min_line, max_line)
+        
 class BinaryOp(Node):
     def __init__(self, op: str, lhs: Expr, rhs: Expr, line: int) -> None:
         super().__init__("binary_op", line)
@@ -556,6 +1043,24 @@ class BinaryOp(Node):
         self.lhs = lhs
         self.rhs = rhs
 
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        node = self.lhs.get_node(id)
+        if node is not None:
+            return node
+        return self.rhs.get_node(id)
+
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        lhs_min, lhs_max = self.lhs.get_span()
+        min_line = min(min_line, lhs_min)
+        max_line = max(max_line, lhs_max)
+        rhs_min, rhs_max = self.rhs.get_span()
+        min_line = min(min_line, rhs_min)
+        max_line = max(max_line, rhs_max)
+        return (min_line, max_line)
 
 class UnaryOp(Node):
     def __init__(self, op: str, operand: Expr, line: int) -> None:
@@ -563,6 +1068,18 @@ class UnaryOp(Node):
         self.op = op
         self.operand = operand
 
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        return self.operand.get_node(id)
+
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        operand_min, operand_max = self.operand.get_span()
+        min_line = min(min_line, operand_min)
+        max_line = max(max_line, operand_max)
+        return (min_line, max_line)
 
 # Lark to inhouse AST
 class ASTTransformer(Transformer):
@@ -1224,15 +1741,19 @@ class TypeVar(Type):
 
 # Error handling
 class CussError(Exception):
-    def __init__(self, message: str, line: int) -> None:
+    def __init__(self, message: str, line: int, ast_id: int) -> None:
         super().__init__(f"[Line {line}] {message}")
         self.message = message
         self.line = line
+        self.ast_id = ast_id
 
     def __str__(self) -> str:
         return f"[Line {self.line}] {self.message}"
 
-    def report(self, source: str) -> None:
+    # TODO: print the body the entire parent of the error for example
+    # if the error is in a function body, print the entire function body with lines next to it and highlight the error line
+    # we can do this by getting the node from the ast_id and then getting the top line of the parent and the bottom line of the parent
+    def report(self, source: str, program: Program) -> None:
         lines = source.splitlines()
         print(self)
         # print the line with the error
@@ -1242,22 +1763,27 @@ class CussError(Exception):
 
 
 # Type mismatch etc
-class TypeError(CussError):
+class CussTypeError(CussError):
     pass
 
 
 # Syntax errors
-class SyntaxError(CussError):
+class CussSyntaxError(CussError):
     pass
 
 
 # Attempting to mutate a constant
-class MutabilityError(CussError):
+class CussMutabilityError(CussError):
     pass
 
 
 # Attempting to use an undefined name
-class NameError(CussError):
+class CussNameError(CussError):
+    pass
+
+
+# Runtime errors
+class CussRuntimeError(CussError):
     pass
 
 
@@ -1370,7 +1896,9 @@ class SemanticAnalyzer:
         # we are already in the scope of the function
         # so we just make sure the name is unique and bind the type
         if param.name in self.context.var_bindings[-1]:
-            raise NameError(f"Duplicate parameter name: {param.name}")
+            raise CussNameError(
+                f"Duplicate parameter name: {param.name}", param.line, param.ast_id
+            )
         # parameters are immutable so we set mutable to False
         self.context.bind_var(param.name, False, param.type)
 
