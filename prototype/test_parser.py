@@ -1,6 +1,38 @@
-from main import Array, Assign, BinaryOp, Break, Continue, EnumDecl, GetIndex, GetAttr, TypeAliasDecl, Ident, If, ImplDecl, Loop, StructDecl, TupleTypeAnnotation, TypeAnnotation, VarDecl, While, parse, Program, FnDecl, Statement, Return, Integer
+from main import (
+    Array,
+    Assign,
+    BinaryOp,
+    Break,
+    Continue,
+    EnumDecl,
+    EnumStructExpr,
+    EnumTupleExpr,
+    EnumUnitExpr,
+    FieldInit,
+    GetIndex,
+    GetAttr,
+    StructExpr,
+    StructField,
+    TypeAliasDecl,
+    Ident,
+    If,
+    ImplDecl,
+    Loop,
+    StructDecl,
+    TupleTypeAnnotation,
+    TypeAnnotation,
+    VarDecl,
+    While,
+    parse,
+    Program,
+    FnDecl,
+    Statement,
+    Return,
+    Integer,
+)
 import pytest
 import textwrap
+
 
 def test_empty_program():
     program = parse("")
@@ -9,10 +41,12 @@ def test_empty_program():
 
 
 def test_simple_fn_decl():
-    source = textwrap.dedent('''
+    source = textwrap.dedent(
+        """
     fn main() -> int
         return 0     
-    ''')
+    """
+    )
     program = parse(source)
     assert isinstance(program, Program)
     assert len(program.declarations) == 1
@@ -27,12 +61,15 @@ def test_simple_fn_decl():
     expr = return_stmt.expr
     assert isinstance(expr, Integer)
     assert expr.value == 0
-    
+
+
 def test_fn_w_params():
-    source = textwrap.dedent('''
+    source = textwrap.dedent(
+        """
     fn add(a: int, b: int) -> int
         return a + b
-    ''')
+    """
+    )
     program = parse(source)
     assert isinstance(program, Program)
     assert len(program.declarations) == 1
@@ -54,13 +91,16 @@ def test_fn_w_params():
     assert expr.lhs.name == "a"
     assert isinstance(expr.rhs, Ident)
     assert expr.rhs.name == "b"
-    
+
+
 def test_struct_decl():
-    source = textwrap.dedent('''
+    source = textwrap.dedent(
+        """
     struct Point
         x: int
         y: int
-    ''')
+    """
+    )
     program = parse(source)
     assert isinstance(program, Program)
     assert len(program.declarations) == 1
@@ -68,17 +108,25 @@ def test_struct_decl():
     assert isinstance(struct_decl, StructDecl)
     assert struct_decl.name == "Point"
     assert len(struct_decl.fields) == 2
-    assert struct_decl.fields[0].name == "x" and struct_decl.fields[0].type.name == "int"
-    assert struct_decl.fields[1].name == "y" and struct_decl.fields[1].type.name == "int"
-    
-    
+    assert (
+        struct_decl.fields[0].name == "x" and struct_decl.fields[0].type.name == "int"
+    )
+    assert (
+        struct_decl.fields[1].name == "y" and struct_decl.fields[1].type.name == "int"
+    )
+
+
+# TODO: test tuple enums
+# TODO: test struct enums
 def test_simple_enum_decl():
-    source = textwrap.dedent('''
+    source = textwrap.dedent(
+        """
     enum Color
         Red
         Green
         Blue
-    ''')
+    """
+    )
     program = parse(source)
     assert isinstance(program, Program)
     assert len(program.declarations) == 1
@@ -89,9 +137,11 @@ def test_simple_enum_decl():
     assert enum_decl.variants[0].name == "Red"
     assert enum_decl.variants[1].name == "Green"
     assert enum_decl.variants[2].name == "Blue"
-    
+
+
 def test_if_stmt():
-    source = textwrap.dedent('''
+    source = textwrap.dedent(
+        """
     fn main() -> int
         const a = 10
         
@@ -102,7 +152,8 @@ def test_if_stmt():
             return b
         else
             return 0
-    ''')
+    """
+    )
     program = parse(source)
     fn_body = program.declarations[0].body
     const_a = fn_body[0]
@@ -132,15 +183,18 @@ def test_if_stmt():
     assert isinstance(ret_on_else, Return)
     assert isinstance(ret_on_else.expr, Integer)
     assert ret_on_else.expr.value == 0
-    
+
+
 def test_while_stmt():
-    source = textwrap.dedent('''
+    source = textwrap.dedent(
+        """
     fn main() -> int
         let a = 10
         while a > 0
             a = a - 1
         return a
-    ''')
+    """
+    )
     program = parse(source)
     fn_body = program.declarations[0].body
     while_stmt = fn_body[1]
@@ -152,30 +206,34 @@ def test_while_stmt():
     assert isinstance(while_stmt.body[0], Assign)
     assert isinstance(fn_body[2], Return)
 
+
 def test_continue_stmt():
-    source = textwrap.dedent('''
+    source = textwrap.dedent(
+        """
     fn main() -> int
         loop
             continue
         return 0
-    ''')
+    """
+    )
     program = parse(source)
     fn_body = program.declarations[0].body
     assert isinstance(fn_body[0], Loop)
     loop_body = fn_body[0].body
     assert isinstance(loop_body[0], Continue)
-    
-    
+
 
 def test_assigns():
-    source = textwrap.dedent('''
+    source = textwrap.dedent(
+        """
     fn main() -> int
         let a = 10
         a = a + 1
         const b = a
         a = b + 1
         return a
-    ''')
+    """
+    )
     program = parse(source)
     fn_body = program.declarations[0].body
     assert isinstance(fn_body[0], VarDecl)
@@ -185,9 +243,11 @@ def test_assigns():
     assert isinstance(fn_body[1], Assign)
     assert isinstance(fn_body[2], VarDecl)
     assert isinstance(fn_body[3], Assign)
-    
+
+
 def test_loop():
-    source = textwrap.dedent('''
+    source = textwrap.dedent(
+        """
     fn main() -> int
         let a = 10
         loop
@@ -195,7 +255,8 @@ def test_loop():
             if a == 0
                 break
         return a
-    ''')
+    """
+    )
     program = parse(source)
     fn_body = program.declarations[0].body
     assert isinstance(fn_body[0], VarDecl)
@@ -208,12 +269,15 @@ def test_loop():
     assert isinstance(if_stmt.body[0], Break)
     assert isinstance(fn_body[2], Return)
 
+
 def test_array_expr():
-    source = textwrap.dedent('''
+    source = textwrap.dedent(
+        """
     fn main() -> int
         const a = [1, 2, 3]
         return a[0]
-    ''')
+    """
+    )
     program = parse(source)
     fn_body = program.declarations[0].body
     assert isinstance(fn_body[0], VarDecl)
@@ -236,11 +300,13 @@ def test_array_expr():
 
 
 def test_binary_expr_chaining():
-    source = textwrap.dedent('''
+    source = textwrap.dedent(
+        """
     fn main() -> int
         const result = 1 + 2 * 3
         return result
-    ''')
+    """
+    )
     program = parse(source)
     fn_body = program.declarations[0].body
     const_result = fn_body[0]
@@ -261,14 +327,15 @@ def test_binary_expr_chaining():
     assert isinstance(return_stmt.expr, Ident)
     assert return_stmt.expr.name == "result"
 
- 
 
 def test_paren_expr_binding():
-    source = textwrap.dedent('''
+    source = textwrap.dedent(
+        """
     fn main() -> int
         const result = (1 + 2) * 3
         return result
-    ''')
+    """
+    )
     program = parse(source)
     fn_body = program.declarations[0].body
     const_result = fn_body[0]
@@ -288,16 +355,19 @@ def test_paren_expr_binding():
     assert isinstance(return_stmt, Return)
     assert isinstance(return_stmt.expr, Ident)
     assert return_stmt.expr.name == "result"
-    
+
+
 def test_impl():
-    source = textwrap.dedent('''
+    source = textwrap.dedent(
+        """
     impl Animal
         fn make_sound() -> str
             return "Woof"
 
         fn move() -> void
             print("Moving")
-    ''')
+    """
+    )
     program = parse(source)
     impl_decl = program.declarations[0]
     assert isinstance(impl_decl, ImplDecl)
@@ -311,12 +381,15 @@ def test_impl():
     assert isinstance(method, FnDecl)
     assert method.name == "move"
     assert method.ret_type.name == "void"
-    
+
+
 def test_type_aliases():
-    source = textwrap.dedent('''
+    source = textwrap.dedent(
+        """
     type Coord = (int, int)
     
-    ''')
+    """
+    )
     program = parse(source)
     type_alias = program.declarations[0]
     assert isinstance(type_alias, TypeAliasDecl)
@@ -326,8 +399,64 @@ def test_type_aliases():
     assert isinstance(type_alias.type.elem_types[0], TypeAnnotation)
     assert isinstance(type_alias.type.elem_types[1], TypeAnnotation)
 
+
 # TODO: test tuples SEE main.py first
 # TODO: test struct exprs
+def test_struct_exprs():
+    source = textwrap.dedent(
+        """
+    fn main() -> int
+        const p = Point { x: 1, y: 2 }
+        return p.x
+    """
+    )
+    program = parse(source)
+    fn_body = program.declarations[0].body
+    assert isinstance(fn_body[0], VarDecl)
+    const_p = fn_body[0]
+    assert isinstance(const_p.expr, StructExpr)
+    assert isinstance(const_p.expr.fields[0], FieldInit)
+    assert isinstance(const_p.expr.fields[1], FieldInit)
+    assert isinstance(fn_body[1], Return)
+    assert isinstance(fn_body[1].expr, GetAttr)
+
+
 # TODO: test enum exprs
+def test_enum_exprs():
+    source = textwrap.dedent(
+        """
+    fn main() -> int
+        const c = Color::Red
+        const c2 = Animal::Dog { name: "Fido" }
+        const c3 = Coordinates::Point(1, 2)
+        return c
+    """
+    )
+    program = parse(source)
+    fn_body = program.declarations[0].body
+    assert isinstance(fn_body[0], VarDecl)
+    color_enum = fn_body[0].expr
+    assert isinstance(color_enum, EnumUnitExpr)
+    assert color_enum.name == "Color"
+    assert color_enum.unit == "Red"
+    assert isinstance(fn_body[1], VarDecl)
+    dog_enum = fn_body[1].expr
+    assert isinstance(dog_enum, EnumStructExpr)
+    assert dog_enum.name == "Animal"
+    assert dog_enum.unit == "Dog"
+    assert len(dog_enum.fields) == 1
+    assert isinstance(dog_enum.fields[0], FieldInit)
+    assert isinstance(fn_body[2], VarDecl)
+    point_enum = fn_body[2].expr
+    assert isinstance(point_enum, EnumTupleExpr)
+    assert point_enum.name == "Coordinates"
+    assert point_enum.unit == "Point"
+    assert len(point_enum.elems) == 2
+    assert isinstance(point_enum.elems[0], Integer)
+    assert point_enum.elems[0].value == 1
+    assert isinstance(point_enum.elems[1], Integer)
+    assert point_enum.elems[1].value == 2
+
+
 # TODO: test method calls
 # TODO: test field access

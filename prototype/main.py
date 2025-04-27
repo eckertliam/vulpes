@@ -350,6 +350,7 @@ class VarDecl(Node):
 
 Assignable = Union["Ident", "GetIndex", "GetAttr"]
 
+
 # TODO: rewrite to support field assignments, and array assignments
 class Assign(Node):
     def __init__(self, lhs: Assignable, rhs: "Expr", line: int) -> None:
@@ -465,7 +466,9 @@ class Array(Node):
         super().__init__("array", line)
         self.elems = elems
 
+
 # TODO: write tuple class
+
 
 class FieldInit(Node):
     def __init__(self, name: str, expr: Expr, line: int) -> None:
@@ -482,16 +485,20 @@ class StructExpr(Node):
 
 
 class EnumStructExpr(Node):
-    def __init__(self, name: str, fields: list[FieldInit], line: int) -> None:
+    def __init__(
+        self, name: str, unit: str, fields: list[FieldInit], line: int
+    ) -> None:
         super().__init__("enum_struct_expr", line)
         self.name = name
+        self.unit = unit
         self.fields = fields
 
 
 class EnumTupleExpr(Node):
-    def __init__(self, name: str, elems: list[Expr], line: int) -> None:
+    def __init__(self, name: str, unit: str, elems: list[Expr], line: int) -> None:
         super().__init__("enum_tuple_expr", line)
         self.name = name
+        self.unit = unit
         self.elems = elems
 
 
@@ -736,7 +743,7 @@ class ASTTransformer(Transformer):
         obj = items[0]
         index = items[1]
         return GetIndex(obj, index, obj.line)
-    
+
     def call(self, items):
         name, args = items
         return Call(name, args, name.line)
@@ -831,7 +838,7 @@ class ASTTransformer(Transformer):
 
     def array_expr(self, items):
         return Array(items, items[0].line)
-    
+
     # TODO: write tuple transformer
 
     def field_init(self, items):
@@ -842,20 +849,19 @@ class ASTTransformer(Transformer):
         return items
 
     def struct_expr(self, items):
-        name_tok, *fields = items
+        name_tok, fields = items
         return StructExpr(name_tok.value, fields, name_tok.line)
 
     def enum_struct_expr(self, items):
-        name_tok, *fields = items
-        return EnumStructExpr(name_tok.value, fields, name_tok.line)
+        name_tok, unit_tok, fields = items
+        return EnumStructExpr(name_tok.value, unit_tok.value, fields, name_tok.line)
 
     def enum_tuple_expr(self, items):
-        name_tok, *elems = items
-        return EnumTupleExpr(name_tok.value, elems, name_tok.line)
+        name_tok, unit_tok, *elems = items
+        return EnumTupleExpr(name_tok.value, unit_tok.value, elems, name_tok.line)
 
     def enum_unit_expr(self, items):
-        name_tok = items[0]
-        unit_tok = items[1]
+        name_tok, unit_tok = items
         return EnumUnitExpr(name_tok.value, unit_tok.value, name_tok.line)
 
 
