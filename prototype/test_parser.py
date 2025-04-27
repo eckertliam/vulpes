@@ -1,4 +1,4 @@
-from main import Array, Assign, BinaryOp, Break, Continue, EnumDecl, GetIndex, Ident, If, ImplDecl, Loop, StructDecl, VarDecl, While, parse, Program, FnDecl, Statement, Return, Integer
+from main import Array, Assign, BinaryOp, Break, Continue, EnumDecl, GetIndex, GetAttr, TypeAliasDecl, Ident, If, ImplDecl, Loop, StructDecl, TupleTypeAnnotation, TypeAnnotation, VarDecl, While, parse, Program, FnDecl, Statement, Return, Integer
 import pytest
 import textwrap
 
@@ -312,5 +312,22 @@ def test_impl():
     assert method.name == "move"
     assert method.ret_type.name == "void"
     
+def test_type_aliases():
+    source = textwrap.dedent('''
+    type Coord = (int, int)
     
-    
+    ''')
+    program = parse(source)
+    type_alias = program.declarations[0]
+    assert isinstance(type_alias, TypeAliasDecl)
+    assert type_alias.name == "Coord"
+    assert isinstance(type_alias.type, TupleTypeAnnotation)
+    assert len(type_alias.type.elem_types) == 2
+    assert isinstance(type_alias.type.elem_types[0], TypeAnnotation)
+    assert isinstance(type_alias.type.elem_types[1], TypeAnnotation)
+
+# TODO: test tuples SEE main.py first
+# TODO: test struct exprs
+# TODO: test enum exprs
+# TODO: test method calls
+# TODO: test field access

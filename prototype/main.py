@@ -7,6 +7,7 @@ from typing import Dict, Optional, Union, List
 from lark import Lark, Tree, Token, Transformer
 from lark.indenter import Indenter
 
+# TODO: add tuples to the grammar
 cuss_grammar = r"""
     %import common.INT
     %import common.FLOAT 
@@ -48,7 +49,7 @@ cuss_grammar = r"""
     
     const_def: "const" IDENT [":" type_annotation] "=" expr
     let_def: "let" IDENT [":" type_annotation] "=" expr
-    assign_stmt: IDENT "=" expr
+    assign_stmt: (IDENT | getindex | getattr) "=" expr
     
     type_alias: [PUB] "type" IDENT "=" type_annotation
 
@@ -118,10 +119,13 @@ cuss_grammar = r"""
         | molecule
 
     ?molecule: atom
-        | molecule "[" expr "]" -> getindex
+        | getindex
         | molecule "(" arglist ")" -> call
-        | molecule "." IDENT -> getattr
+        | getattr
         | molecule "." IDENT "(" arglist ")" -> callattr
+        
+    getindex: molecule "[" expr "]"
+    getattr: molecule "." IDENT
         
     ?atom: IDENT -> ident
         | FLOAT -> float
@@ -344,11 +348,14 @@ class VarDecl(Node):
         self.expr = expr
 
 
+Assignable = Union["Ident", "GetIndex", "GetAttr"]
+
+# TODO: rewrite to support field assignments, and array assignments
 class Assign(Node):
-    def __init__(self, name: str, expr: "Expr", line: int) -> None:
-        super().__init__("assign_decl", line)
-        self.name = name
-        self.expr = expr
+    def __init__(self, lhs: Assignable, rhs: "Expr", line: int) -> None:
+        super().__init__("assign", line)
+        self.lhs = lhs
+        self.rhs = rhs
 
 
 class ImplDecl(Node):
@@ -458,6 +465,7 @@ class Array(Node):
         super().__init__("array", line)
         self.elems = elems
 
+# TODO: write tuple class
 
 class FieldInit(Node):
     def __init__(self, name: str, expr: Expr, line: int) -> None:
@@ -692,8 +700,8 @@ class ASTTransformer(Transformer):
         return VarDecl(True, name_tok.value, type_ann, expr, name_tok.line)
 
     def assign_stmt(self, items):
-        name_tok, expr = items
-        return Assign(name_tok.value, expr, name_tok.line)
+        lhs, rhs = items
+        return Assign(lhs, rhs, lhs.line)
 
     def return_stmt(self, items):
         expr = items[0] if len(items) > 0 else None
@@ -725,9 +733,10 @@ class ASTTransformer(Transformer):
 
     # ---------- expressions ----------
     def getindex(self, items):
-        obj, index = items
+        obj = items[0]
+        index = items[1]
         return GetIndex(obj, index, obj.line)
-
+    
     def call(self, items):
         name, args = items
         return Call(name, args, name.line)
@@ -822,6 +831,8 @@ class ASTTransformer(Transformer):
 
     def array_expr(self, items):
         return Array(items, items[0].line)
+    
+    # TODO: write tuple transformer
 
     def field_init(self, items):
         name_tok, expr = items
