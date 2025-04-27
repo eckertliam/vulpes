@@ -120,10 +120,12 @@ cuss_grammar = r"""
 
     ?molecule: atom
         | getindex
-        | molecule "(" arglist ")" -> call
+        | call
         | getattr
-        | molecule "." IDENT "(" arglist ")" -> callattr
+        | callattr
         
+    call: IDENT "(" arglist ")"
+    callattr: molecule "." IDENT "(" arglist ")"
     getindex: molecule "[" expr "]"
     getattr: molecule "." IDENT
         
@@ -750,7 +752,7 @@ class ASTTransformer(Transformer):
 
     def callattr(self, items):
         obj, attr, args = items
-        return CallAttr(obj, attr, args, obj.line)
+        return CallAttr(obj, attr.value, args, obj.line)
 
     def getattr(self, items):
         obj, attr = items
@@ -863,6 +865,9 @@ class ASTTransformer(Transformer):
     def enum_unit_expr(self, items):
         name_tok, unit_tok = items
         return EnumUnitExpr(name_tok.value, unit_tok.value, name_tok.line)
+
+    def arglist(self, items):
+        return items
 
 
 parser = Lark(

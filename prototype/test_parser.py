@@ -3,6 +3,8 @@ from main import (
     Assign,
     BinaryOp,
     Break,
+    Call,
+    CallAttr,
     Continue,
     EnumDecl,
     EnumStructExpr,
@@ -459,4 +461,83 @@ def test_enum_exprs():
 
 
 # TODO: test method calls
-# TODO: test field access
+def test_method_calls():
+    source = textwrap.dedent(
+        """
+    fn main() -> int
+        const p = Point { x: 1, y: 2 }
+        return p.move(1, 1)
+    """
+    )
+    program = parse(source)
+    fn_body = program.declarations[0].body
+    return_stmt = fn_body[1]
+    assert isinstance(return_stmt, Return)
+    assert isinstance(return_stmt.expr, CallAttr)
+    call_attr = return_stmt.expr
+    assert isinstance(call_attr.obj, Ident)
+    assert call_attr.obj.name == "p"
+    assert call_attr.attr == "move"
+    assert len(call_attr.args) == 2
+    assert isinstance(call_attr.args[0], Integer)
+    assert call_attr.args[0].value == 1
+    assert isinstance(call_attr.args[1], Integer)
+    assert call_attr.args[1].value == 1
+
+
+def test_fn_calls():
+    source = textwrap.dedent(
+        """
+    fn main() -> int
+        return add(1, 2)
+    """
+    )
+    program = parse(source)
+    fn_body = program.declarations[0].body
+    assert isinstance(fn_body[0], Return)
+    assert isinstance(fn_body[0].expr, Call)
+    call = fn_body[0].expr
+    assert call.name == "add"
+    assert len(call.args) == 2
+    assert isinstance(call.args[0], Integer)
+    assert call.args[0].value == 1
+    assert isinstance(call.args[1], Integer)
+    assert call.args[1].value == 2
+
+
+def test_field_chaining():
+    source = textwrap.dedent(
+        """
+    fn main() -> int
+        return x.y.z
+    """
+    )
+    program = parse(source)
+    fn_body = program.declarations[0].body
+    assert isinstance(fn_body[0], Return)
+    assert isinstance(fn_body[0].expr, GetAttr)
+    get_attr = fn_body[0].expr
+    assert isinstance(get_attr.obj, GetAttr)
+    assert get_attr.obj.obj.name == "x"
+    assert get_attr.obj.attr == "y"
+    assert isinstance(get_attr.obj.obj, Ident)
+    assert get_attr.obj.obj.name == "x"
+
+
+def test_expr_stmt():
+    source = textwrap.dedent(
+        """
+    fn main() -> int
+        a + b + c
+        return 0
+    """
+    )
+    program = parse(source)
+    fn_body = program.declarations[0].body
+    assert isinstance(fn_body[0], BinaryOp)
+    binary_op = fn_body[0]
+    assert isinstance(binary_op.lhs, BinaryOp)
+    assert isinstance(binary_op.rhs, Ident)
+    assert binary_op.lhs.lhs.name == "a"
+    assert binary_op.lhs.rhs.name == "b"
+    assert binary_op.rhs.name == "c"
