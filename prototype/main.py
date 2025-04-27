@@ -134,7 +134,7 @@ cuss_grammar = r"""
         | INT -> int
         | STRING -> string
         | CHAR -> char
-        | "(" expr ")" -> paren_expr
+        | "(" [expr ("," expr)*] ")" -> paren_expr
         | "true" -> true
         | "false" -> false
         | "[" [expr ("," expr)*] "]" -> array_expr
@@ -839,13 +839,13 @@ class ASTTransformer(Transformer):
         return Bool(False, _items[0].line)
 
     def paren_expr(self, items):
-        return items[0]
+        if len(items) == 1:
+            return items[0]
+        else:
+            return Tuple(items, items[0].line)
 
     def array_expr(self, items):
         return Array(items, items[0].line)
-
-    def tuple_expr(self, items):
-        return Tuple(items, items[0].line)
 
     def field_init(self, items):
         name_tok, expr = items
