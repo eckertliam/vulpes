@@ -3,11 +3,11 @@
 # It is not intended to be a full implementation of the language.
 # It is only intended to be a minimal proof of concept.
 
-from typing import Dict, Optional, Union, List
+from typing import Dict, Optional, Union
 from lark import Lark, Tree, Token, Transformer
 from lark.indenter import Indenter
 
-# TODO: add tuples to the grammar
+# TODO: add tuples to the grammar while avoiding collisions
 cuss_grammar = r"""
     %import common.INT
     %import common.FLOAT 
@@ -137,7 +137,7 @@ cuss_grammar = r"""
         | "(" expr ")" -> paren_expr
         | "true" -> true
         | "false" -> false
-        | "[" expr ("," expr)* "]" -> array_expr
+        | "[" [expr ("," expr)*] "]" -> array_expr
         | IDENT "{" field_init_list "}" -> struct_expr
         | IDENT "::" IDENT "{" field_init_list "}" -> enum_struct_expr
         | IDENT "::" IDENT "(" [expr ("," expr)*] ")" -> enum_tuple_expr
@@ -469,7 +469,10 @@ class Array(Node):
         self.elems = elems
 
 
-# TODO: write tuple class
+class Tuple(Node):
+    def __init__(self, elems: list[Expr], line: int) -> None:
+        super().__init__("tuple", line)
+        self.elems = elems
 
 
 class FieldInit(Node):
@@ -841,7 +844,8 @@ class ASTTransformer(Transformer):
     def array_expr(self, items):
         return Array(items, items[0].line)
 
-    # TODO: write tuple transformer
+    def tuple_expr(self, items):
+        return Tuple(items, items[0].line)
 
     def field_init(self, items):
         name_tok, expr = items

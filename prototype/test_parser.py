@@ -16,6 +16,7 @@ from main import (
     String,
     StructExpr,
     StructField,
+    Tuple,
     TypeAliasDecl,
     Ident,
     If,
@@ -570,3 +571,22 @@ def test_fn_ret_fn():
     assert outer_call.args[0].value == 1
     assert isinstance(outer_call.args[1], Integer)
     assert outer_call.args[1].value == 2
+
+
+def test_tuple_expr():
+    source = textwrap.dedent(
+        """
+    fn main() -> int
+        return (1, 2)
+    """
+    )
+    program = parse(source)
+    fn_body = program.declarations[0].body
+    assert isinstance(fn_body[0], Return)
+    assert isinstance(fn_body[0].expr, Tuple)
+    tuple_expr = fn_body[0].expr
+    assert len(tuple_expr.elems) == 2
+    assert isinstance(tuple_expr.elems[0], Integer)
+    assert tuple_expr.elems[0].value == 1
+    assert isinstance(tuple_expr.elems[1], Integer)
+    assert tuple_expr.elems[1].value == 2
