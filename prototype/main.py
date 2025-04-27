@@ -1750,16 +1750,23 @@ class CussError(Exception):
     def __str__(self) -> str:
         return f"[Line {self.line}] {self.message}"
 
-    # TODO: print the body the entire parent of the error for example
-    # if the error is in a function body, print the entire function body with lines next to it and highlight the error line
-    # we can do this by getting the node from the ast_id and then getting the top line of the parent and the bottom line of the parent
-    def report(self, source: str, program: Program) -> None:
-        lines = source.splitlines()
-        print(self)
-        # print the line with the error
-        print(lines[self.line - 1])
-        # print the error line
-        print(" " * (len(str(self.line)) + 2) + "^")
+    def report(self, program: Program) -> None:
+        # get the declaration of the node
+        decl = program.get_declaration(self.ast_id)
+        if decl is None:
+            raise RuntimeError(f"Declaration not found for ast_id: {self.ast_id}")
+        # print the error
+        print(f"Error: {self}")
+        # get the span of the declaration
+        span = decl.get_span()
+        # split the source code into lines
+        lines = program.source.splitlines()
+        # print the lines with the error
+        for i in range(span[0], span[1]):
+            if i == self.line:
+                print(f"{i} | > {lines[i]}")
+            else:
+                print(f"{i} |   {lines[i]}")
 
 
 # Type mismatch etc
