@@ -394,8 +394,8 @@ class StructDecl(Node):
             min_line = min(min_line, fmin)
             max_line = max(max_line, fmax)
         return (min_line, max_line)
-    
-    
+
+
 class StructField(Node):
     def __init__(self, pub: bool, name: str, type: TypeAnnotation, line: int) -> None:
         super().__init__("struct_field", line)
@@ -407,10 +407,11 @@ class StructField(Node):
         if self.id == id:
             return self
         return self.type.get_node(id)
-    
+
     def get_span(self) -> tuple[int, int]:
         tmin, tmax = self.type.get_span()
         return (self.line, max(self.line, tmax))
+
 
 class EnumDecl(Node):
     def __init__(
@@ -438,6 +439,7 @@ class EnumDecl(Node):
             min_line = min(min_line, vmin)
             max_line = max(max_line, vmax)
         return (min_line, max_line)
+
 
 class EnumVariant(Node):
     def __init__(self, kind: str, name: str, line: int) -> None:
@@ -478,7 +480,7 @@ class EnumStructVariant(EnumVariant):
             if node is not None:
                 return node
         return None
-    
+
     def get_span(self) -> tuple[int, int]:
         min_line = self.line
         max_line = self.line
@@ -564,7 +566,7 @@ class Assign(Node):
         if self.id == id:
             return self
         return self.lhs.get_node(id) or self.rhs.get_node(id)
-    
+
     def get_span(self) -> tuple[int, int]:
         lhs_min, lhs_max = self.lhs.get_span()
         rhs_min, rhs_max = self.rhs.get_span()
@@ -585,7 +587,7 @@ class ImplDecl(Node):
             if node is not None:
                 return node
         return None
-    
+
     def get_span(self) -> tuple[int, int]:
         min_line = self.line
         max_line = self.line
@@ -605,7 +607,7 @@ class Return(Node):
         if self.id == id:
             return self
         return self.expr.get_node(id) if self.expr is not None else None
-    
+
     def get_span(self) -> tuple[int, int]:
         if self.expr is None:
             return (self.line, self.line)
@@ -642,7 +644,7 @@ class If(Node):
                 if node is not None:
                     return node
         return None
-    
+
     def get_span(self) -> tuple[int, int]:
         min_line = self.line
         max_line = self.line
@@ -675,7 +677,7 @@ class While(Node):
             if node is not None:
                 return node
         return None
-    
+
     def get_span(self) -> tuple[int, int]:
         min_line = self.line
         max_line = self.line
@@ -795,6 +797,7 @@ class Array(Node):
             max_line = max(max_line, emax)
         return (min_line, max_line)
 
+
 class Tuple(Node):
     def __init__(self, elems: list[Expr], line: int) -> None:
         super().__init__("tuple", line)
@@ -817,6 +820,7 @@ class Tuple(Node):
             min_line = min(min_line, emin)
             max_line = max(max_line, emax)
         return (min_line, max_line)
+
 
 class FieldInit(Node):
     def __init__(self, name: str, expr: Expr, line: int) -> None:
@@ -860,6 +864,7 @@ class StructExpr(Node):
             max_line = max(max_line, smax)
         return (min_line, max_line)
 
+
 class EnumStructExpr(Node):
     def __init__(
         self, name: str, unit: str, fields: list[FieldInit], line: int
@@ -877,7 +882,7 @@ class EnumStructExpr(Node):
             if node is not None:
                 return node
         return None
-    
+
     def get_span(self) -> tuple[int, int]:
         min_line = self.line
         max_line = self.line
@@ -886,6 +891,7 @@ class EnumStructExpr(Node):
             min_line = min(min_line, smin)
             max_line = max(max_line, smax)
         return (min_line, max_line)
+
 
 class EnumTupleExpr(Node):
     def __init__(self, name: str, unit: str, elems: list[Expr], line: int) -> None:
@@ -911,6 +917,7 @@ class EnumTupleExpr(Node):
             min_line = min(min_line, emin)
             max_line = max(max_line, emax)
         return (min_line, max_line)
+
 
 class EnumUnitExpr(Node):
     def __init__(self, name: str, unit: str, line: int) -> None:
@@ -955,6 +962,7 @@ class Call(Node):
             max_line = max(max_line, arg_max)
         return (min_line, max_line)
 
+
 class GetIndex(Node):
     def __init__(self, obj: Expr, index: Expr, line: int) -> None:
         super().__init__("getindex", line)
@@ -983,6 +991,7 @@ class GetIndex(Node):
         max_line = max(max_line, index_max)
         return (min_line, max_line)
 
+
 class GetAttr(Node):
     def __init__(self, obj: Expr, attr: str, line: int) -> None:
         super().__init__("getattr", line)
@@ -1005,6 +1014,7 @@ class GetAttr(Node):
         max_line = max(max_line, obj_max)
         return (min_line, max_line)
 
+
 class CallAttr(Node):
     def __init__(self, obj: Expr, attr: str, args: list[Expr], line: int) -> None:
         super().__init__("callattr", line)
@@ -1024,7 +1034,7 @@ class CallAttr(Node):
                 return node
         return None
 
-    def get_span(self) -> tuple[int, int]: 
+    def get_span(self) -> tuple[int, int]:
         min_line = self.line
         max_line = self.line
         obj_min, obj_max = self.obj.get_span()
@@ -1035,7 +1045,8 @@ class CallAttr(Node):
             min_line = min(min_line, arg_min)
             max_line = max(max_line, arg_max)
         return (min_line, max_line)
-        
+
+
 class BinaryOp(Node):
     def __init__(self, op: str, lhs: Expr, rhs: Expr, line: int) -> None:
         super().__init__("binary_op", line)
@@ -1062,6 +1073,7 @@ class BinaryOp(Node):
         max_line = max(max_line, rhs_max)
         return (min_line, max_line)
 
+
 class UnaryOp(Node):
     def __init__(self, op: str, operand: Expr, line: int) -> None:
         super().__init__("unary_op", line)
@@ -1080,6 +1092,7 @@ class UnaryOp(Node):
         min_line = min(min_line, operand_min)
         max_line = max(max_line, operand_max)
         return (min_line, max_line)
+
 
 # Lark to inhouse AST
 class ASTTransformer(Transformer):
