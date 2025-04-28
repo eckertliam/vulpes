@@ -3,7 +3,8 @@
 # It is not intended to be a full implementation of the language.
 # It is only intended to be a minimal proof of concept.
 
-from typing import Dict, Optional, Union
+from abc import ABC, abstractmethod
+from typing import Dict, List, Optional, Union
 from lark import Lark, Tree, Token, Transformer
 from lark.indenter import Indenter
 
@@ -113,7 +114,7 @@ cuss_grammar = r"""
     ?product: unary
         | product "*" unary -> mul
         | product "/" unary -> div
-        
+        | product "%" unary -> mod
     ?unary: "-" unary -> neg
         | "!" unary -> not_
         | molecule
@@ -166,17 +167,34 @@ cuss_grammar = r"""
 
 # Indentation handling
 class CussIndenter(Indenter):
-    NL_type = "_NL"
-    OPEN_PAREN_types = ["LPAR", "LSQB", "LBRACE"]
-    CLOSE_PAREN_types = ["RPAR", "RSQB", "RBRACE"]
-    INDENT_type = "_INDENT"
-    DEDENT_type = "_DEDENT"
-    tab_len = 4
+    @property
+    def NL_type(self) -> str:
+        return "_NL"
+
+    @property
+    def OPEN_PAREN_types(self) -> list[str]:
+        return ["LPAR", "LSQB", "LBRACE"]
+
+    @property
+    def CLOSE_PAREN_types(self) -> list[str]:
+        return ["RPAR", "RSQB", "RBRACE"]
+
+    @property
+    def INDENT_type(self) -> str:
+        return "_INDENT"
+
+    @property
+    def DEDENT_type(self) -> str:
+        return "_DEDENT"
+
+    @property
+    def tab_len(self) -> int:
+        return 4
 
 
 # Expressive AST we convert the Lark ast into
 class Program:
-    def __init__(self, source: str) -> None:
+    def __init__(self, source: Optional[str] = None) -> None:
         self.declarations = []
         self.source = source
         # memoize nodes by id to improve perf when grabbing nodes by id a lot
@@ -226,14 +244,11 @@ class Node:
         return (self.line, self.line)
 
 
-Declaration = Union["FnDecl", "EnumDecl", "StructDecl", "TypeAliasDecl"]
+Declaration = Union["FnDecl", "EnumDecl", "StructDecl", "TypeAliasDecl", "ImplDecl"]
 
 Statement = Union[
     "Expr",
     "FnDecl",
-    "EnumDecl",
-    "StructDecl",
-    "TypeAliasDecl",
     "VarDecl",
     "Assign",
     "Return",
@@ -1413,10 +1428,13 @@ parser = Lark(
 
 
 def parse(source: str) -> Program:
-    program: Optional[Program] = parser.parse(source)
+    program: Union[Optional[Program], Tree] = parser.parse(source)
     if program is None:
         return Program()
-    return program
+    elif isinstance(program, Program):
+        return program
+    else:
+        raise ValueError("Invalid program")
 
 
 # Internal Type Representation
@@ -1434,21 +1452,15 @@ class Type:
         raise NotImplementedError("Subclasses must implement __hash__")
 
 
-def resolve_type_alias(type: Type) -> Type:
-    while isinstance(type, TypeAliasType):
-        type = type.target_type
-    return type
-
-
 class IntType(Type):
     def __str__(self) -> str:
         return "int"
 
     def __eq__(self, other: "Type") -> bool:
-        return isinstance(resolve_type_alias(other), IntType)
+        return isinstance(other, IntType)
 
     def __ne__(self, other: "Type") -> bool:
-        return not isinstance(resolve_type_alias(other), IntType)
+        return not isinstance(other, IntType)
 
     def __hash__(self) -> int:
         return hash("int")
@@ -1459,10 +1471,10 @@ class FloatType(Type):
         return "float"
 
     def __eq__(self, other: "Type") -> bool:
-        return isinstance(resolve_type_alias(other), FloatType)
+        return isinstance(other, FloatType)
 
     def __ne__(self, other: "Type") -> bool:
-        return not isinstance(resolve_type_alias(other), FloatType)
+        return not isinstance(other, FloatType)
 
     def __hash__(self) -> int:
         return hash("float")
@@ -1473,10 +1485,10 @@ class StringType(Type):
         return "string"
 
     def __eq__(self, other: "Type") -> bool:
-        return isinstance(resolve_type_alias(other), StringType)
+        return isinstance(other, StringType)
 
     def __ne__(self, other: "Type") -> bool:
-        return not isinstance(resolve_type_alias(other), StringType)
+        return not isinstance(other, StringType)
 
     def __hash__(self) -> int:
         return hash("string")
@@ -1487,10 +1499,10 @@ class BoolType(Type):
         return "bool"
 
     def __eq__(self, other: "Type") -> bool:
-        return isinstance(resolve_type_alias(other), BoolType)
+        return isinstance(other, BoolType)
 
     def __ne__(self, other: "Type") -> bool:
-        return not isinstance(resolve_type_alias(other), BoolType)
+        return not isinstance(other, BoolType)
 
     def __hash__(self) -> int:
         return hash("bool")
@@ -1501,10 +1513,10 @@ class CharType(Type):
         return "char"
 
     def __eq__(self, other: "Type") -> bool:
-        return isinstance(resolve_type_alias(other), CharType)
+        return isinstance(other, CharType)
 
     def __ne__(self, other: "Type") -> bool:
-        return not isinstance(resolve_type_alias(other), CharType)
+        return not isinstance(other, CharType)
 
     def __hash__(self) -> int:
         return hash("char")
@@ -1518,16 +1530,10 @@ class ArrayType(Type):
         return f"[{self.elem_type}]"
 
     def __eq__(self, other: "Type") -> bool:
-        return (
-            isinstance(resolve_type_alias(other), ArrayType)
-            and self.elem_type == resolve_type_alias(other).elem_type
-        )
+        return isinstance(other, ArrayType) and self.elem_type == other.elem_type
 
     def __ne__(self, other: "Type") -> bool:
-        return (
-            not isinstance(resolve_type_alias(other), ArrayType)
-            or self.elem_type != resolve_type_alias(other).elem_type
-        )
+        return not isinstance(other, ArrayType) or self.elem_type != other.elem_type
 
     def __hash__(self) -> int:
         return hash(("array", hash(self.elem_type)))
@@ -1541,16 +1547,10 @@ class TupleType(Type):
         return f"({', '.join(str(t) for t in self.elem_types)})"
 
     def __eq__(self, other: "Type") -> bool:
-        return (
-            isinstance(resolve_type_alias(other), TupleType)
-            and self.elem_types == resolve_type_alias(other).elem_types
-        )
+        return isinstance(other, TupleType) and self.elem_types == other.elem_types
 
     def __ne__(self, other: "Type") -> bool:
-        return (
-            not isinstance(resolve_type_alias(other), TupleType)
-            or self.elem_types != resolve_type_alias(other).elem_types
-        )
+        return not isinstance(other, TupleType) or self.elem_types != other.elem_types
 
     def __hash__(self) -> int:
         return hash(("tuple", tuple(hash(t) for t in self.elem_types)))
@@ -1561,27 +1561,21 @@ class FunctionType(Type):
         self.params = params
         self.ret_type = ret_type
 
-    @staticmethod
-    def from_fn_decl(decl: FnDecl) -> "FunctionType":
-        params = [p.type for p in decl.params]
-        ret_type = decl.ret_type
-        return FunctionType(params, ret_type)
-
     def __str__(self) -> str:
         return f"({', '.join(str(t) for t in self.params)}) -> {self.ret_type}"
 
     def __eq__(self, other: "Type") -> bool:
         return (
-            isinstance(resolve_type_alias(other), FunctionType)
-            and self.params == resolve_type_alias(other).params
-            and self.ret_type == resolve_type_alias(other).ret_type
+            isinstance(other, FunctionType)
+            and self.params == other.params
+            and self.ret_type == other.ret_type
         )
 
     def __ne__(self, other: "Type") -> bool:
         return (
-            not isinstance(resolve_type_alias(other), FunctionType)
-            or self.params != resolve_type_alias(other).params
-            or self.ret_type != resolve_type_alias(other).ret_type
+            not isinstance(other, FunctionType)
+            or self.params != other.params
+            or self.ret_type != other.ret_type
         )
 
     def __hash__(self) -> int:
@@ -1593,22 +1587,32 @@ class StructType(Type):
     def __init__(self, name: str, fields: Dict[str, Type]) -> None:
         self.name = name
         self.fields = fields
+        self.methods: Dict[str, FunctionType] = {}
+
+    def add_method(
+        self, name: str, method: FunctionType, line: int, ast_id: int
+    ) -> None:
+        if name in self.methods:
+            raise NameResolutionError(
+                f"Method {name} already exists for struct {self.name}", line, ast_id
+            )
+        self.methods[name] = method
 
     def __str__(self) -> str:
         return f"{self.name} {{ {', '.join(f'{k}: {v}' for k, v in self.fields.items())} }}"
 
     def __eq__(self, other: "Type") -> bool:
         return (
-            isinstance(resolve_type_alias(other), StructType)
-            and self.name == resolve_type_alias(other).name
-            and self.fields == resolve_type_alias(other).fields
+            isinstance(other, StructType)
+            and self.name == other.name
+            and self.fields == other.fields
         )
 
     def __ne__(self, other: "Type") -> bool:
         return (
-            not isinstance(resolve_type_alias(other), StructType)
-            or self.name != resolve_type_alias(other).name
-            or self.fields != resolve_type_alias(other).fields
+            not isinstance(other, StructType)
+            or self.name != other.name
+            or self.fields != other.fields
         )
 
     def __hash__(self) -> int:
@@ -1677,22 +1681,32 @@ class EnumType(Type):
     def __init__(self, name: str, variants: list[EnumVariantType]) -> None:
         self.name = name
         self.variants: Dict[str, EnumVariantType] = {v.name: v for v in variants}
+        self.methods: Dict[str, FunctionType] = {}
+
+    def add_method(
+        self, name: str, method: FunctionType, line: int, ast_id: int
+    ) -> None:
+        if name in self.methods:
+            raise NameResolutionError(
+                f"Method {name} already exists for enum {self.name}", line, ast_id
+            )
+        self.methods[name] = method
 
     def __str__(self) -> str:
         return f"{self.name} {{ {', '.join(str(v) for v in self.variants.values())} }}"
 
     def __eq__(self, other: "Type") -> bool:
         return (
-            isinstance(resolve_type_alias(other), EnumType)
-            and self.name == resolve_type_alias(other).name
-            and self.variants == resolve_type_alias(other).variants
+            isinstance(other, EnumType)
+            and self.name == other.name
+            and self.variants == other.variants
         )
 
     def __ne__(self, other: "Type") -> bool:
         return (
-            not isinstance(resolve_type_alias(other), EnumType)
-            or self.name != resolve_type_alias(other).name
-            or self.variants != resolve_type_alias(other).variants
+            not isinstance(other, EnumType)
+            or self.name != other.name
+            or self.variants != other.variants
         )
 
     def __hash__(self) -> int:
@@ -1705,51 +1719,29 @@ class EnumType(Type):
         )
 
 
-class TypeAliasType(Type):
-    def __init__(self, name: str, target_type: Type) -> None:
-        self.name = name
-        self.target_type = target_type
-
-    def __str__(self) -> str:
-        return f"{self.name} = {self.target_type}"
-
-    def __eq__(self, other: "Type") -> bool:
-        return (
-            isinstance(resolve_type_alias(other), TypeAliasType)
-            and self.name == resolve_type_alias(other).name
-            and self.target_type == resolve_type_alias(other).target_type
-        )
-
-    def __ne__(self, other: "Type") -> bool:
-        return (
-            not isinstance(resolve_type_alias(other), TypeAliasType)
-            or self.name != resolve_type_alias(other).name
-            or self.target_type != resolve_type_alias(other).target_type
-        )
-
-
-# For type inference
 class TypeVar(Type):
-    def __init__(self, name: str) -> None:
-        self.name = name
+    next_alpha = "a"
+    next_numeric = 0
+
+    def __init__(self) -> None:
+        self.name = f"T{TypeVar.next_alpha}{TypeVar.next_numeric}"
+        if TypeVar.next_numeric == 9:
+            TypeVar.next_alpha = chr(ord(TypeVar.next_alpha) + 1)
+            TypeVar.next_numeric = 0
+        else:
+            TypeVar.next_numeric += 1
 
     def __str__(self) -> str:
         return self.name
 
     def __eq__(self, other: "Type") -> bool:
-        return (
-            isinstance(resolve_type_alias(other), TypeVar)
-            and self.name == resolve_type_alias(other).name
-        )
+        return isinstance(other, TypeVar) and self.name == other.name
 
     def __ne__(self, other: "Type") -> bool:
-        return (
-            not isinstance(resolve_type_alias(other), TypeVar)
-            or self.name != resolve_type_alias(other).name
-        )
+        return not self.__eq__(other)
 
     def __hash__(self) -> int:
-        return hash(("typevar", self.name))
+        return hash(self.name)
 
 
 # Error handling
@@ -1765,15 +1757,19 @@ class CussError(Exception):
 
     def report(self, program: Program) -> None:
         # get the declaration of the node
-        decl = program.get_declaration(self.ast_id)
+        decl = program.get_decl(self.ast_id)
         if decl is None:
             raise RuntimeError(f"Declaration not found for ast_id: {self.ast_id}")
         # print the error
         print(f"Error: {self}")
         # get the span of the declaration
         span = decl.get_span()
+        # get the source code
+        source = program.source
+        if source is None:
+            raise RuntimeError(f"Source code not found for ast_id: {self.ast_id}")
         # split the source code into lines
-        lines = program.source.splitlines()
+        lines = source.splitlines()
         # print the lines with the error
         for i in range(span[0], span[1]):
             if i == self.line:
@@ -1782,183 +1778,902 @@ class CussError(Exception):
                 print(f"{i} |   {lines[i]}")
 
 
-# Type mismatch etc
-class CussTypeError(CussError):
+# Cannot infer type
+class TypeInferenceError(CussError):
     pass
 
 
-# Syntax errors
-class CussSyntaxError(CussError):
+# Cannot resolve name
+class NameResolutionError(CussError):
     pass
 
 
-# Attempting to mutate a constant
-class CussMutabilityError(CussError):
-    pass
+# Passes are used to transform and validate the AST
+# This is the base class for all passes
+class Pass(ABC):
+    @abstractmethod
+    def run(self, program: Program) -> Program:
+        pass
 
 
-# Attempting to use an undefined name
-class CussNameError(CussError):
-    pass
+# Pass utils
+# Scopes map identifiers to types
+class Scope:
+    def __init__(self, parent_id: Optional[int] = None) -> None:
+        self.identifiers: dict[str, Type] = {}
+        self.parent_id = parent_id
+
+    # adds an identifier to the scope
+    def add_identifier(self, name: str, type: Type) -> None:
+        self.identifiers[name] = type
+
+    # only looks in the current scope
+    def lookup(self, name: str) -> Optional[Type]:
+        return self.identifiers.get(name)
 
 
-# Runtime errors
-class CussRuntimeError(CussError):
-    pass
-
-
-# Track type and mutability of variables
-class VarBinding:
-    def __init__(self, mutable: bool, type: Type) -> None:
-        self.mutable = mutable
-        self.type = type
-
-
-# Context for type checking, type inference, etc.
-class Context:
+# The symbol table maps ast ids to scopes
+# SymbolTable persists across passes.
+# Each AST node ID maps to the scope visible at that node's entry point.
+# Scopes are never deleted.
+class SymbolTable:
     def __init__(self) -> None:
-        # top level type scope
-        self.named_types: Dict[str, Type] = {}
-        # track type bindings over scopes
-        self.var_bindings: list[Dict[str, VarBinding]] = [{}]
-        # function bindings
-        self.fn_bindings: Dict[str, FunctionType] = {}
-        # impl bindings struct -> method -> function type
-        self.impl_bindings: Dict[str, Dict[str, FunctionType]] = {}
+        self.scopes: dict[int, Scope] = {}
+        # add global scope -1
+        self.scopes[-1] = Scope()
+        self.current_scope_id: int = -1
 
-    def enter_scope(self) -> None:
-        self.var_bindings.append({})
-
-    def exit_scope(self) -> None:
-        if len(self.var_bindings) > 1:
-            self.var_bindings.pop()
+    # creates a new scope and makes it the current scope
+    def enter_scope(self, id: int) -> None:
+        if id in self.scopes:
+            self.current_scope_id = id
         else:
-            raise RuntimeError("Cannot exit top scope")
+            self.scopes[id] = Scope(self.current_scope_id)
+            self.current_scope_id = id
 
-    def bind_var(self, name: str, mutable: bool, type: Type) -> None:
-        self.var_bindings[-1][name] = VarBinding(mutable, type)
+    # pops the current scope and makes the parent scope the current scope if it exists
+    # returns the id of the parent scope
+    def pop_scope(self) -> int:
+        if self.current_scope_id == -1:
+            raise RuntimeError("Cannot exit global scope")
+        parent_id = self.scopes[self.current_scope_id].parent_id
+        if parent_id is None:
+            raise RuntimeError("Cannot exit global scope")
+        self.current_scope_id = parent_id
+        return parent_id
 
-    def get_var(self, name: str) -> Optional[VarBinding]:
-        for scope in reversed(self.var_bindings):
-            if name in scope:
-                return scope[name]
-        return None
+    # adds an identifier to the current scope
+    def add_identifier(self, name: str, type: Type, line: int, ast_id: int) -> None:
+        # make sure no ident shadower exists
+        if self.lookup_local(name) is not None:
+            raise NameResolutionError(
+                f"Identifier {name} already exists in current scope", line, ast_id
+            )
+        self.scopes[self.current_scope_id].add_identifier(name, type)
+
+    def set_identifier_type(self, name: str, type: Type) -> None:
+        if name not in self.scopes[self.current_scope_id].identifiers:
+            raise RuntimeError(f"Identifier {name} does not exist in current scope")
+        # set the type of an existing identifier
+        # used to resolve type variables
+        self.scopes[self.current_scope_id].identifiers[name] = type
+
+    # looks up an identifier in the current scope
+    def lookup_local(self, name: str) -> Optional[Type]:
+        return self.scopes[self.current_scope_id].lookup(name)
+
+    # looks up ident in current scope and any parent scopes
+    def lookup(self, name: str) -> Optional[Type]:
+        scope = self.scopes[self.current_scope_id]
+        while True:
+            type = scope.lookup(name)
+            if type is not None:
+                return type
+            # we will break if we hit global and return a check to that scope
+            if scope.parent_id == -1 or scope.parent_id is None:
+                break
+            scope = self.scopes[scope.parent_id]
+        # check global scope
+        return self.scopes[-1].lookup(name)
+
+
+# Type scope is a map of type names to types
+# It is used to resolve type aliases and ensure no type shadowing
+class TypeScope:
+    def __init__(self, parent_id: Optional[int] = None) -> None:
+        self.types: dict[str, Type] = {}
+        self.parent_id = parent_id
+
+    def lookup(self, name: str) -> Optional[Type]:
+        return self.types.get(name)
 
     def add_type(self, name: str, type: Type) -> None:
-        self.named_types[name] = type
+        self.types[name] = type
+
+
+# Type resolver is a map of type names to types
+# It is used to resolve type aliases and ensure no type shadowing
+class TypeResolver:
+    def __init__(self) -> None:
+        self.type_scopes: dict[int, TypeScope] = {}
+        # global scope
+        self.type_scopes[-1] = TypeScope()
+        self.current_scope_id: int = -1
+
+    def enter_scope(self, id: int) -> None:
+        if id in self.type_scopes:
+            self.current_scope_id = id
+        else:
+            self.type_scopes[id] = TypeScope(self.current_scope_id)
+            self.current_scope_id = id
+
+    def pop_scope(self) -> int:
+        if self.current_scope_id == -1:
+            raise RuntimeError("Cannot exit global scope")
+        parent_id = self.type_scopes[self.current_scope_id].parent_id
+        if parent_id is None:
+            raise RuntimeError("Cannot exit global scope")
+        self.current_scope_id = parent_id
+        return parent_id
+
+    def lookup(self, name: str) -> Optional[Type]:
+        scope = self.type_scopes[self.current_scope_id]
+        while True:
+            type = scope.lookup(name)
+            if type is not None:
+                return type
+            # we will break if we hit global and return a check to that scope
+            if scope.parent_id == -1 or scope.parent_id is None:
+                break
+            scope = self.type_scopes[scope.parent_id]
+        # check global scope
+        return self.type_scopes[-1].lookup(name)
+
+    def add_type(self, name: str, type: Type, line: int, ast_id: int) -> None:
+        if self.lookup(name) is not None:
+            raise TypeInferenceError(f"Type {name} already defined", line, ast_id)
+        self.type_scopes[self.current_scope_id].add_type(name, type)
+
+    def update_type(self, name: str, type: Type, line: int, ast_id: int) -> None:
+        if self.lookup(name) is None:
+            raise TypeInferenceError(f"Type {name} not defined", line, ast_id)
+        self.type_scopes[self.current_scope_id].types[name] = type
+
+
+# Micropasses
+
+
+# Pass 1: Name resolution
+class NameResolver(Pass):
+    def __init__(self) -> None:
+        super().__init__()
+        self.symbol_table = SymbolTable()
+        self.type_resolver = TypeResolver()
+        self.errors: list[CussError] = []
+        # nodes that need to be revisited after the first pass
+        # this is used to resolve methods in case their type is not resolved yet
+        self.back_tracks: list[int] = []
+
+    def enter_scope(self, id: int) -> None:
+        self.type_resolver.enter_scope(id)
+        self.symbol_table.enter_scope(id)
+
+    def pop_scope(self) -> int:
+        self.type_resolver.pop_scope()
+        return self.symbol_table.pop_scope()
+
+    def push_symbol(self, name: str, type: Type, line: int, ast_id: int) -> None:
+        try:
+            self.symbol_table.add_identifier(name, type, line, ast_id)
+        except NameResolutionError as e:
+            self.errors.append(e)
+
+    def add_type(self, name: str, type: Type, line: int, ast_id: int) -> None:
+        try:
+            self.type_resolver.add_type(name, type, line, ast_id)
+        except TypeInferenceError as e:
+            self.errors.append(e)
+
+    def resolve_type_annotation(
+        self, type_annotation: TypeAnnotation
+    ) -> Optional[Type]:
+        match type_annotation.kind:
+            case "named_type":
+                assert isinstance(type_annotation, NamedTypeAnnotation)
+                return self.type_resolver.lookup(type_annotation.name)
+            case "array_type":
+                assert isinstance(type_annotation, ArrayTypeAnnotation)
+                elem_type = self.resolve_type_annotation(type_annotation.elem_type)
+                if elem_type is None:
+                    return None
+                return ArrayType(elem_type)
+            case "tuple_type":
+                assert isinstance(type_annotation, TupleTypeAnnotation)
+                elem_types = [
+                    self.resolve_type_annotation(t) for t in type_annotation.elem_types
+                ]
+                if any(t is None for t in elem_types):
+                    return None
+                elem_types = [
+                    t for t in elem_types if t is not None
+                ]  # done to please the type checker
+                return TupleType(elem_types)
+            case "function_type":
+                assert isinstance(type_annotation, FunctionTypeAnnotation)
+                params = [
+                    self.resolve_type_annotation(p) for p in type_annotation.params
+                ]
+                if any(p is None for p in params):
+                    return None
+                params = [
+                    p for p in params if p is not None
+                ]  # done to please the type checker
+                ret_type = self.resolve_type_annotation(type_annotation.ret_type)
+                if ret_type is None:
+                    return None
+                return FunctionType(params, ret_type)
+            case _:
+                raise NameResolutionError(
+                    f"Unknown type annotation: {type_annotation.kind}",
+                    type_annotation.line,
+                    type_annotation.id,
+                )
+
+    def run(self, program: Program) -> Program:
+        for decl in program.declarations:
+            self.resolve_decl(decl)
+        if len(self.back_tracks) > 0:
+            for id in self.back_tracks:
+                decl = program.get_decl(id)
+                if decl is None:
+                    raise RuntimeError(f"Declaration not found: {id}")
+                self.resolve_decl(decl, True)
+        if len(self.errors) > 0:
+            for error in self.errors:
+                error.report(program)
+        return program
+
+    def resolve_decl(self, decl: Declaration, back_track: bool = False) -> None:
+        if isinstance(decl, FnDecl):
+            self.resolve_fn_decl(decl, back_track)
+        elif isinstance(decl, ImplDecl):
+            self.resolve_impl_decl(decl, back_track)
+        elif isinstance(decl, StructDecl):
+            self.resolve_struct_decl(decl, back_track)
+        elif isinstance(decl, EnumDecl):
+            self.resolve_enum_decl(decl, back_track)
+        elif isinstance(decl, TypeAliasDecl):
+            self.resolve_type_alias_decl(decl, back_track)
+
+    def resolve_struct_decl(self, decl: StructDecl, back_track: bool = False) -> None:
+        # convert the type annotations in the fields to types
+        typed_fields = {}
+        for field in decl.fields:
+            type = self.resolve_type_annotation(field.type)
+            if type is None:
+                if back_track:
+                    # if we are back tracking we have no tolerance for unresolved types
+                    self.errors.append(
+                        TypeInferenceError(
+                            f"Struct field {field.name} has an unresolved type {field.type}",
+                            field.line,
+                            field.id,
+                        )
+                    )
+                else:
+                    # add to the back tracks and return out of the struct decl
+                    self.back_tracks.append(decl.id)
+                    return None
+            # check that the field name is not already in use
+            elif field.name in typed_fields:
+                self.errors.append(
+                    NameResolutionError(
+                        f"Struct field {field.name} already defined in {decl.name}",
+                        field.line,
+                        field.id,
+                    )
+                )
+            else:
+                typed_fields[field.name] = type
+        struct_type = StructType(decl.name, typed_fields)
+        self.add_type(decl.name, struct_type, decl.line, decl.id)
+
+    def resolve_enum_decl(self, decl: EnumDecl, back_track: bool = False) -> None:
+        # TODO: implement this
+        raise NotImplementedError("Enum declarations not implemented")
+
+    def resolve_type_alias_decl(self, decl: TypeAliasDecl, back_track: bool = False) -> None:
+        type = self.resolve_type_annotation(decl.type)
+        if type is None:
+            if back_track:
+                # if we are back tracking we have no tolerance for unresolved types
+                self.errors.append(
+                    TypeInferenceError(
+                        f"Type alias {decl.name} has an unresolved type {decl.type}",
+                        decl.line,
+                        decl.id,
+                    )
+                )
+            else:
+                # add to the back tracks and return out of the type alias decl
+                self.back_tracks.append(decl.id)
+                return None
+        else:
+            self.add_type(decl.name, type, decl.line, decl.id)
+
+    def resolve_impl_decl(self, decl: ImplDecl, back_track: bool = False) -> None:
+        # get the type of the object being implemented on
+        obj_type = self.type_resolver.lookup(decl.name)
+        
+        if obj_type is None:
+            if back_track:
+                # if we are back tracking we have no tolerance for unresolved types
+                self.errors.append(
+                    TypeInferenceError(
+                        f"Cannot find type {decl.name} to implement on",
+                        decl.line,
+                        decl.id,
+                    )
+                )
+            else:
+                # if object type is not resolved, we need to revisit this node
+                self.back_tracks.append(decl.id)
+                return None
+        # check that the object type is a struct or enum
+        if not isinstance(obj_type, (StructType, EnumType)):
+            self.errors.append(
+                TypeInferenceError(
+                    f"Cannot implement on {decl.name} because it is not a struct or enum",
+                    decl.line,
+                    decl.id,
+                )
+            )
+            return
+        # resolve the methods
+        for method in decl.methods:
+            obj_type = self.resolve_method_decl(method, obj_type)
+            if obj_type is None:
+                if back_track:
+                    # if we are back tracking and the method type is unresolved
+                    # it already added an error so we can just return
+                    return
+                else:
+                    # add to the back tracks and return out of the impl decl
+                    self.back_tracks.append(decl.id)
+                    return None
+        # update the type of the object since we stayed in the global scope
+        self.type_resolver.update_type(decl.name, obj_type, decl.line, decl.id)
+
+    def resolve_method_decl(
+        self, decl: FnDecl, obj_type: Union[StructType, EnumType], back_track: bool = False
+    ) -> Optional[Union[StructType, EnumType]]:
+        # convert the type annotations in the params to types
+        typed_params: Dict[str, Type] = {}
+        for param in decl.params:
+            type = self.resolve_type_annotation(param.type)
+            if type is None:
+                if back_track:
+                    self.errors.append(
+                        TypeInferenceError(
+                            f"Method {decl.name}'s parameter {param.name} has an unresolved type {param.type}",
+                            decl.line,
+                            decl.id,
+                        )
+                    )
+                    return
+                else:
+                    # add to the back tracks and return out of the method decl
+                    self.back_tracks.append(decl.id)
+                    return None
+            elif param.name in typed_params:
+                self.errors.append(
+                    NameResolutionError(
+                        f"Method {decl.name}'s parameter {param.name} already defined in {decl.name}",
+                        param.line,
+                        param.id,
+                    )
+                )
+            else:
+                typed_params[param.name] = type
+        # add self param to the fn params
+        typed_params["self"] = obj_type
+        # get the return type
+        ret_type = self.resolve_type_annotation(decl.ret_type)
+        if ret_type is None:
+            # add to the back tracks and return out of the method decl
+            self.back_tracks.append(decl.id)
+            return None
+        # create the function type
+        fn_type = FunctionType(list(typed_params.values()), ret_type)
+        # enter the new scope
+        self.enter_scope(decl.id)
+        # add params to the symbol table
+        for param in typed_params.items():
+            self.push_symbol(param[0], param[1], decl.line, decl.id)
+        # go over the body and resolve each statement
+        for stmt in decl.body:
+            self.resolve_stmt(stmt)
+        # exit the scope
+        self.pop_scope()
+        # add the method to the object type
+        try:
+            obj_type.add_method(decl.name, fn_type, decl.line, decl.id)
+        except CussError as e:
+            self.errors.append(e)
+        return obj_type
+
+    def resolve_fn_decl(self, decl: FnDecl, back_track: bool = False) -> None:
+        # get the type of the fn
+        # first convert the type annotations in the params to types
+        typed_params: Dict[str, Type] = {}
+        for param in decl.params:
+            type = self.resolve_type_annotation(param.type)
+            if type is None:
+                if back_track:
+                    self.errors.append(
+                        TypeInferenceError(
+                            f"Function {decl.name}'s parameter {param.name} has an unresolved type {param.type}",
+                            decl.line,
+                            decl.id,
+                        )
+                    )
+                else:
+                    # add to the back tracks and return out of the fn decl
+                    self.back_tracks.append(decl.id)
+                    return None
+            elif param.name in typed_params:
+                self.errors.append(
+                    NameResolutionError(
+                        f"Function {decl.name}'s parameter {param.name} already defined in {decl.name}",
+                        param.line,
+                        param.id,
+                    )
+                )
+            else:
+                typed_params[param.name] = type
+        # get the return type
+        ret_type = self.resolve_type_annotation(decl.ret_type)
+        if ret_type is None:
+            # add to the back tracks and return out of the method decl
+            self.back_tracks.append(decl.id)
+            return None
+        # create the function type
+        fn_type = FunctionType(list(typed_params.values()), ret_type)
+        # add the fn type to the symbol table
+        self.push_symbol(decl.name, fn_type, decl.line, decl.id)
+        # enter the new scope
+        self.enter_scope(decl.id)
+        # add params to the symbol table
+        for param in typed_params.items():
+            self.push_symbol(param[0], param[1], decl.line, decl.id)
+        # go over the body and resolve each statement
+        for stmt in decl.body:
+            self.resolve_stmt(stmt)
+        # exit the scope
+        self.pop_scope()
+
+    def resolve_stmt(self, stmt: Statement, back_track: bool = False) -> None:
+        if isinstance(stmt, FnDecl):
+            self.resolve_fn_decl(stmt, back_track)
+        elif isinstance(stmt, VarDecl):
+            self.resolve_var_decl(stmt, back_track)
+        elif isinstance(stmt, If):
+            self.resolve_if(stmt, back_track)
+        elif isinstance(stmt, While):
+            self.resolve_while(stmt, back_track)
+        elif isinstance(stmt, Loop):
+            self.resolve_loop(stmt, back_track)
+        else:
+            pass  # only bodied statements need to be resolvedp
+
+    def resolve_var_decl(self, stmt: VarDecl, back_track: bool = False) -> None:
+        # check if the decl has a type
+        if stmt.type is not None:
+            type = self.resolve_type_annotation(stmt.type)
+            if type is None:
+                if back_track:
+                    # add to the back tracks and return out of the method decl
+                    self.back_tracks.append(stmt.id)
+                    return None
+                else:
+                    # add to the back tracks and return out of the method decl
+                    self.back_tracks.append(stmt.id)
+                    return None
+            else:
+                self.push_symbol(stmt.name, type, stmt.line, stmt.id)
+        else:
+            # no type, so we need to infer it, for now we will use a type variable
+            self.push_symbol(stmt.name, TypeVar(), stmt.line, stmt.id)
+
+    def resolve_if(self, stmt: If, back_track: bool = False) -> None:
+        # enter the new scope
+        self.enter_scope(stmt.id)
+        # do not touch the cond
+        # resolve the body
+        for item in stmt.body:
+            self.resolve_stmt(item, back_track)
+        # exit the scope
+        self.pop_scope()
+        # resolve the else body if it exists
+        if stmt.else_body is not None:
+            for item in stmt.else_body:
+                self.resolve_stmt(item, back_track)
+
+    def resolve_while(self, stmt: While, back_track: bool = False) -> None:
+        # enter the new scope
+        self.enter_scope(stmt.id)
+        # do not touch the cond
+        # resolve the body
+        for item in stmt.body:
+            self.resolve_stmt(item, back_track)
+        # exit the scope
+        self.pop_scope()
+
+    def resolve_loop(self, stmt: Loop, back_track: bool = False) -> None:
+        # enter the new scope
+        self.enter_scope(stmt.id)
+        # resolve the body
+        for item in stmt.body:
+            self.resolve_stmt(item, back_track)
+        # exit the scope
+        self.pop_scope()
+
+
+# Pass 2: Type inference
+class TypeInferencePass(Pass):
+    # takes prebuilt symbol table from name resolution pass
+    def __init__(self, symbol_table: SymbolTable) -> None:
+        super().__init__()
+        self.type_resolver: TypeResolver = TypeResolver.top()
+        self.symbol_table: SymbolTable = symbol_table
+        # node ids that need to be revisited with more information
+        # this makes it so types can be used before they are defined
+        self.backtracks: list[int] = []
+        self.errors: list[TypeInferenceError] = []
+
+    def run(self, program: Program) -> Program:
+        for decl in program.declarations:
+            self.infer_decl(decl)
+        return program
+
+    def push_type(self, name: str, type: Type, line: int, ast_id: int) -> None:
+        try:
+            self.type_resolver.add_type(name, type, line, ast_id)
+        except TypeInferenceError as e:
+            self.errors.append(e)
 
     def get_type(self, name: str) -> Optional[Type]:
-        return self.named_types.get(name)
+        return self.type_resolver.lookup(name)
 
-    def bind_fn(self, name: str, fn_type: FunctionType) -> None:
-        self.fn_bindings[name] = fn_type
+    def get_identifier_type(self, name: str) -> Optional[Type]:
+        return self.symbol_table.lookup(name)
 
-    def get_fn(self, name: str) -> Optional[FunctionType]:
-        return self.fn_bindings.get(name)
+    def set_identifier_type(
+        self, name: str, type: Type, line: int, ast_id: int
+    ) -> None:
+        self.symbol_table.set_identifier_type(name, type, line, ast_id)
 
-    def bind_impl(self, name: str, method_name: str, fn_type: FunctionType) -> None:
-        if name not in self.impl_bindings:
-            self.impl_bindings[name] = {}
-        self.impl_bindings[name][method_name] = fn_type
+    def enter_scope(self, id: int) -> None:
+        self.type_resolver.enter_scope(id)
+        self.symbol_table.enter_scope(id)
 
-    def get_impl(self, name: str, method_name: str) -> Optional[FunctionType]:
-        return self.impl_bindings.get(name, {}).get(method_name, None)
+    def pop_scope(self) -> int:
+        self.symbol_table.pop_scope()
+        return self.type_resolver.pop_scope()
 
-
-# Semantic analysis
-class SemanticAnalyzer:
-    def __init__(self) -> None:
-        self.context = Context()
-
-    def check_program(self, program: Program, source: str) -> None:
-        errors: list[CussError] = []
-        for decl in program.declarations:
-            try:
-                self.check_declaration(decl)
-            except CussError as e:
-                errors.append(e)
-        if errors:
-            for error in errors:
-                error.report(source)
-            exit(1)
-
-    def check_declaration(self, decl: Declaration) -> None:
+    # infer the types of the declarations
+    def infer_decl(self, decl: Declaration) -> None:
         match decl.kind:
             case "fn_decl":
-                self.check_fn_decl(decl)
+                self.infer_fn_decl(decl)
             case "struct_decl":
-                self.check_struct_decl(decl)
+                self.infer_struct_decl(decl)
             case "enum_decl":
-                self.check_enum_decl(decl)
+                self.infer_enum_decl(decl)
             case "type_alias_decl":
-                self.check_type_alias_decl(decl)
+                self.infer_type_alias_decl(decl)
             case "impl_decl":
-                self.check_impl_decl(decl)
+                self.infer_impl_decl(decl)
             case _:
                 raise RuntimeError(f"Unknown declaration kind: {decl.kind}")
 
-    def check_fn_decl(self, decl: FnDecl) -> None:
-        assert isinstance(decl, FnDecl)
-        # enter scope
-        self.context.enter_scope()
-        # check params
-        for param in decl.params:
-            self.check_param(param)
-        # check body
-        self.check_fn_body(decl.body, decl.ret_type)
-        # if everything checks out, bind the function
-        fn_type = FunctionType.from_fn_decl(decl)
-        self.context.bind_fn(decl.name, fn_type)
-        # exit scope
-        self.context.exit_scope()
+    def infer_fn_decl(self, decl: FnDecl) -> None:
+        # enter the scope
+        self.enter_scope(decl.id)
+        # go over the body and infer the types of the statements
+        for stmt in decl.body:
+            self.infer_stmt(stmt)
+        # exit the scope
+        self.pop_scope()
 
-    def check_param(self, param: Param) -> None:
-        # we are already in the scope of the function
-        # so we just make sure the name is unique and bind the type
-        if param.name in self.context.var_bindings[-1]:
-            raise CussNameError(
-                f"Duplicate parameter name: {param.name}", param.line, param.ast_id
+    def infer_struct_decl(self, decl: StructDecl) -> None:
+        # enter the struct into the type resolver
+        self.push_type(decl.name, StructType(decl.fields), decl.line, decl.id)
+
+    def infer_enum_decl(self, decl: EnumDecl) -> None:
+        # enter the enum into the type resolver
+        self.push_type(decl.name, EnumType(decl.variants), decl.line, decl.id)
+
+    def infer_type_alias_decl(self, decl: TypeAliasDecl) -> None:
+        # enter the type alias into the type resolver
+        self.push_type(decl.name, decl.type, decl.line, decl.id)
+
+    def infer_impl_decl(self, decl: ImplDecl) -> None:
+        # enter the impl into the type resolver
+        self.enter_scope(decl.id)
+        # go over the body and infer the types of the statements
+        for method in decl.methods:
+            self.infer_fn_decl(method)
+        # exit the scope
+        self.pop_scope()
+
+    def infer_stmt(self, stmt: Statement) -> None:
+        match stmt.kind:
+            case "fn_decl":
+                self.infer_fn_decl(stmt)
+            case "const_decl" | "let_decl":
+                self.infer_var_decl(stmt)
+            case "if":
+                self.infer_if(stmt)
+            case "while":
+                self.infer_while(stmt)
+            case "loop":
+                self.infer_loop(stmt)
+            case _:  # other statements dont need type inference
+                pass
+
+    def infer_var_decl(self, stmt: VarDecl) -> None:
+        # retrieve the type of the identifier from the symbol table
+        type = self.get_identifier_type(stmt.name)
+        # if it is a type variable, we need to infer it
+        if isinstance(type, TypeVar):
+            # we need to infer the type of the expression
+            expr_type = self.infer_expr(stmt.expr)
+            if expr_type is None:
+                # we need to backtrack
+                self.backtracks.append(stmt.id)
+                return
+            # if we know the type, set it
+            self.set_identifier_type(stmt.name, expr_type, stmt.line, stmt.id)
+        # otherwise, the type is already known
+
+    def infer_if(self, stmt: If) -> None:
+        # enter the scope
+        self.enter_scope(stmt.id)
+        # do not touch the cond
+        # perform type inference on the body
+        for stmt in stmt.body:
+            self.infer_stmt(stmt)
+        # exit the scope
+        self.pop_scope()
+        # resolve the else body if it exists
+        if stmt.else_body is not None:
+            for stmt in stmt.else_body:
+                self.infer_stmt(stmt)
+
+    def infer_while(self, stmt: While) -> None:
+        # enter the scope
+        self.enter_scope(stmt.id)
+        # do not touch the cond
+        # perform type inference on the body
+        for stmt in stmt.body:
+            self.infer_stmt(stmt)
+        # exit the scope
+        self.pop_scope()
+
+    def infer_loop(self, stmt: Loop) -> None:
+        # enter the scope
+        self.enter_scope(stmt.id)
+        # perform type inference on the body
+        for stmt in stmt.body:
+            self.infer_stmt(stmt)
+        # exit the scope
+        self.pop_scope()
+
+    def infer_expr(self, expr: Expr) -> Optional[Type]:
+        if isinstance(expr, Integer):
+            return IntType()
+        elif isinstance(expr, Float):
+            return FloatType()
+        elif isinstance(expr, String):
+            return StringType()
+        elif isinstance(expr, Bool):
+            return BoolType()
+        elif isinstance(expr, Char):
+            return CharType()
+        elif isinstance(expr, Array):
+            return ArrayType(self.infer_expr(expr.elem_type))
+        elif isinstance(expr, Tuple):
+            return TupleType(self.infer_expr(expr.elem_type))
+        elif isinstance(expr, StructExpr):
+            return self.infer_struct_expr(expr)
+        elif isinstance(expr, EnumStructExpr) or isinstance(expr, EnumTupleExpr) or isinstance(expr, EnumUnitExpr):
+            return self.infer_enum_expr(expr)
+        elif isinstance(expr, Ident):
+            return self.infer_ident(expr)
+        elif isinstance(expr, Call):
+            return self.infer_call(expr)
+        elif isinstance(expr, GetIndex):
+            return self.infer_get_index(expr)
+        elif isinstance(expr, GetAttr):
+            return self.infer_get_attr(expr)
+        elif isinstance(expr, CallAttr):
+            return self.infer_callattr(expr)
+        elif isinstance(expr, BinaryOp):
+            return self.infer_binary_op(expr)
+        elif isinstance(expr, UnaryOp):
+            return self.infer_unary_op(expr)
+        
+    def infer_array(self, expr: Array) -> Optional[Type]:
+        elem_types: List[Type] = []
+        for elem in expr.elems:
+            elem_type = self.infer_expr(elem)
+            if elem_type is None:
+                return None
+            elem_types.append(elem_type)
+        # TODO: check if all the types are the same
+        return ArrayType(elem_types)
+        
+        
+    def infer_struct_expr(self, expr: StructExpr) -> Optional[Type]:
+        # lookup the struct in the type resolver
+        struct_type = self.get_type(expr.name)
+        # if the type is not yet known we will need to backtrack
+        # hopefully it is defined below this point in source code
+        if struct_type is None:
+            # return none and the type inference will backtrack
+            return None
+        # otherwise we figured out the type
+        return struct_type
+
+    def infer_enum_expr(
+        self, expr: Union[EnumStructExpr, EnumTupleExpr, EnumUnitExpr]
+    ) -> Optional[Type]:
+        # lookup the enum in the type resolver
+        enum_type = self.get_type(expr.name)
+        # if the type is not yet known we will need to backtrack
+        # hopefully it is defined below this point in source code
+        if enum_type is None:
+            # return none and the type inference will backtrack
+            return None
+        # otherwise we figured out the type
+        return enum_type
+
+    def infer_ident(self, expr: Ident) -> Optional[Type]:
+        # lookup the identifier in the symbol table
+        ident_type = self.get_identifier_type(expr.name)
+        # if the ident type is not yet known thats not okay
+        # idents need to be defined and typed before they are used
+        if ident_type is None:
+            raise TypeInferenceError(
+                f"Identifier {expr.name} is not defined", expr.line, expr.id
             )
-        # parameters are immutable so we set mutable to False
-        self.context.bind_var(param.name, False, param.type)
+        # we also need to check if the type is a type variable
+        # it shouldnt be but edge cases are possible
+        if isinstance(ident_type, TypeVar):
+            # we will return none and hope that the type variable is resolved later
+            return None
+        # otherwise we figured out the type
+        return ident_type
 
-    def check_fn_body(self, body: list[Statement], expected_ret_type: Type) -> None:
-        # TODO: implement function body checking
-        raise NotImplementedError("Function body checking not implemented")
+    def infer_call(self, expr: Call) -> Type:
+        # lookup the function in the symbol table
+        fn_type = self.get_identifier_type(expr.name)
+        # if the type is not in the symbol table this is problematic
+        # it should have been entered during name resolution
+        if fn_type is None:
+            raise TypeInferenceError(f"Function {expr.name} is not defined", expr.line, expr.id)
+        # otherwise get the return type of the function
+        return fn_type.ret_type
 
-    def check_struct_decl(self, decl: StructDecl) -> None:
-        # TODO: implement struct declaration checking
-        raise NotImplementedError("Struct declaration checking not implemented")
+    def infer_get_index(self, expr: GetIndex) -> Type:
+        # check what obj we are indexing it should be an array, ident, or string
+        obj_type = self.infer_expr(expr.obj)
+        # the obj type should resolve to an array, string, or type variable
+        # otherwise this is an error
+        if isinstance(obj_type, ArrayType):
+            return obj_type.elem_type
+        elif isinstance(obj_type, StringType):
+            return CharType()
+        elif isinstance(obj_type, TypeVar):
+            # we will return none and hope that the type variable is resolved later
+            return None
+        else:
+            raise TypeInferenceError(
+                f"Cannot index expression of type {obj_type}", expr.line
+            )
 
-    def check_enum_decl(self, decl: EnumDecl) -> None:
-        # TODO: implement enum declaration checking
-        raise NotImplementedError("Enum declaration checking not implemented")
+    def infer_get_attr(self, expr: GetAttr) -> Type:
+        # lookup the type of the object
+        obj_type = self.infer_expr(expr.obj)
+        # the obj type should resolve to a struct, enum, or type variable
+        # otherwise this is an error
+        if isinstance(obj_type, StructType):
+            # get the field type
+            field_type = obj_type.fields[expr.attr]
+            # if the type is none that means the field does not exist
+            if field_type is None:
+                raise TypeInferenceError(
+                    f"Field {expr.attr} does not exist in struct {expr.obj.name}",
+                    expr.line,
+                )
+            # otherwise we figured out the type
+            return field_type
+        elif isinstance(obj_type, EnumType):
+            # TODO: we need to add support for field access on enums
+            # right now this is an error
+            raise NotImplementedError("Field access on enums not implemented")
+        elif isinstance(obj_type, TypeVar):
+            # we will return none and hope that the type variable is resolved later
+            return None
+        else:
+            raise TypeInferenceError(
+                f"Cannot get attribute of type {obj_type}", expr.line
+            )
 
-    def check_type_alias_decl(self, decl: TypeAliasDecl) -> None:
-        # TODO: implement type alias declaration checking
-        raise NotImplementedError("Type alias declaration checking not implemented")
+    def infer_callattr(self, expr: CallAttr) -> Type:
+        # TODO: we need to add support for method calls somehow attach the method to the type
+        raise NotImplementedError("Method calls not implemented")
 
-    def check_impl_decl(self, decl: ImplDecl) -> None:
-        # TODO: implement impl declaration checking
-        raise NotImplementedError("Impl declaration checking not implemented")
+    def infer_binary_op(self, expr: BinaryOp) -> Type:
+        lhs_type = self.infer_expr(expr.lhs)
+        rhs_type = self.infer_expr(expr.rhs)
+        match expr.op:
+            case "+":
+                return self.infer_arith(lhs_type, rhs_type, expr.line)
+            case "-":
+                return self.infer_arith(lhs_type, rhs_type, expr.line)
+            case "*":
+                return self.infer_arith(lhs_type, rhs_type, expr.line)
+            case "/":
+                return self.infer_arith(lhs_type, rhs_type, expr.line)
+            case "%":
+                return self.infer_arith(lhs_type, rhs_type, expr.line)
+            case "==":
+                return self.infer_eq(lhs_type, rhs_type, expr.line)
+            case "!=":
+                return self.infer_eq(lhs_type, rhs_type, expr.line)
+            case "<":
+                return self.infer_cmp(lhs_type, rhs_type, expr.line)
+            case ">":
+                return self.infer_cmp(lhs_type, rhs_type, expr.line)
+            case "<=":
+                return self.infer_cmp(lhs_type, rhs_type, expr.line)
+            case ">=":
+                return self.infer_cmp(lhs_type, rhs_type, expr.line)
+            case "and":
+                return self.infer_logic(lhs_type, rhs_type, expr.line)
+            case "or":
+                return self.infer_logic(lhs_type, rhs_type, expr.line)
+            case _:
+                raise TypeInferenceError(
+                    f"Unknown binary operator: {expr.op}", expr.line
+                )
 
+    def infer_arith(self, lhs: Type, rhs: Type, line: int) -> Type:
+        # TODO: implement
+        raise NotImplementedError(
+            "Type inference for arithmetic operations not implemented"
+        )
 
-if __name__ == "__main__":
-    try:
-        with open("example.cuss", "r") as f:
-            content = f.read()
-            if not content.strip():
-                print("Warning: example.cuss is empty. Parsing empty file.")
-            ast = parser.parse(content)
-            for decl in ast.declarations:
-                print(decl)
-    except FileNotFoundError:
-        print("Error: example.cuss file not found")
-    except Exception as e:
-        # traceback
-        import traceback
+    def infer_eq(self, lhs: Type, rhs: Type, line: int) -> Type:
+        # TODO: implement
+        raise NotImplementedError(
+            "Type inference for equality operations not implemented"
+        )
 
-        tb = traceback.extract_tb(e.__traceback__)
-        last_frame = tb[-1]
-        print(f"Error parsing: {e}")
-        print(f"File: {last_frame.filename}, Line: {last_frame.lineno}")
+    def infer_cmp(self, lhs: Type, rhs: Type, line: int) -> Type:
+        # TODO: implement
+        raise NotImplementedError(
+            "Type inference for comparison operations not implemented"
+        )
+
+    def infer_logic(self, lhs: Type, rhs: Type, line: int) -> Type:
+        # TODO: implement
+        raise NotImplementedError(
+            "Type inference for logical operations not implemented"
+        )
+
+    def infer_unary_op(self, expr: UnaryOp) -> Type:
+        # TODO: implement
+        raise NotImplementedError("Unary operation expressions not implemented")
