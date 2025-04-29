@@ -621,6 +621,28 @@ class Return(Node):
             return (self.line, self.line)
         return self.expr.get_span()
 
+class Else(Node):
+    def __init__(self, body: list[Statement], line: int) -> None:
+        super().__init__("else", line)
+        self.body = body
+
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        for stmt in self.body:
+            node = stmt.get_node(id)
+            if node is not None:
+                return node
+        return None
+    
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        for stmt in self.body:
+            smin, smax = stmt.get_span()
+            min_line = min(min_line, smin)
+            max_line = max(max_line, smax)
+        return (min_line, max_line)
 
 class If(Node):
     def __init__(
@@ -633,7 +655,10 @@ class If(Node):
         super().__init__("if", line)
         self.cond = cond
         self.body = body
-        self.else_body = else_body
+        if else_body is not None:
+            self.else_body = Else(else_body, line)
+        else:
+            self.else_body = None
 
     # get node by id
     def get_node(self, id: int) -> Optional[Node]:
@@ -647,10 +672,9 @@ class If(Node):
             if node is not None:
                 return node
         if self.else_body is not None:
-            for stmt in self.else_body:
-                node = stmt.get_node(id)
-                if node is not None:
-                    return node
+            node = self.else_body.get_node(id)
+            if node is not None:
+                return node
         return None
 
     def get_span(self) -> tuple[int, int]:
@@ -661,10 +685,9 @@ class If(Node):
             min_line = min(min_line, smin)
             max_line = max(max_line, smax)
         if self.else_body is not None:
-            for stmt in self.else_body:
-                smin, smax = stmt.get_span()
-                min_line = min(min_line, smin)
-                max_line = max(max_line, smax)
+            smin, smax = self.else_body.get_span()
+            min_line = min(min_line, smin)
+            max_line = max(max_line, smax)
         return (min_line, max_line)
 
 
@@ -1188,6 +1211,8 @@ class ASTTransformer(Transformer):
         name_tok = items[idx]
         idx += 1
         params = items[idx]
+        # filter None from params
+        params = [param for param in params if param is not None]
         idx += 1
         ret_type = items[idx]
         idx += 1
@@ -1260,7 +1285,16 @@ class ASTTransformer(Transformer):
     def if_stmt(self, items):
         cond = items[0]
         body = items[1]
-        else_body = items[2] if len(items) > 2 else None
+        else_body = items[2:] if len(items) > 2 else None
+        # flatten the else body
+        if else_body is not None:
+            new_else_body = []
+            for item in else_body:
+                if isinstance(item, list):
+                    new_else_body.extend(item)
+                else:
+                    new_else_body.append(item)
+            else_body = new_else_body
         return If(cond, body, else_body, items[0].line)
 
     def while_stmt(self, items):

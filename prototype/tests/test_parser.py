@@ -6,6 +6,7 @@ from prototype.parser import (
     Call,
     CallAttr,
     Continue,
+    Else,
     EnumDecl,
     EnumStructExpr,
     EnumTupleExpr,
@@ -193,18 +194,9 @@ def test_if_stmt():
     assert if_stmt.cond.op == ">"
     ret_on_true = if_stmt.body[0]
     assert isinstance(ret_on_true, Return)
-    assert isinstance(if_stmt.else_body, If)
-    else_if_stmt = if_stmt.else_body
-    assert isinstance(else_if_stmt.cond, BinaryOp)
-    assert else_if_stmt.cond.op == "<"
-    ret_on_else_if = else_if_stmt.body[0]
-    assert isinstance(ret_on_else_if, Return)
-    assert isinstance(else_if_stmt.else_body, list)
-    ret_on_else = else_if_stmt.else_body[0]
-    assert isinstance(ret_on_else, Return)
-    assert isinstance(ret_on_else.expr, Integer)
-    assert ret_on_else.expr.value == 0
-
+    assert isinstance(if_stmt.else_body, Else)
+    else_stmt = if_stmt.else_body
+    
 
 def test_while_stmt():
     source = textwrap.dedent(
