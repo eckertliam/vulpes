@@ -1,4 +1,4 @@
-from main import (
+from prototype.parser import (
     Array,
     Assign,
     BinaryOp,
@@ -13,6 +13,7 @@ from main import (
     FieldInit,
     GetIndex,
     GetAttr,
+    NamedTypeAnnotation,
     String,
     StructExpr,
     StructField,
@@ -58,6 +59,7 @@ def test_simple_fn_decl():
     assert isinstance(fn_decl, FnDecl)
     assert fn_decl.pub == False
     assert fn_decl.name == "main"
+    assert isinstance(fn_decl.ret_type, NamedTypeAnnotation)
     assert fn_decl.ret_type.name == "int"
     assert len(fn_decl.body) == 1
     return_stmt = fn_decl.body[0]
@@ -82,9 +84,20 @@ def test_fn_w_params():
     assert fn_decl.pub == False
     assert fn_decl.name == "add"
     assert len(fn_decl.params) == 2
-    assert fn_decl.params[0].name == "a" and fn_decl.params[0].type.name == "int"
-    assert fn_decl.params[1].name == "b" and fn_decl.params[1].type.name == "int"
-    assert fn_decl.ret_type.name == "int"
+    assert (
+        fn_decl.params[0].name == "a"
+        and isinstance(fn_decl.params[0].type, NamedTypeAnnotation)
+        and fn_decl.params[0].type.name == "int"
+    )
+    assert (
+        fn_decl.params[1].name == "b"
+        and isinstance(fn_decl.params[1].type, NamedTypeAnnotation)
+        and fn_decl.params[1].type.name == "int"
+    )
+    assert (
+        isinstance(fn_decl.ret_type, NamedTypeAnnotation)
+        and fn_decl.ret_type.name == "int"
+    )
     assert len(fn_decl.body) == 1
     return_stmt = fn_decl.body[0]
     assert isinstance(return_stmt, Return)
@@ -113,10 +126,14 @@ def test_struct_decl():
     assert struct_decl.name == "Point"
     assert len(struct_decl.fields) == 2
     assert (
-        struct_decl.fields[0].name == "x" and struct_decl.fields[0].type.name == "int"
+        struct_decl.fields[0].name == "x"
+        and isinstance(struct_decl.fields[0].type, NamedTypeAnnotation)
+        and struct_decl.fields[0].type.name == "int"
     )
     assert (
-        struct_decl.fields[1].name == "y" and struct_decl.fields[1].type.name == "int"
+        struct_decl.fields[1].name == "y"
+        and isinstance(struct_decl.fields[1].type, NamedTypeAnnotation)
+        and struct_decl.fields[1].type.name == "int"
     )
 
 
@@ -380,10 +397,12 @@ def test_impl():
     method = impl_decl.methods[0]
     assert isinstance(method, FnDecl)
     assert method.name == "make_sound"
+    assert isinstance(method.ret_type, NamedTypeAnnotation)
     assert method.ret_type.name == "str"
     method = impl_decl.methods[1]
     assert isinstance(method, FnDecl)
     assert method.name == "move"
+    assert isinstance(method.ret_type, NamedTypeAnnotation)
     assert method.ret_type.name == "void"
 
 
@@ -521,6 +540,7 @@ def test_field_chaining():
     assert isinstance(fn_body[0].expr, GetAttr)
     get_attr = fn_body[0].expr
     assert isinstance(get_attr.obj, GetAttr)
+    assert isinstance(get_attr.obj.obj, Ident)
     assert get_attr.obj.obj.name == "x"
     assert get_attr.obj.attr == "y"
     assert isinstance(get_attr.obj.obj, Ident)
@@ -541,8 +561,11 @@ def test_expr_stmt():
     binary_op = fn_body[0]
     assert isinstance(binary_op.lhs, BinaryOp)
     assert isinstance(binary_op.rhs, Ident)
+    assert isinstance(binary_op.lhs.lhs, Ident)
     assert binary_op.lhs.lhs.name == "a"
+    assert isinstance(binary_op.lhs.rhs, Ident)
     assert binary_op.lhs.rhs.name == "b"
+    assert isinstance(binary_op.rhs, Ident)
     assert binary_op.rhs.name == "c"
 
 
