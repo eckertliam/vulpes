@@ -40,8 +40,21 @@ from .types import (
 
 # Pass base class
 class Pass(ABC):
+    def __init__(self, program: Optional[Program] = None, previous_pass: Optional["Pass"] = None):
+        if program:
+            self.program = program
+            self.symbol_table = SymbolTable()
+            self.errors: List[CussError] = []
+        elif previous_pass:
+            self.program = previous_pass.program
+            self.symbol_table = previous_pass.symbol_table
+            self.errors = previous_pass.errors
+        else:
+            raise ValueError("Either program or previous_pass must be provided")
+        
+        
     @abstractmethod
-    def run(self) -> Program:
+    def run(self) -> None:
         pass
 
 
@@ -147,17 +160,15 @@ class SymbolTable:
 
 
 class NameDeclarationPass(Pass):
-    def __init__(self, program: Program):
-        self.symbol_table = SymbolTable()
-        self.errors: List[CussError] = []
-        self.program = program
+    def __init__(self, program: Program) -> None:
+        super().__init__(program=program)
 
     def add_symbol(self, name: str, ast_id: int, line: int) -> None:
         res = self.symbol_table.add_symbol(name, ast_id, line, self.program)
         if res is not None:
             self.errors.append(res)
 
-    def run(self) -> Program:
+    def run(self) -> None:
         # first we add all defined data structs to the symbol table
         # we do this so that we can then add their impls to their scopes
         for declaration in self.program.declarations:
@@ -174,8 +185,6 @@ class NameDeclarationPass(Pass):
                 self.impl_decl(declaration)
             elif isinstance(declaration, FnDecl):
                 self.fn_decl(declaration)
-
-        return self.program
 
     def impl_decl(self, impl: ImplDecl) -> None:
         # we look up the impl's type in the symbol table
@@ -280,3 +289,49 @@ class NameDeclarationPass(Pass):
             self.statement(statement)
         # we exit the loop's scope
         self.symbol_table.exit_scope()
+
+# TODO: implement NameReferencePass
+# This pass checks that all variable references, fn calls, method calls, etc are valid
+class NameReferencePass(Pass):
+    def __init__(self, previous_pass: NameDeclarationPass):
+        self.symbol_table = previous_pass.symbol_table
+        # reset the symbol table to global scope
+        self.symbol_table.current_scope_id = -1
+        self.errors: List[CussError] = []
+        self.program = previous_pass.program
+        
+    def run(self) -> Program:
+        # TODO: implement
+        return self.program
+    
+
+# TODO: implement TypeResolutionPass
+# This pass converts all type annotations into concrete types using the symbol table
+# We add a TypeVar to any Symbol that does not have a type annotation
+class TypeResolutionPass(Pass):
+    def __init__(self, previous_pass: NameReferencePass):
+        super().__init__(previous_pass=previous_pass)
+        
+    def run(self) -> None:
+        # TODO: implement
+        raise NotImplementedError("TypeResolutionPass not implemented")
+    
+# TODO: implement TypeInferencePass
+# This pass checks for TypeVars and infers them from the context
+class TypeInferencePass(Pass):
+    def __init__(self, previous_pass: TypeResolutionPass):
+        super().__init__(previous_pass=previous_pass)
+        
+    def run(self) -> None:
+        # TODO: implement
+        raise NotImplementedError("TypeInferencePass not implemented")
+    
+# TODO: implement TypeCheckingPass
+# This pass checks that all types are valid
+class TypeCheckingPass(Pass):
+    def __init__(self, previous_pass: TypeInferencePass):
+        super().__init__(previous_pass=previous_pass)
+        
+    def run(self) -> None:
+        # TODO: implement
+        raise NotImplementedError("TypeCheckingPass not implemented")
