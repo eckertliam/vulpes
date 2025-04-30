@@ -237,20 +237,12 @@ class Node:
         return (self.line, self.line)
 
 
-Declaration = Union["FnDecl", "EnumDecl", "StructDecl", "TypeAliasDecl", "ImplDecl"]
+class Declaration(Node):
+    pass
 
-Statement = Union[
-    "Expr",
-    "FnDecl",
-    "VarDecl",
-    "Assign",
-    "Return",
-    "If",
-    "While",
-    "Loop",
-    "Break",
-    "Continue",
-]
+
+class Statement(Node):
+    pass
 
 
 class TypeAnnotation(Node):
@@ -309,7 +301,7 @@ class FunctionTypeAnnotation(TypeAnnotation):
         return self.ret_type.get_node(id)
 
 
-class FnDecl(Node):
+class FnDecl(Declaration, Statement):
     def __init__(
         self,
         pub: bool,
@@ -376,7 +368,7 @@ class Param(Node):
         return self.type.get_node(id)
 
 
-class StructDecl(Node):
+class StructDecl(Declaration):
     def __init__(
         self, pub: bool, name: str, fields: list["StructField"], line: int
     ) -> None:
@@ -421,7 +413,7 @@ class StructField(Node):
         return (self.line, max(self.line, tmax))
 
 
-class EnumDecl(Node):
+class EnumDecl(Declaration):
     def __init__(
         self, pub: bool, name: str, variants: list["EnumVariant"], line: int
     ) -> None:
@@ -515,7 +507,7 @@ class EnumStructField(Node):
         return (self.line, max(self.line, tmax))
 
 
-class TypeAliasDecl(Node):
+class TypeAliasDecl(Declaration):
     def __init__(self, pub: bool, name: str, type: TypeAnnotation, line: int) -> None:
         super().__init__("type_alias_decl", line)
         self.pub = pub
@@ -532,7 +524,7 @@ class TypeAliasDecl(Node):
         return (self.line, max(self.line, tmax))
 
 
-class VarDecl(Node):
+class VarDecl(Statement):
     def __init__(
         self,
         mutable: bool,
@@ -558,14 +550,20 @@ class VarDecl(Node):
 
     def get_span(self) -> tuple[int, int]:
         expr_min, expr_max = self.expr.get_span()
+
         return (self.line, max(self.line, expr_max))
 
 
-Assignable = Union["Ident", "GetIndex", "GetAttr"]
+class Expr(Statement):
+    pass
 
 
-class Assign(Node):
-    def __init__(self, lhs: Assignable, rhs: "Expr", line: int) -> None:
+class AssignableExpr(Expr):
+    pass
+
+
+class Assign(Statement):
+    def __init__(self, lhs: AssignableExpr, rhs: "Expr", line: int) -> None:
         super().__init__("assign", line)
         self.lhs = lhs
         self.rhs = rhs
@@ -581,7 +579,7 @@ class Assign(Node):
         return (min(lhs_min, rhs_min), max(lhs_max, rhs_max))
 
 
-class ImplDecl(Node):
+class ImplDecl(Declaration):
     def __init__(self, name: str, methods: list[FnDecl], line: int) -> None:
         super().__init__("impl_decl", line)
         self.name = name
@@ -606,7 +604,7 @@ class ImplDecl(Node):
         return (min_line, max_line)
 
 
-class Return(Node):
+class Return(Statement):
     def __init__(self, expr: Optional["Expr"], line: int) -> None:
         super().__init__("return", line)
         self.expr = expr
@@ -621,7 +619,8 @@ class Return(Node):
             return (self.line, self.line)
         return self.expr.get_span()
 
-class Else(Node):
+
+class Else(Statement):
     def __init__(self, body: list[Statement], line: int) -> None:
         super().__init__("else", line)
         self.body = body
@@ -634,7 +633,7 @@ class Else(Node):
             if node is not None:
                 return node
         return None
-    
+
     def get_span(self) -> tuple[int, int]:
         min_line = self.line
         max_line = self.line
@@ -644,7 +643,8 @@ class Else(Node):
             max_line = max(max_line, smax)
         return (min_line, max_line)
 
-class If(Node):
+
+class If(Statement):
     def __init__(
         self,
         cond: "Expr",
@@ -691,7 +691,7 @@ class If(Node):
         return (min_line, max_line)
 
 
-class While(Node):
+class While(Statement):
     def __init__(self, cond: "Expr", body: list[Statement], line: int) -> None:
         super().__init__("while", line)
         self.cond = cond
@@ -719,7 +719,7 @@ class While(Node):
         return (min_line, max_line)
 
 
-class Loop(Node):
+class Loop(Statement):
     def __init__(self, body: list[Statement], line: int) -> None:
         super().__init__("loop", line)
         self.body = body
@@ -743,69 +743,47 @@ class Loop(Node):
         return (min_line, max_line)
 
 
-class Break(Node):
+class Break(Statement):
     def __init__(self, line: int) -> None:
         super().__init__("break", line)
 
 
-class Continue(Node):
+class Continue(Statement):
     def __init__(self, line: int) -> None:
         super().__init__("continue", line)
 
 
-Expr = Union[
-    "Integer",
-    "Float",
-    "String",
-    "Char",
-    "Bool",
-    "Array",
-    "Ident",
-    "Call",
-    "GetIndex",
-    "GetAttr",
-    "CallAttr",
-    "BinaryOp",
-    "UnaryOp",
-    "Return",
-    "StructExpr",
-    "EnumStructExpr",
-    "EnumTupleExpr",
-    "EnumUnitExpr",
-]
-
-
-class Integer(Node):
+class Integer(Expr):
     def __init__(self, value: int, line: int) -> None:
         super().__init__("integer", line)
         self.value = value
 
 
-class Float(Node):
+class Float(Expr):
     def __init__(self, value: float, line: int) -> None:
         super().__init__("float", line)
         self.value = value
 
 
-class String(Node):
+class String(Expr):
     def __init__(self, value: str, line: int) -> None:
         super().__init__("string", line)
         self.value = value
 
 
-class Char(Node):
+class Char(Expr):
     def __init__(self, value: str, line: int) -> None:
         super().__init__("char", line)
         self.value = value
 
 
-class Bool(Node):
+class Bool(Expr):
     def __init__(self, value: bool, line: int) -> None:
         super().__init__("bool", line)
         self.value = value
 
 
-class Array(Node):
+class Array(Expr):
     def __init__(self, elems: list[Expr], line: int) -> None:
         super().__init__("array", line)
         self.elems = elems
@@ -829,7 +807,7 @@ class Array(Node):
         return (min_line, max_line)
 
 
-class Tuple(Node):
+class Tuple(Expr):
     def __init__(self, elems: list[Expr], line: int) -> None:
         super().__init__("tuple", line)
         self.elems = elems
@@ -871,7 +849,7 @@ class FieldInit(Node):
         return (min(min_line, expr_min), max(max_line, expr_max))
 
 
-class StructExpr(Node):
+class StructExpr(Expr):
     def __init__(self, name: str, fields: list[FieldInit], line: int) -> None:
         super().__init__("struct_expr", line)
         self.name = name
@@ -896,7 +874,7 @@ class StructExpr(Node):
         return (min_line, max_line)
 
 
-class EnumStructExpr(Node):
+class EnumStructExpr(Expr):
     def __init__(
         self, name: str, unit: str, fields: list[FieldInit], line: int
     ) -> None:
@@ -924,7 +902,7 @@ class EnumStructExpr(Node):
         return (min_line, max_line)
 
 
-class EnumTupleExpr(Node):
+class EnumTupleExpr(Expr):
     def __init__(self, name: str, unit: str, elems: list[Expr], line: int) -> None:
         super().__init__("enum_tuple_expr", line)
         self.name = name
@@ -950,20 +928,20 @@ class EnumTupleExpr(Node):
         return (min_line, max_line)
 
 
-class EnumUnitExpr(Node):
+class EnumUnitExpr(Expr):
     def __init__(self, name: str, unit: str, line: int) -> None:
         super().__init__("enum_unit_expr", line)
         self.name = name
         self.unit = unit
 
 
-class Ident(Node):
+class Ident(AssignableExpr):
     def __init__(self, name: str, line: int) -> None:
         super().__init__("ident", line)
         self.name = name
 
 
-class Call(Node):
+class Call(Expr):
     def __init__(self, callee: Expr, args: list[Expr], line: int) -> None:
         super().__init__("call", line)
         self.callee = callee
@@ -994,7 +972,7 @@ class Call(Node):
         return (min_line, max_line)
 
 
-class GetIndex(Node):
+class GetIndex(AssignableExpr):
     def __init__(self, obj: Expr, index: Expr, line: int) -> None:
         super().__init__("getindex", line)
         self.obj = obj
@@ -1023,7 +1001,7 @@ class GetIndex(Node):
         return (min_line, max_line)
 
 
-class GetAttr(Node):
+class GetAttr(AssignableExpr):
     def __init__(self, obj: Expr, attr: str, line: int) -> None:
         super().__init__("getattr", line)
         self.obj = obj
@@ -1046,7 +1024,7 @@ class GetAttr(Node):
         return (min_line, max_line)
 
 
-class CallAttr(Node):
+class CallAttr(Expr):
     def __init__(self, obj: Expr, attr: str, args: list[Expr], line: int) -> None:
         super().__init__("callattr", line)
         self.obj = obj
@@ -1078,7 +1056,7 @@ class CallAttr(Node):
         return (min_line, max_line)
 
 
-class BinaryOp(Node):
+class BinaryOp(Expr):
     def __init__(self, op: str, lhs: Expr, rhs: Expr, line: int) -> None:
         super().__init__("binary_op", line)
         self.op = op
@@ -1105,7 +1083,7 @@ class BinaryOp(Node):
         return (min_line, max_line)
 
 
-class UnaryOp(Node):
+class UnaryOp(Expr):
     def __init__(self, op: str, operand: Expr, line: int) -> None:
         super().__init__("unary_op", line)
         self.op = op
