@@ -25,6 +25,7 @@ def test_valid_ident():
     # check that there are no errors
     assert len(name_ref_pass.errors) == 0
 
+
 def test_invalid_ident():
     source = textwrap.dedent(
         """
@@ -45,7 +46,8 @@ def test_invalid_ident():
     # check that there are errors
     assert len(name_ref_pass.errors) == 1
     assert isinstance(name_ref_pass.errors[0], NameResolutionError)
-    
+
+
 def test_valid_assign():
     source = textwrap.dedent(
         """
@@ -67,7 +69,8 @@ def test_valid_assign():
     name_ref_pass.run()
     # check that there are no errors
     assert len(name_ref_pass.errors) == 0
-    
+
+
 def test_invalid_assign():
     source = textwrap.dedent(
         """
@@ -91,7 +94,8 @@ def test_invalid_assign():
     assert len(name_ref_pass.errors) == 2
     assert isinstance(name_ref_pass.errors[0], NameResolutionError)
     assert isinstance(name_ref_pass.errors[1], NameResolutionError)
-    
+
+
 def test_if_stmt():
     source = textwrap.dedent(
         """
@@ -114,7 +118,8 @@ def test_if_stmt():
     name_ref_pass.run()
     # check that there are no errors
     assert len(name_ref_pass.errors) == 0
-    
+
+
 def test_while_stmt():
     source = textwrap.dedent(
         """
@@ -137,7 +142,7 @@ def test_while_stmt():
     name_ref_pass.run()
     # check that there are no errors
     assert len(name_ref_pass.errors) == 0
-    
+
 
 def test_loop_stmt():
     source = textwrap.dedent(
@@ -161,4 +166,47 @@ def test_loop_stmt():
     name_ref_pass = NameReferencePass(name_decl_pass)
     name_ref_pass.run()
     # check that there are no errors
+    assert len(name_ref_pass.errors) == 0
+
+
+def test_def_in_if():
+    source = textwrap.dedent(
+        """
+    fn main() -> int
+        if true
+            const x = 1
+        else
+            const x = 2
+        return x
+    """
+    )
+    program = parse(source)
+    # pass through the name declaration pass
+    name_decl_pass = NameDeclarationPass(program)
+    name_decl_pass.run()
+    assert len(name_decl_pass.errors) == 0
+    # pass through the name reference pass
+    name_ref_pass = NameReferencePass(name_decl_pass)
+    name_ref_pass.run()
+    # there should be one error for the undefined return
+    assert len(name_ref_pass.errors) == 1
+    assert isinstance(name_ref_pass.errors[0], NameResolutionError)
+
+
+def test_shadowing_in_nested_scope():
+    source = textwrap.dedent(
+        """
+    fn main() -> int
+        const x = 1
+        if true
+            const x = 2
+            return x
+        return x
+    """
+    )
+    program = parse(source)
+    name_decl_pass = NameDeclarationPass(program)
+    name_decl_pass.run()
+    name_ref_pass = NameReferencePass(name_decl_pass)
+    name_ref_pass.run()
     assert len(name_ref_pass.errors) == 0

@@ -2,7 +2,7 @@
 # This is the base class for all passes
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Set, Union
+from typing import Dict, List, Optional
 
 from .symbol import Symbol
 
@@ -16,7 +16,10 @@ from .parser import (
     Declaration,
     Else,
     EnumDecl,
+    EnumStructExpr,
+    EnumTupleExpr,
     Expr,
+    FieldInit,
     FnDecl,
     FunctionTypeAnnotation,
     GetAttr,
@@ -31,6 +34,7 @@ from .parser import (
     Return,
     Statement,
     StructDecl,
+    StructExpr,
     TupleTypeAnnotation,
     TypeAliasDecl,
     TypeAnnotation,
@@ -38,6 +42,7 @@ from .parser import (
     VarDecl,
     While,
     Tuple,
+    Array,
 )
 from .types import (
     ArrayType,
@@ -427,23 +432,71 @@ class NameReferencePass(Pass):
             self.visit_binary_op(expr)
         elif isinstance(expr, UnaryOp):
             self.visit_unary_op(expr)
-        # TODO: add remaining expr types
+        elif isinstance(expr, StructExpr):
+            self.visit_struct_expr(expr)
+        elif isinstance(expr, Tuple):
+            self.visit_tuple_expr(expr)
+        elif isinstance(expr, EnumStructExpr):
+            self.visit_enum_struct_expr(expr)
+        elif isinstance(expr, EnumTupleExpr):
+            self.visit_enum_tuple_expr(expr)
+        elif isinstance(expr, Array):
+            self.visit_array_expr(expr)
+
+    def visit_struct_expr(self, struct_expr: StructExpr) -> None:
+        # we need to visit all the fields
+        for field in struct_expr.fields:
+            self.visit_field_init(field)
+
+    def visit_field_init(self, field_init: FieldInit) -> None:
+        # we need to visit the expr
+        self.visit_expr(field_init.expr)
+
+    def visit_tuple_expr(self, tuple_expr: Tuple) -> None:
+        # we need to visit all the elements
+        for elem in tuple_expr.elems:
+            self.visit_expr(elem)
+
+    def visit_enum_struct_expr(self, enum_struct_expr: EnumStructExpr) -> None:
+        # we visit all the field inits just like a struct expr
+        for field in enum_struct_expr.fields:
+            self.visit_field_init(field)
+
+    def visit_enum_tuple_expr(self, enum_tuple_expr: EnumTupleExpr) -> None:
+        # we visit all the elements just like a tuple expr
+        for elem in enum_tuple_expr.elems:
+            self.visit_expr(elem)
+
+    def visit_array_expr(self, array_expr: Array) -> None:
+        # we visit all the elements just like a tuple expr
+        for elem in array_expr.elems:
+            self.visit_expr(elem)
 
     def visit_get_attr(self, get_attr: GetAttr) -> None:
-        # TODO: implement
-        raise NotImplementedError("NameReferencePass not implemented")
+        # we need to ensure the object is defined
+        self.visit_expr(get_attr.obj)
 
     def visit_call(self, call: Call) -> None:
-        # TODO: implement
-        raise NotImplementedError("NameReferencePass not implemented")
+        # in name reference pass we dont care if the callee is actually callable
+        # for now we just need to ensure that the callee is defined
+        self.visit_expr(call.callee)
+        # then we visit all the args
+        for arg in call.args:
+            self.visit_expr(arg)
 
     def visit_call_attr(self, call_attr: CallAttr) -> None:
-        # TODO: implement
-        raise NotImplementedError("NameReferencePass not implemented")
+        # we need to ensure the object is defined
+        # NOTE: in later passes we will check if the object is an object that contains the method
+        self.visit_expr(call_attr.obj)
+        # then we visit all the args
+        for arg in call_attr.args:
+            self.visit_expr(arg)
 
     def visit_get_index(self, get_index: GetIndex) -> None:
-        # TODO: implement
-        raise NotImplementedError("NameReferencePass not implemented")
+        # we need to ensure the object is defined
+        self.visit_expr(get_index.obj)
+        # then we visit the index
+        self.visit_expr(get_index.index)
 
     def visit_binary_op(self, binary_op: BinaryOp) -> None:
         # this is simple we just visit the left and right operands
