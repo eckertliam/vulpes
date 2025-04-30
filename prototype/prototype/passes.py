@@ -2,7 +2,7 @@
 # This is the base class for all passes
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set, Union
 
 from .symbol import Symbol
 
@@ -51,6 +51,7 @@ from .types import (
     StructType,
     TupleType,
     Type,
+    TypeEnv,
     TypeVar,
 )
 
@@ -64,10 +65,14 @@ class Pass(ABC):
             self.program = program
             self.symbol_table = SymbolTable()
             self.errors: List[CussError] = []
+            self.type_env = TypeEnv()
         elif previous_pass:
             self.program = previous_pass.program
             self.symbol_table = previous_pass.symbol_table
+            # reset symbol table to global scope
+            self.symbol_table.current_scope_id = -1
             self.errors = previous_pass.errors
+            self.type_env = previous_pass.type_env
         else:
             raise ValueError("Either program or previous_pass must be provided")
 
@@ -539,15 +544,181 @@ class NameReferencePass(Pass):
 
 
 # TODO: implement TypeResolutionPass
-# This pass converts all type annotations into concrete types using the symbol table
-# We add a TypeVar to any Symbol that does not have a type annotation
+# This pass adds type definitions to the type env
+# it then attaches types to ast nodes that are typed
+# it adds type vars to ast nodes that will need to be inferred in the next pass
 class TypeResolutionPass(Pass):
     def __init__(self, previous_pass: NameReferencePass):
         super().__init__(previous_pass=previous_pass)
+        # we need to keep track of the type aliases, enums, and structs
+        # we sometimes need to jump around the ast to add types to the type env
+        # so we need to keep track of what we have already visited
+        self.visited_type_aliases: Set[int] = set()
+        self.visited_enums: Set[int] = set()
+        self.visited_structs: Set[int] = set()
+
+    def convert_type_annotation_top_level(
+        self, type_annotation: TypeAnnotation, decl_line: int, decl_id: int
+    ) -> Optional[Type]:
+        # used to convert type annotations that are at the top level
+        # this means converting type annotations for structs, enums, and type aliases
+        if isinstance(type_annotation, NamedTypeAnnotation):
+            existing_type = self.type_env.get_type(type_annotation.name)
+            if existing_type is None:
+                # we need to go to the ast node of the type declaration and add it
+                # then come back here and convert the type annotation
+                # we search global for the name
+                type_decl = self.symbol_table.lookup_global(type_annotation.name)
+                if type_decl is None:
+                    self.errors.append(
+                        TypeInferenceError(
+                            f"Undefined type {type_annotation.name}",
+                            decl_line,
+                            decl_id,
+                        )
+                    )
+                    return None
+                # get the node of the type declaration
+                type_decl_node = self.program.get_node(type_decl.ast_id)
+                if type_decl_node is None:
+                    raise RuntimeError("Cannot find node for type declaration")
+                # check if the type declaration is a type alias, enum, or struct
+                if not (
+                    isinstance(type_decl_node, TypeAliasDecl)
+                    or isinstance(type_decl_node, EnumDecl)
+                    or isinstance(type_decl_node, StructDecl)
+                ):
+                    self.errors.append(
+                        TypeInferenceError(
+                            f"Type {type_annotation.name} is not a type alias, enum, or struct",
+                            decl_line,
+                            decl_id,
+                        )
+                    )
+                    return None
+                # run type resolution on the type declaration
+                self.visit_type_decl(type_decl_node)
+                # we refetch the type
+                existing_type = self.type_env.get_type(type_annotation.name)
+                # if it still doesnt exist something went wrong
+                if existing_type is None:
+                    self.errors.append(
+                        TypeInferenceError(
+                            f"Type {type_annotation.name} is not defined",
+                            decl_line,
+                            decl_id,
+                        )
+                    )
+                    return None
+            # existing type is defined so we return it
+            return existing_type
+        elif isinstance(type_annotation, ArrayTypeAnnotation):
+            # we need to convert the element type
+            elem_type = self.convert_type_annotation_top_level(
+                type_annotation.elem_type, decl_line, decl_id
+            )
+            if elem_type is None:
+                # if somehting went wrong we return None
+                # the attempt to convert the element type will have added an error
+                return None
+            # we return the array type
+            return ArrayType(elem_type)
+        elif isinstance(type_annotation, TupleTypeAnnotation):
+            # we need to convert the element types
+            elem_types = [
+                self.convert_type_annotation_top_level(elem_type, decl_line, decl_id)
+                for elem_type in type_annotation.elem_types
+            ]
+            for elem_type in elem_types:
+                if elem_type is None:
+                    # if somehting went wrong we return None
+                    # the attempt to convert the element type will have added an error
+                    return None
+            # to please the type checker we need to filter out None types even though we know there are none
+            elem_types = [t for t in elem_types if t is not None]
+            # we return the tuple type
+            return TupleType(elem_types)
+        elif isinstance(type_annotation, FunctionTypeAnnotation):
+            # we need to convert the parameter types
+            param_types = [
+                self.convert_type_annotation_top_level(param_type, decl_line, decl_id)
+                for param_type in type_annotation.params
+            ]
+            for param_type in param_types:
+                if param_type is None:
+                    # if somehting went wrong we return None
+                    # the attempt to convert the parameter type will have added an error
+                    return None
+            # please the type checker
+            param_types = [t for t in param_types if t is not None]
+            # we convert the return type
+            ret_type = self.convert_type_annotation_top_level(
+                type_annotation.ret_type, decl_line, decl_id
+            )
+            if ret_type is None:
+                return None
+            # we return the function type
+            return FunctionType(param_types, ret_type)
+        else:
+            raise RuntimeError(f"Unknown type annotation {type_annotation}")
 
     def run(self) -> None:
+        # first we again need to iterate through all top level declarations
+        # it is important that we add all aliases, enums, and structs to the type env
+        # before we do any type resolution
+        for declaration in self.program.declarations:
+            self.visit_type_decl(declaration)
+
+    def visit_type_decl(
+        self, type_decl: Union[TypeAliasDecl, EnumDecl, StructDecl]
+    ) -> None:
+        if isinstance(type_decl, TypeAliasDecl):
+            self.visit_type_alias_decl(type_decl)
+        elif isinstance(type_decl, EnumDecl):
+            self.visit_enum_decl(type_decl)
+        elif isinstance(type_decl, StructDecl):
+            self.visit_struct_decl(type_decl)
+
+    def visit_type_alias_decl(self, type_alias_decl: TypeAliasDecl) -> None:
+        # make sure we have not already visited this type alias
+        if type_alias_decl.id in self.visited_type_aliases:
+            return
+        # we convert the type annotation
+        type_annotation = self.convert_type_annotation_top_level(
+            type_alias_decl.type_annotation, type_alias_decl.line, type_alias_decl.id
+        )
+        if type_annotation is None:
+            # the attempt to convert the type annotation will have added an error
+            return None
+        # we add the type to the type env
+        self.type_env.add_type(type_alias_decl.name, type_annotation)
+        # we add the type alias to the visited set
+        self.visited_type_aliases.add(type_alias_decl.id)
+
+    def visit_enum_decl(self, enum_decl: EnumDecl) -> None:
         # TODO: implement
         raise NotImplementedError("TypeResolutionPass not implemented")
+
+    def visit_struct_decl(self, struct_decl: StructDecl) -> None:
+        # make sure we have not already visited this struct
+        if struct_decl.id in self.visited_structs:
+            return
+        # we convert the struct fields
+        field_types: Dict[str, Type] = {}
+        for field in struct_decl.fields:
+            field_type = self.convert_type_annotation_top_level(
+                field.type_annotation, field.line, field.id
+            )
+            if field_type is None:
+                # the attempt to convert the field type will have added an error
+                return
+            field_types[field.name] = field_type
+        # we create the struct type
+        struct_type = StructType(struct_decl.name, field_types)
+        # we add the struct to the type env
+        self.type_env.add_type(struct_decl.name, struct_type)
+        # we add the struct to the visited set
+        self.visited_structs.add(struct_decl.id)
 
 
 # TODO: implement TypeInferencePass

@@ -2,7 +2,7 @@ from typing import Dict, Optional, Union
 from lark import Lark, Tree, Token, Transformer
 from lark.indenter import Indenter
 
-from .types import Type
+from .types import BoolType, CharType, FloatType, IntType, StringType, Type
 
 from .symbol import Symbol
 
@@ -474,8 +474,8 @@ class EnumTupleVariant(EnumVariant):
     def get_node(self, id: int) -> Optional["Node"]:
         if self.id == id:
             return self
-        for type in self.types:
-            node = type.get_node(id)
+        for type_annotation in self.types:
+            node = type_annotation.get_node(id)
             if node is not None:
                 return node
         return None
@@ -522,11 +522,13 @@ class EnumStructField(Node):
 
 
 class TypeAliasDecl(Declaration):
-    def __init__(self, pub: bool, name: str, type: TypeAnnotation, line: int) -> None:
+    def __init__(
+        self, pub: bool, name: str, type_annotation: TypeAnnotation, line: int
+    ) -> None:
         super().__init__("type_alias_decl", line)
         self.pub = pub
         self.name = name
-        self.type_annotation = type
+        self.type_annotation = type_annotation
 
     def get_node(self, id: int) -> Optional[Node]:
         if self.id == id:
@@ -543,14 +545,14 @@ class VarDecl(Statement):
         self,
         mutable: bool,
         name: str,
-        type: Optional[TypeAnnotation],
+        type_annotation: Optional[TypeAnnotation],
         expr: "Expr",
         line: int,
     ) -> None:
         kind = "let_decl" if mutable else "const_decl"
         super().__init__(kind, line)
         self.name = name
-        self.type_annotation = type
+        self.type_annotation = type_annotation
         self.expr = expr
 
     def get_node(self, id: int) -> Optional[Node]:
@@ -771,30 +773,35 @@ class Integer(Expr):
     def __init__(self, value: int, line: int) -> None:
         super().__init__("integer", line)
         self.value = value
+        self.type = IntType()
 
 
 class Float(Expr):
     def __init__(self, value: float, line: int) -> None:
         super().__init__("float", line)
         self.value = value
+        self.type = FloatType()
 
 
 class String(Expr):
     def __init__(self, value: str, line: int) -> None:
         super().__init__("string", line)
         self.value = value
+        self.type = StringType()
 
 
 class Char(Expr):
     def __init__(self, value: str, line: int) -> None:
         super().__init__("char", line)
         self.value = value
+        self.type = CharType()
 
 
 class Bool(Expr):
     def __init__(self, value: bool, line: int) -> None:
         super().__init__("bool", line)
         self.value = value
+        self.type = BoolType()
 
 
 class Array(Expr):

@@ -1,5 +1,5 @@
 # Internal Type Representation
-from typing import Dict
+from typing import Dict, Optional
 
 
 class Type:
@@ -14,6 +14,20 @@ class Type:
 
     def __hash__(self) -> int:
         raise NotImplementedError("Subclasses must implement __hash__")
+
+
+class VoidType(Type):
+    def __str__(self) -> str:
+        return "void"
+
+    def __eq__(self, other: "Type") -> bool:
+        return isinstance(other, VoidType)
+
+    def __ne__(self, other: "Type") -> bool:
+        return not isinstance(other, VoidType)
+
+    def __hash__(self) -> int:
+        return hash("void")
 
 
 class IntType(Type):
@@ -276,16 +290,16 @@ class EnumType(Type):
 
 
 class TypeVar(Type):
-    next_alpha = "a"
-    next_numeric = 0
+    _next_alpha = "a"
+    _next_numeric = 0
 
     def __init__(self) -> None:
-        self.name = f"T{TypeVar.next_alpha}{TypeVar.next_numeric}"
-        if TypeVar.next_numeric == 9:
-            TypeVar.next_alpha = chr(ord(TypeVar.next_alpha) + 1)
-            TypeVar.next_numeric = 0
+        self.name = f"T{TypeVar._next_alpha}{TypeVar._next_numeric}"
+        if TypeVar._next_numeric == 9:
+            TypeVar._next_alpha = chr(ord(TypeVar._next_alpha) + 1)
+            TypeVar._next_numeric = 0
         else:
-            TypeVar.next_numeric += 1
+            TypeVar._next_numeric += 1
 
     def __str__(self) -> str:
         return self.name
@@ -298,3 +312,22 @@ class TypeVar(Type):
 
     def __hash__(self) -> int:
         return hash(self.name)
+
+# Type Env is a helper type that contains a mapping of type name to their corresponding type
+class TypeEnv:
+    def __init__(self) -> None:
+        self.types: Dict[str, Type] = {
+            "int": IntType(),
+            "float": FloatType(),
+            "string": StringType(),
+            "bool": BoolType(),
+            "char": CharType(),
+            "void": VoidType(),
+        }
+
+    def add_type(self, name: str, type: Type) -> None:
+        self.types[name] = type
+        
+    def get_type(self, name: str) -> Optional[Type]:
+        return self.types.get(name)
+    
