@@ -234,9 +234,6 @@ class Node:
         # optional symbol associated with the node
         # makes passes a lot easier and more efficient
         self.symbol: Optional[Symbol] = None
-        # optional type associated with the node
-        # makes type checking a lot easier and more efficient
-        self.type: Optional[Type] = None
         Node._next_id += 1
 
     def get_node(self, id: int) -> Optional["Node"]:
@@ -571,7 +568,9 @@ class VarDecl(Statement):
 
 
 class Expr(Statement):
-    pass
+    def __init__(self, kind: str, line: int, type: Optional[Type] = None) -> None:
+        super().__init__(kind, line)
+        self.type = type
 
 
 class AssignableExpr(Expr):
@@ -771,37 +770,32 @@ class Continue(Statement):
 
 class Integer(Expr):
     def __init__(self, value: int, line: int) -> None:
-        super().__init__("integer", line)
+        super().__init__("integer", line, IntType())
         self.value = value
-        self.type = IntType()
 
 
 class Float(Expr):
     def __init__(self, value: float, line: int) -> None:
-        super().__init__("float", line)
+        super().__init__("float", line, FloatType())
         self.value = value
-        self.type = FloatType()
 
 
 class String(Expr):
     def __init__(self, value: str, line: int) -> None:
-        super().__init__("string", line)
+        super().__init__("string", line, StringType())
         self.value = value
-        self.type = StringType()
 
 
 class Char(Expr):
     def __init__(self, value: str, line: int) -> None:
-        super().__init__("char", line)
+        super().__init__("char", line, CharType())
         self.value = value
-        self.type = CharType()
 
 
 class Bool(Expr):
     def __init__(self, value: bool, line: int) -> None:
-        super().__init__("bool", line)
+        super().__init__("bool", line, BoolType())
         self.value = value
-        self.type = BoolType()
 
 
 class Array(Expr):
@@ -960,6 +954,17 @@ class Ident(AssignableExpr):
     def __init__(self, name: str, line: int) -> None:
         super().__init__("ident", line)
         self.name = name
+
+    @property
+    def type(
+        self,
+    ) -> Optional[Type]:
+        return self.symbol.type if self.symbol else None
+
+    @type.setter
+    def type(self, type: Type) -> None:
+        if self.symbol:
+            self.symbol.type = type
 
 
 class Call(Expr):
@@ -1275,6 +1280,10 @@ class ASTTransformer(Transformer):
 
     def assign_stmt(self, items):
         lhs, rhs = items
+        if isinstance(lhs, Token):
+            assert lhs.type == "IDENT"
+            assert lhs.line is not None
+            lhs = Ident(lhs.value, lhs.line)
         return Assign(lhs, rhs, lhs.line)
 
     def return_stmt(self, items):
@@ -1389,7 +1398,10 @@ class ASTTransformer(Transformer):
         return UnaryOp("!", operand, operand.line)
 
     def ident(self, items):
-        return Ident(items[0].value, items[0].line)
+        token = items[0]
+        assert isinstance(token, Token)
+        assert token.line is not None
+        return Ident(token.value, token.line)
 
     def int(self, items):
         return Integer(int(items[0].value), items[0].line)
@@ -1456,4 +1468,5 @@ PARSER = Lark(
 def parse(source: str) -> Program:
     program: Union[Optional[Program], Tree] = PARSER.parse(source)
     assert isinstance(program, Program)
+    program.source = source
     return program

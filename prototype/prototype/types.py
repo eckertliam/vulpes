@@ -1,6 +1,8 @@
 # Internal Type Representation
 from typing import Dict, Optional
 
+from .symbol import Symbol
+
 
 class Type:
     def __str__(self) -> str:
@@ -165,12 +167,7 @@ class StructType(Type):
     def __init__(self, name: str, fields: Dict[str, Type]) -> None:
         self.name = name
         self.fields = fields
-        self.methods: Dict[str, FunctionType] = {}
-
-    def add_method(
-        self, name: str, method: FunctionType, line: int, ast_id: int
-    ) -> None:
-        self.methods[name] = method
+        self.methods: Dict[str, Symbol] = {}
 
     def __str__(self) -> str:
         return f"{self.name} {{ {', '.join(f'{k}: {v}' for k, v in self.fields.items())} }}"
@@ -255,12 +252,7 @@ class EnumType(Type):
     def __init__(self, name: str, variants: list[EnumVariantType]) -> None:
         self.name = name
         self.variants: Dict[str, EnumVariantType] = {v.name: v for v in variants}
-        self.methods: Dict[str, FunctionType] = {}
-
-    def add_method(
-        self, name: str, method: FunctionType, line: int, ast_id: int
-    ) -> None:
-        self.methods[name] = method
+        self.methods: Dict[str, Symbol] = {}
 
     def __str__(self) -> str:
         return f"{self.name} {{ {', '.join(str(v) for v in self.variants.values())} }}"
@@ -313,6 +305,7 @@ class TypeVar(Type):
     def __hash__(self) -> int:
         return hash(self.name)
 
+
 # Type Env is a helper type that contains a mapping of type name to their corresponding type
 class TypeEnv:
     def __init__(self) -> None:
@@ -327,7 +320,6 @@ class TypeEnv:
 
     def add_type(self, name: str, type: Type) -> None:
         self.types[name] = type
-        
+
     def get_type(self, name: str) -> Optional[Type]:
         return self.types.get(name)
-    

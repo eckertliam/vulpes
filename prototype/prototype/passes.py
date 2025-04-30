@@ -128,8 +128,7 @@ class SymbolTable:
         ast_id: int,
         line: int,
         program: Program,
-        type: Optional[Type] = None,
-    ) -> Optional[CussError]:
+    ) -> Union[Symbol, CussError]:
         # check for shadowing
         if name in self.table[self.current_scope_id].symbols:
             # get the existing symbol
@@ -147,10 +146,9 @@ class SymbolTable:
                 ast_id,
             )
         else:
-            self.table[self.current_scope_id].symbols[name] = Symbol(
-                name, ast_id, self.current_scope_id
-            )
-            return None
+            symbol = Symbol(name, ast_id, self.current_scope_id)
+            self.table[self.current_scope_id].symbols[name] = symbol
+            return symbol
 
     def lookup_local(self, name: str) -> Optional[Symbol]:
         # lookup in only the current scope
@@ -184,21 +182,42 @@ class NameDeclarationPass(Pass):
     def __init__(self, program: Program) -> None:
         super().__init__(program=program)
 
-    def add_symbol(self, name: str, ast_id: int, line: int) -> None:
+    def add_symbol(self, name: str, ast_id: int, line: int) -> Optional[Symbol]:
         res = self.symbol_table.add_symbol(name, ast_id, line, self.program)
-        if res is not None:
+        if isinstance(res, CussError):
             self.errors.append(res)
+            return None
+        else:
+            return res
 
     def run(self) -> None:
         # first we add all defined data structs to the symbol table
         # we do this so that we can then add their impls to their scopes
         for declaration in self.program.declarations:
             if isinstance(declaration, StructDecl):
-                self.add_symbol(declaration.name, declaration.id, declaration.line)
+                res = self.add_symbol(
+                    declaration.name, declaration.id, declaration.line
+                )
+                if res is None:
+                    return
+                # add the symbol to the struct declaration node
+                declaration.symbol = res
             elif isinstance(declaration, EnumDecl):
-                self.add_symbol(declaration.name, declaration.id, declaration.line)
+                res = self.add_symbol(
+                    declaration.name, declaration.id, declaration.line
+                )
+                if res is None:
+                    return
+                # add the symbol to the enum declaration node
+                declaration.symbol = res
             elif isinstance(declaration, TypeAliasDecl):
-                self.add_symbol(declaration.name, declaration.id, declaration.line)
+                res = self.add_symbol(
+                    declaration.name, declaration.id, declaration.line
+                )
+                if res is None:
+                    return
+                # add the symbol to the type alias declaration node
+                declaration.symbol = res
 
         # now we add all impls and fns to the symbol table
         for declaration in self.program.declarations:
@@ -206,6 +225,11 @@ class NameDeclarationPass(Pass):
                 self.impl_decl(declaration)
             elif isinstance(declaration, FnDecl):
                 self.fn_decl(declaration)
+
+        # check for any errors that may have been added
+        if len(self.errors) > 0:
+            for error in self.errors:
+                error.report(self.program)
 
     def impl_decl(self, impl: ImplDecl) -> None:
         # we look up the impl's type in the symbol table
@@ -229,7 +253,11 @@ class NameDeclarationPass(Pass):
 
     def method_decl(self, method: FnDecl, impl_type: Symbol) -> None:
         # we add the method to the current scope
-        self.add_symbol(method.name, method.id, method.line)
+        res = self.add_symbol(method.name, method.id, method.line)
+        if res is None:
+            return
+        # add the symbol to the method's declaration node
+        method.symbol = res
         # we enter the method's scope
         self.symbol_table.enter_scope(method.id)
         # we add the self param
@@ -238,7 +266,11 @@ class NameDeclarationPass(Pass):
         method.params.insert(0, param)
         # we add all the params to the method's scope
         for param in method.params:
-            self.add_symbol(param.name, param.id, param.line)
+            res = self.add_symbol(param.name, param.id, param.line)
+            if res is None:
+                return
+            # add the symbol to the param node
+            param.symbol = res
         # we iterate through the body and all child bodys and add all vars to the symbol table
         for statement in method.body:
             self.statement(statement)
@@ -247,12 +279,20 @@ class NameDeclarationPass(Pass):
 
     def fn_decl(self, fn: FnDecl) -> None:
         # we add the fn to the current scope
-        self.add_symbol(fn.name, fn.id, fn.line)
+        res = self.add_symbol(fn.name, fn.id, fn.line)
+        if res is None:
+            return
+        # add the symbol to the fn's declaration node
+        fn.symbol = res
         # we enter the fn's scope
         self.symbol_table.enter_scope(fn.id)
         # we add all the params to the fn's scope
         for param in fn.params:
-            self.add_symbol(param.name, param.id, param.line)
+            res = self.add_symbol(param.name, param.id, param.line)
+            if res is None:
+                return
+            # add the symbol to the param node
+            param.symbol = res
         # we iterate through the body and all child bodys and add all vars to the symbol table
         for statement in fn.body:
             self.statement(statement)
@@ -262,7 +302,11 @@ class NameDeclarationPass(Pass):
     def statement(self, statement: Statement) -> None:
         # we only really care about vars and statements with bodies
         if isinstance(statement, VarDecl):
-            self.add_symbol(statement.name, statement.id, statement.line)
+            res = self.add_symbol(statement.name, statement.id, statement.line)
+            if res is None:
+                return
+            # add the symbol to the var's declaration node
+            statement.symbol = res
         elif isinstance(statement, FnDecl):
             self.fn_decl(statement)
         elif isinstance(statement, If):
@@ -319,13 +363,17 @@ class NameReferencePass(Pass):
     def __init__(self, previous_pass: NameDeclarationPass):
         super().__init__(previous_pass=previous_pass)
 
-    def run(self) -> Program:
+    def run(self) -> None:
         for declaration in self.program.declarations:
             if isinstance(declaration, FnDecl):
                 self.visit_fn_decl(declaration)
             elif isinstance(declaration, ImplDecl):
                 self.visit_impl_decl(declaration)
-        return self.program
+
+        # check for any errors that may have been added
+        if len(self.errors) > 0:
+            for error in self.errors:
+                error.report(self.program)
 
     def visit_fn_decl(self, fn_decl: FnDecl) -> None:
         # enter the fn's scope
@@ -543,7 +591,6 @@ class NameReferencePass(Pass):
         ident.symbol = symbol
 
 
-# TODO: implement TypeResolutionPass
 # This pass adds type definitions to the type env
 # it then attaches types to ast nodes that are typed
 # it adds type vars to ast nodes that will need to be inferred in the next pass
@@ -667,7 +714,20 @@ class TypeResolutionPass(Pass):
         # it is important that we add all aliases, enums, and structs to the type env
         # before we do any type resolution
         for declaration in self.program.declarations:
-            self.visit_type_decl(declaration)
+            if (
+                isinstance(declaration, TypeAliasDecl)
+                or isinstance(declaration, EnumDecl)
+                or isinstance(declaration, StructDecl)
+            ):
+                self.visit_type_decl(declaration)
+
+        # now we can go through the function and impl declarations
+        # and add types to the ast nodes that need them
+        for declaration in self.program.declarations:
+            if isinstance(declaration, FnDecl):
+                self.visit_fn_decl(declaration)
+            elif isinstance(declaration, ImplDecl):
+                self.visit_impl_decl(declaration)
 
     def visit_type_decl(
         self, type_decl: Union[TypeAliasDecl, EnumDecl, StructDecl]
@@ -680,20 +740,30 @@ class TypeResolutionPass(Pass):
             self.visit_struct_decl(type_decl)
 
     def visit_type_alias_decl(self, type_alias_decl: TypeAliasDecl) -> None:
-        # make sure we have not already visited this type alias
+        # check if this alias is already being visited (i.e. recursion)
         if type_alias_decl.id in self.visited_type_aliases:
+            self.errors.append(
+                TypeInferenceError(
+                    f"Recursive type alias detected for {type_alias_decl.name}",
+                    type_alias_decl.line,
+                    type_alias_decl.id,
+                )
+            )
             return
+        # mark as being visited
+        self.visited_type_aliases.add(type_alias_decl.id)
         # we convert the type annotation
         type_annotation = self.convert_type_annotation_top_level(
             type_alias_decl.type_annotation, type_alias_decl.line, type_alias_decl.id
         )
         if type_annotation is None:
             # the attempt to convert the type annotation will have added an error
+            self.visited_type_aliases.remove(type_alias_decl.id)
             return None
         # we add the type to the type env
         self.type_env.add_type(type_alias_decl.name, type_annotation)
-        # we add the type alias to the visited set
-        self.visited_type_aliases.add(type_alias_decl.id)
+        # remove the alias ID from the visited set
+        self.visited_type_aliases.remove(type_alias_decl.id)
 
     def visit_enum_decl(self, enum_decl: EnumDecl) -> None:
         # TODO: implement
@@ -719,6 +789,191 @@ class TypeResolutionPass(Pass):
         self.type_env.add_type(struct_decl.name, struct_type)
         # we add the struct to the visited set
         self.visited_structs.add(struct_decl.id)
+
+    def visit_fn_decl(self, fn_decl: FnDecl) -> None:
+        # first we get the function's type signature
+        # we go through the params and convert them to a list of types
+        param_types: list[Type] = []
+        for param in fn_decl.params:
+            param_type = self.convert_type_annotation_top_level(
+                param.type_annotation, param.line, param.id
+            )
+            if param_type is None:
+                # the attempt to convert the parameter type will have added an error
+                return
+            param_types.append(param_type)
+            # add the param_type to the param's symbol
+            if param.symbol is None:  # this should never happen
+                raise RuntimeError("Parameter has no symbol")
+            param.symbol.type = param_type
+        # we convert the return type
+        ret_type = self.convert_type_annotation_top_level(
+            fn_decl.ret_type, fn_decl.line, fn_decl.id
+        )
+        if ret_type is None:
+            # the attempt to convert the return type will have added an error
+            return
+        fn_type = FunctionType(param_types, ret_type)
+        # add the function type to the function's symbol
+        if fn_decl.symbol is None:  # this should never happen
+            raise RuntimeError("Function declaration has no symbol")
+        fn_decl.symbol.type = fn_type
+        # now we enter the fn's scope
+        self.symbol_table.enter_scope(fn_decl.id)
+        # now we visit the body
+        for statement in fn_decl.body:
+            self.visit_statement(statement)
+        # now we exit the fn's scope
+        self.symbol_table.exit_scope()
+
+    def visit_impl_decl(self, impl_decl: ImplDecl) -> None:
+        # we need to get the type the impl is implementing
+        # we do this by looking up the type in the type env
+        impl_type = self.type_env.get_type(impl_decl.name)
+        if impl_type is None:
+            self.errors.append(
+                TypeInferenceError(
+                    f"Type {impl_decl.name} is not defined",
+                    impl_decl.line,
+                    impl_decl.id,
+                )
+            )
+            return
+        elif not isinstance(impl_type, (StructType, EnumType)):
+            self.errors.append(
+                TypeInferenceError(
+                    f"Type {impl_decl.name} is not a struct or enum cannot implement methods",
+                    impl_decl.line,
+                    impl_decl.id,
+                )
+            )
+            return
+        # now we need to visit the methods
+        for method in impl_decl.methods:
+            self.visit_method_decl(method, impl_type)
+
+    def visit_method_decl(
+        self, method_decl: FnDecl, impl_type: Union[StructType, EnumType]
+    ) -> None:
+        # like functions we need to get the method's type signature
+        # we go through the params and convert them to a list of types
+        param_types: list[Type] = []
+        for param in method_decl.params:
+            param_type = self.convert_type_annotation_top_level(
+                param.type_annotation, param.line, param.id
+            )
+            if param_type is None:
+                # the attempt to convert the parameter type will have added an error
+                return
+            param_types.append(param_type)
+            # add the param_type to the param's symbol
+            if param.symbol is None:  # this should never happen
+                raise RuntimeError("Parameter has no symbol")
+            param.symbol.type = param_type
+        # we convert the return type
+        ret_type = self.convert_type_annotation_top_level(
+            method_decl.ret_type, method_decl.line, method_decl.id
+        )
+        if ret_type is None:
+            # the attempt to convert the return type will have added an error
+            return
+        method_type = FunctionType(param_types, ret_type)
+        # add the method type to the method's symbol
+        if method_decl.symbol is None:  # this should never happen
+            raise RuntimeError("Method declaration has no symbol")
+        method_decl.symbol.type = method_type
+        # make sure the impl type doesnt already have a method with this name
+        if method_decl.name in impl_type.methods:
+            self.errors.append(
+                TypeInferenceError(
+                    f"Method {method_decl.name} already exists in impl type {impl_type.name}",
+                    method_decl.line,
+                    method_decl.id,
+                )
+            )
+            return
+        # add the method's symbol to the impl type
+        impl_type.methods[method_decl.name] = method_decl.symbol
+        # now we enter the method's scope
+        self.symbol_table.enter_scope(method_decl.id)
+        # now we visit the body
+        for statement in method_decl.body:
+            self.visit_statement(statement)
+        # now we exit the method's scope
+        self.symbol_table.exit_scope()
+
+    def visit_statement(self, statement: Statement) -> None:
+        # we only care about var decls and statements with bodies
+        if isinstance(statement, VarDecl):
+            self.visit_var_decl(statement)
+        elif isinstance(statement, FnDecl):
+            self.visit_fn_decl(statement)
+        elif isinstance(statement, If):
+            self.visit_if_stmt(statement)
+        elif isinstance(statement, Else):
+            self.visit_else_stmt(statement)
+        elif isinstance(statement, While):
+            self.visit_while_stmt(statement)
+        elif isinstance(statement, Loop):
+            self.visit_loop_stmt(statement)
+
+    def visit_var_decl(self, var_decl: VarDecl) -> None:
+        # if the var has a type annotation we need to convert it
+        if var_decl.type_annotation is not None:
+            type_annotation = self.convert_type_annotation_top_level(
+                var_decl.type_annotation, var_decl.line, var_decl.id
+            )
+            if type_annotation is None:
+                # the attempt to convert the type annotation will have added an error
+                return
+            # we add the type to the var's symbol
+            if var_decl.symbol is None:  # this should never happen
+                raise RuntimeError("Variable declaration has no symbol")
+            var_decl.symbol.type = type_annotation
+        else:  # the var has no type annotation so we need to infer it
+            # for now we just add a type var which lets the next pass know this var needs to be inferred
+            if var_decl.symbol is None:  # this should never happen
+                raise RuntimeError("Variable declaration has no symbol")
+            var_decl.symbol.type = TypeVar()
+
+    def visit_if_stmt(self, if_stmt: If) -> None:
+        # we need to enter the if's scope
+        self.symbol_table.enter_scope(if_stmt.id)
+        # we visit the body
+        for statement in if_stmt.body:
+            self.visit_statement(statement)
+        # we exit the if's scope
+        self.symbol_table.exit_scope()
+        # we visit the else body if it exists
+        if if_stmt.else_body is not None:
+            self.visit_else_stmt(if_stmt.else_body)
+
+    def visit_else_stmt(self, else_stmt: Else) -> None:
+        # we need to enter the else's scope
+        self.symbol_table.enter_scope(else_stmt.id)
+        # we visit the body
+        for statement in else_stmt.body:
+            self.visit_statement(statement)
+        # we exit the else's scope
+        self.symbol_table.exit_scope()
+
+    def visit_while_stmt(self, while_stmt: While) -> None:
+        # we need to enter the while's scope
+        self.symbol_table.enter_scope(while_stmt.id)
+        # we visit the body
+        for statement in while_stmt.body:
+            self.visit_statement(statement)
+        # we exit the while's scope
+        self.symbol_table.exit_scope()
+
+    def visit_loop_stmt(self, loop_stmt: Loop) -> None:
+        # we need to enter the loop's scope
+        self.symbol_table.enter_scope(loop_stmt.id)
+        # we visit the body
+        for statement in loop_stmt.body:
+            self.visit_statement(statement)
+        # we exit the loop's scope
+        self.symbol_table.exit_scope()
 
 
 # TODO: implement TypeInferencePass
