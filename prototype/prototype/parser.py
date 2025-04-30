@@ -2,6 +2,8 @@ from typing import Dict, Optional, Union
 from lark import Lark, Tree, Token, Transformer
 from lark.indenter import Indenter
 
+from .types import Type
+
 from .symbol import Symbol
 
 cuss_grammar = r"""
@@ -232,6 +234,9 @@ class Node:
         # optional symbol associated with the node
         # makes passes a lot easier and more efficient
         self.symbol: Optional[Symbol] = None
+        # optional type associated with the node
+        # makes type checking a lot easier and more efficient
+        self.type: Optional[Type] = None
         Node._next_id += 1
 
     def get_node(self, id: int) -> Optional["Node"]:
@@ -363,16 +368,16 @@ class FnDecl(Declaration, Statement):
 
 
 class Param(Node):
-    def __init__(self, name: str, type: TypeAnnotation, line: int) -> None:
+    def __init__(self, name: str, type_annotation: TypeAnnotation, line: int) -> None:
         super().__init__("param", line)
         self.name = name
-        self.type = type
+        self.type_annotation = type_annotation
         self.line = line
 
     def get_node(self, id: int) -> Optional[Node]:
         if self.id == id:
             return self
-        return self.type.get_node(id)
+        return self.type_annotation.get_node(id)
 
 
 class StructDecl(Declaration):
@@ -404,19 +409,21 @@ class StructDecl(Declaration):
 
 
 class StructField(Node):
-    def __init__(self, pub: bool, name: str, type: TypeAnnotation, line: int) -> None:
+    def __init__(
+        self, pub: bool, name: str, type_annotation: TypeAnnotation, line: int
+    ) -> None:
         super().__init__("struct_field", line)
         self.pub = pub
         self.name = name
-        self.type = type
+        self.type_annotation = type_annotation
 
     def get_node(self, id: int) -> Optional["Node"]:
         if self.id == id:
             return self
-        return self.type.get_node(id)
+        return self.type_annotation.get_node(id)
 
     def get_span(self) -> tuple[int, int]:
-        tmin, tmax = self.type.get_span()
+        tmin, tmax = self.type_annotation.get_span()
         return (self.line, max(self.line, tmax))
 
 
@@ -499,18 +506,18 @@ class EnumStructVariant(EnumVariant):
 
 
 class EnumStructField(Node):
-    def __init__(self, name: str, type: TypeAnnotation, line: int) -> None:
+    def __init__(self, name: str, type_annotation: TypeAnnotation, line: int) -> None:
         super().__init__("enum_struct_field", line)
         self.name = name
-        self.type = type
+        self.type_annotation = type_annotation
 
     def get_node(self, id: int) -> Optional[Node]:
         if self.id == id:
             return self
-        return self.type.get_node(id)
+        return self.type_annotation.get_node(id)
 
     def get_span(self) -> tuple[int, int]:
-        tmin, tmax = self.type.get_span()
+        tmin, tmax = self.type_annotation.get_span()
         return (self.line, max(self.line, tmax))
 
 
@@ -519,15 +526,15 @@ class TypeAliasDecl(Declaration):
         super().__init__("type_alias_decl", line)
         self.pub = pub
         self.name = name
-        self.type = type
+        self.type_annotation = type
 
     def get_node(self, id: int) -> Optional[Node]:
         if self.id == id:
             return self
-        return self.type.get_node(id)
+        return self.type_annotation.get_node(id)
 
     def get_span(self) -> tuple[int, int]:
-        tmin, tmax = self.type.get_span()
+        tmin, tmax = self.type_annotation.get_span()
         return (self.line, max(self.line, tmax))
 
 
@@ -543,14 +550,14 @@ class VarDecl(Statement):
         kind = "let_decl" if mutable else "const_decl"
         super().__init__(kind, line)
         self.name = name
-        self.type = type
+        self.type_annotation = type
         self.expr = expr
 
     def get_node(self, id: int) -> Optional[Node]:
         if self.id == id:
             return self
-        if self.type is not None:
-            node = self.type.get_node(id)
+        if self.type_annotation is not None:
+            node = self.type_annotation.get_node(id)
             if node is not None:
                 return node
         return self.expr.get_node(id)

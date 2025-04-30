@@ -87,13 +87,13 @@ def test_fn_w_params():
     assert len(fn_decl.params) == 2
     assert (
         fn_decl.params[0].name == "a"
-        and isinstance(fn_decl.params[0].type, NamedTypeAnnotation)
-        and fn_decl.params[0].type.name == "int"
+        and isinstance(fn_decl.params[0].type_annotation, NamedTypeAnnotation)
+        and fn_decl.params[0].type_annotation.name == "int"
     )
     assert (
         fn_decl.params[1].name == "b"
-        and isinstance(fn_decl.params[1].type, NamedTypeAnnotation)
-        and fn_decl.params[1].type.name == "int"
+        and isinstance(fn_decl.params[1].type_annotation, NamedTypeAnnotation)
+        and fn_decl.params[1].type_annotation.name == "int"
     )
     assert (
         isinstance(fn_decl.ret_type, NamedTypeAnnotation)
@@ -128,13 +128,13 @@ def test_struct_decl():
     assert len(struct_decl.fields) == 2
     assert (
         struct_decl.fields[0].name == "x"
-        and isinstance(struct_decl.fields[0].type, NamedTypeAnnotation)
-        and struct_decl.fields[0].type.name == "int"
+        and isinstance(struct_decl.fields[0].type_annotation, NamedTypeAnnotation)
+        and struct_decl.fields[0].type_annotation.name == "int"
     )
     assert (
         struct_decl.fields[1].name == "y"
-        and isinstance(struct_decl.fields[1].type, NamedTypeAnnotation)
-        and struct_decl.fields[1].type.name == "int"
+        and isinstance(struct_decl.fields[1].type_annotation, NamedTypeAnnotation)
+        and struct_decl.fields[1].type_annotation.name == "int"
     )
 
 
@@ -196,7 +196,7 @@ def test_if_stmt():
     assert isinstance(ret_on_true, Return)
     assert isinstance(if_stmt.else_body, Else)
     else_stmt = if_stmt.else_body
-    
+
 
 def test_while_stmt():
     source = textwrap.dedent(
@@ -409,10 +409,10 @@ def test_type_aliases():
     type_alias = program.declarations[0]
     assert isinstance(type_alias, TypeAliasDecl)
     assert type_alias.name == "Coord"
-    assert isinstance(type_alias.type, TupleTypeAnnotation)
-    assert len(type_alias.type.elem_types) == 2
-    assert isinstance(type_alias.type.elem_types[0], TypeAnnotation)
-    assert isinstance(type_alias.type.elem_types[1], TypeAnnotation)
+    assert isinstance(type_alias.type_annotation, TupleTypeAnnotation)
+    assert len(type_alias.type_annotation.elem_types) == 2
+    assert isinstance(type_alias.type_annotation.elem_types[0], TypeAnnotation)
+    assert isinstance(type_alias.type_annotation.elem_types[1], TypeAnnotation)
 
 
 # TODO: test tuples SEE main.py first

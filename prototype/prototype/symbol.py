@@ -8,4 +8,3 @@ class Symbol:
     name: str
     ast_id: int
     parent_scope_id: int
-    type: Optional[Type] = None

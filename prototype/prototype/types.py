@@ -1,8 +1,6 @@
 # Internal Type Representation
 from typing import Dict
 
-from .errors import NameResolutionError
-
 
 class Type:
     def __str__(self) -> str:
@@ -158,10 +156,6 @@ class StructType(Type):
     def add_method(
         self, name: str, method: FunctionType, line: int, ast_id: int
     ) -> None:
-        if name in self.methods:
-            raise NameResolutionError(
-                f"Method {name} already exists for struct {self.name}", line, ast_id
-            )
         self.methods[name] = method
 
     def __str__(self) -> str:
@@ -252,10 +246,6 @@ class EnumType(Type):
     def add_method(
         self, name: str, method: FunctionType, line: int, ast_id: int
     ) -> None:
-        if name in self.methods:
-            raise NameResolutionError(
-                f"Method {name} already exists for enum {self.name}", line, ast_id
-            )
         self.methods[name] = method
 
     def __str__(self) -> str:
