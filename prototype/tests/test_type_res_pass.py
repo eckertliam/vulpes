@@ -102,3 +102,29 @@ def test_recursive_type_alias():
     # A and B should not be added to the type env
     assert type_res_pass.type_env.get_type("A") is None
     assert type_res_pass.type_env.get_type("B") is None
+
+
+def test_recursive_struct_decl():
+    source = textwrap.dedent(
+        """
+    struct Node
+        value: int
+        next: Node
+    """
+    )
+    program = parse(source)
+    name_decl_pass = NameDeclarationPass(program)
+    name_decl_pass.run()
+    name_ref_pass = NameReferencePass(name_decl_pass)
+    name_ref_pass.run()
+    type_res_pass = TypeResolutionPass(name_ref_pass)
+    type_res_pass.run()
+    # no errors should have been generated
+    assert len(type_res_pass.errors) == 0
+    # the struct should have been added to the type env
+    node_type = type_res_pass.type_env.get_type("Node")
+    assert node_type is not None
+    assert isinstance(node_type, StructType)
+    assert len(node_type.fields) == 2
+    assert node_type.fields["value"] == IntType()
+    assert node_type.fields["next"] == node_type

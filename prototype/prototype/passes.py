@@ -766,13 +766,31 @@ class TypeResolutionPass(Pass):
         self.visited_type_aliases.remove(type_alias_decl.id)
 
     def visit_enum_decl(self, enum_decl: EnumDecl) -> None:
-        # TODO: implement
-        raise NotImplementedError("TypeResolutionPass not implemented")
+        # make sure we have not already visited this enum
+        if enum_decl.id in self.visited_enums:
+            return
+        # mark as being visited
+        self.visited_enums.add(enum_decl.id)
+        # we create the enum type
+        enum_type = EnumType(enum_decl.name, [])
+        # and add it to the type env
+        self.type_env.add_type(enum_decl.name, enum_type)
+        # we add the enum to the visited set
+        self.visited_enums.add(enum_decl.id)
+        # TODO: convert the enum variants
+        # TODO: add the variants to the enum type
 
     def visit_struct_decl(self, struct_decl: StructDecl) -> None:
         # make sure we have not already visited this struct
         if struct_decl.id in self.visited_structs:
             return
+        # we create the struct type
+        struct_type = StructType(struct_decl.name, {})
+        # and add it to the type env
+        self.type_env.add_type(struct_decl.name, struct_type)
+        # we add the struct to the visited set
+        self.visited_structs.add(struct_decl.id)
+
         # we convert the struct fields
         field_types: Dict[str, Type] = {}
         for field in struct_decl.fields:
@@ -783,12 +801,9 @@ class TypeResolutionPass(Pass):
                 # the attempt to convert the field type will have added an error
                 return
             field_types[field.name] = field_type
-        # we create the struct type
-        struct_type = StructType(struct_decl.name, field_types)
-        # we add the struct to the type env
-        self.type_env.add_type(struct_decl.name, struct_type)
-        # we add the struct to the visited set
-        self.visited_structs.add(struct_decl.id)
+        # now we set the fields on the struct type
+        struct_type.fields = field_types
+        # this allows recursive structs
 
     def visit_fn_decl(self, fn_decl: FnDecl) -> None:
         # first we get the function's type signature
