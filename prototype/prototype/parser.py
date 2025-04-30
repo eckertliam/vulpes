@@ -2,6 +2,8 @@ from typing import Dict, Optional, Union
 from lark import Lark, Tree, Token, Transformer
 from lark.indenter import Indenter
 
+from .symbol import Symbol
+
 cuss_grammar = r"""
     %import common.INT
     %import common.FLOAT 
@@ -129,8 +131,8 @@ cuss_grammar = r"""
         | STRING -> string
         | CHAR -> char
         | "(" [expr ("," expr)*] ")" -> paren_expr
-        | "true" -> true
-        | "false" -> false
+        | TRUE -> true
+        | FALSE -> false
         | "[" [expr ("," expr)*] "]" -> array_expr
         | IDENT "{" field_init_list "}" -> struct_expr
         | IDENT "::" IDENT "{" field_init_list "}" -> enum_struct_expr
@@ -143,6 +145,8 @@ cuss_grammar = r"""
 
     arglist: [expr ("," expr)*]
     
+    TRUE: "true"
+    FALSE: "false"
     BREAK: "break"
     CONTINUE: "continue"
     PUB: "pub"
@@ -225,6 +229,9 @@ class Node:
         self.kind = kind
         self.line = line
         self.id = Node._next_id
+        # optional symbol associated with the node
+        # makes passes a lot easier and more efficient
+        self.symbol: Optional[Symbol] = None
         Node._next_id += 1
 
     def get_node(self, id: int) -> Optional["Node"]:
@@ -1382,11 +1389,11 @@ class ASTTransformer(Transformer):
     def char(self, items):
         return Char(items[0].value, items[0].line)
 
-    def true(self, _items):
-        return Bool(True, _items[0].line)
+    def true(self, items):
+        return Bool(True, items[0].line)
 
-    def false(self, _items):
-        return Bool(False, _items[0].line)
+    def false(self, items):
+        return Bool(False, items[0].line)
 
     def paren_expr(self, items):
         if len(items) == 1:

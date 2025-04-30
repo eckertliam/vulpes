@@ -2,27 +2,39 @@
 # This is the base class for all passes
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Set, Union
+
+from .symbol import Symbol
 
 from .errors import CussError, NameResolutionError, TypeInferenceError
 from .parser import (
     ArrayTypeAnnotation,
+    Assign,
+    BinaryOp,
+    Call,
+    CallAttr,
     Declaration,
     Else,
     EnumDecl,
+    Expr,
     FnDecl,
     FunctionTypeAnnotation,
+    GetAttr,
+    GetIndex,
+    Ident,
     If,
     ImplDecl,
     Loop,
     NamedTypeAnnotation,
     Param,
     Program,
+    Return,
     Statement,
     StructDecl,
     TupleTypeAnnotation,
     TypeAliasDecl,
     TypeAnnotation,
+    UnaryOp,
     VarDecl,
     While,
     Tuple,
@@ -61,15 +73,6 @@ class Pass(ABC):
 
 # Pass 1: Name Declaration Pass
 # This pass enters all variable declarations into their respective scopes in a symbol table
-
-
-# Symbol is a helper type that contains the name of a variable, its ast id, and its parent scope id
-@dataclass
-class Symbol:
-    name: str
-    ast_id: int
-    parent_scope_id: int
-    type: Optional[Type] = None
 
 
 # Scope is a helper type that contains the id of the scope, the parent scope id, and the symbols in the scope
@@ -135,7 +138,7 @@ class SymbolTable:
             )
         else:
             self.table[self.current_scope_id].symbols[name] = Symbol(
-                name, ast_id, self.current_scope_id, type
+                name, ast_id, self.current_scope_id
             )
             return None
 
@@ -158,6 +161,13 @@ class SymbolTable:
                 current_scope_id
             ].parent_id  # move to the parent scope
         return None
+
+    def lookup_global(self, name: str) -> Optional[Symbol]:
+        # lookup in only the global scope
+        if name in self.table[-1].symbols:
+            return self.table[-1].symbols[name]
+        else:
+            return None
 
 
 class NameDeclarationPass(Pass):
@@ -292,7 +302,6 @@ class NameDeclarationPass(Pass):
         self.symbol_table.exit_scope()
 
 
-# TODO: implement NameReferencePass
 # This pass checks that all variable references, fn calls, method calls, etc are valid
 # This means checking that names are defined prior to their use
 # and that field accesses, method calls, are accessing valid fields/methods
@@ -301,8 +310,179 @@ class NameReferencePass(Pass):
         super().__init__(previous_pass=previous_pass)
 
     def run(self) -> Program:
-        # TODO: implement
+        for declaration in self.program.declarations:
+            if isinstance(declaration, FnDecl):
+                self.visit_fn_decl(declaration)
+            elif isinstance(declaration, ImplDecl):
+                self.visit_impl_decl(declaration)
         return self.program
+
+    def visit_fn_decl(self, fn_decl: FnDecl) -> None:
+        # enter the fn's scope
+        self.symbol_table.enter_scope(fn_decl.id)
+        # iterate through the body and all child bodys and add all vars to the symbol table
+        for statement in fn_decl.body:
+            self.visit_statement(statement)
+        # exit the fn's scope
+        self.symbol_table.exit_scope()
+
+    def visit_impl_decl(self, impl_decl: ImplDecl) -> None:
+        # dont enter the impl's scope
+        # all the impl's functions are scoped to their respective type's namespace
+        # so we dont need to do anything
+        # just loop through the methods and visit them
+        for method in impl_decl.methods:
+            self.visit_fn_decl(method)
+
+    def visit_statement(self, statement: Statement) -> None:
+        if isinstance(statement, FnDecl):
+            self.visit_fn_decl(statement)
+        elif isinstance(statement, VarDecl):
+            self.visit_var_decl(statement)
+        elif isinstance(statement, Assign):
+            self.visit_assign(statement)
+        elif isinstance(statement, Return):
+            self.visit_return(statement)
+        elif isinstance(statement, If):
+            self.visit_if_stmt(statement)
+        elif isinstance(statement, While):
+            self.visit_while_stmt(statement)
+        elif isinstance(statement, Loop):
+            self.visit_loop_stmt(statement)
+        elif isinstance(statement, Expr):
+            self.visit_expr(statement)
+        else:
+            pass
+
+    def visit_var_decl(self, var_decl: VarDecl) -> None:
+        # we need to check that the expression is valid
+        # we do this by visiting the expression
+        self.visit_expr(var_decl.expr)
+
+    def visit_assign(self, assign: Assign) -> None:
+        # we need to visit the lhs and rhs
+        self.visit_expr(assign.lhs)
+        self.visit_expr(assign.rhs)
+
+    def visit_return(self, return_stmt: Return) -> None:
+        # we need to visit the return expression
+        if return_stmt.expr is not None:
+            self.visit_expr(return_stmt.expr)
+
+    def visit_if_stmt(self, if_stmt: If) -> None:
+        # we need to visit the cond and body
+        self.visit_expr(if_stmt.cond)
+        # then we enter the if's scope
+        self.symbol_table.enter_scope(if_stmt.id)
+        # we iterate through the body and all child bodys and add all vars to the symbol table
+        for statement in if_stmt.body:
+            self.visit_statement(statement)
+        # we exit the if's scope
+        self.symbol_table.exit_scope()
+        # if there is an else body we visit it
+        if if_stmt.else_body is not None:
+            self.visit_else_stmt(if_stmt.else_body)
+
+    def visit_else_stmt(self, else_stmt: Else) -> None:
+        # we need to enter the else's scope
+        self.symbol_table.enter_scope(else_stmt.id)
+        # we iterate through the body and all child bodys and add all vars to the symbol table
+        for statement in else_stmt.body:
+            self.visit_statement(statement)
+        # we exit the else's scope
+        self.symbol_table.exit_scope()
+
+    def visit_while_stmt(self, while_stmt: While) -> None:
+        # we need to visit the cond and body
+        self.visit_expr(while_stmt.cond)
+        # then we enter the while's scope
+        self.symbol_table.enter_scope(while_stmt.id)
+        # we iterate through the body and all child bodys and add all vars to the symbol table
+        for statement in while_stmt.body:
+            self.visit_statement(statement)
+        # we exit the while's scope
+        self.symbol_table.exit_scope()
+
+    def visit_loop_stmt(self, loop_stmt: Loop) -> None:
+        # we need to visit the body
+        self.symbol_table.enter_scope(loop_stmt.id)
+        # we iterate through the body and all child bodys and add all vars to the symbol table
+        for statement in loop_stmt.body:
+            self.visit_statement(statement)
+        # we exit the loop's scope
+        self.symbol_table.exit_scope()
+
+    def visit_expr(self, expr: Expr) -> None:
+        if isinstance(expr, Ident):
+            self.visit_ident(expr)
+        elif isinstance(expr, GetAttr):
+            self.visit_get_attr(expr)
+        elif isinstance(expr, Call):
+            self.visit_call(expr)
+        elif isinstance(expr, CallAttr):
+            self.visit_call_attr(expr)
+        elif isinstance(expr, GetIndex):
+            self.visit_get_index(expr)
+        elif isinstance(expr, BinaryOp):
+            self.visit_binary_op(expr)
+        elif isinstance(expr, UnaryOp):
+            self.visit_unary_op(expr)
+        # TODO: add remaining expr types
+
+    def visit_get_attr(self, get_attr: GetAttr) -> None:
+        # TODO: implement
+        raise NotImplementedError("NameReferencePass not implemented")
+
+    def visit_call(self, call: Call) -> None:
+        # TODO: implement
+        raise NotImplementedError("NameReferencePass not implemented")
+
+    def visit_call_attr(self, call_attr: CallAttr) -> None:
+        # TODO: implement
+        raise NotImplementedError("NameReferencePass not implemented")
+
+    def visit_get_index(self, get_index: GetIndex) -> None:
+        # TODO: implement
+        raise NotImplementedError("NameReferencePass not implemented")
+
+    def visit_binary_op(self, binary_op: BinaryOp) -> None:
+        # this is simple we just visit the left and right operands
+        self.visit_expr(binary_op.lhs)
+        self.visit_expr(binary_op.rhs)
+
+    def visit_unary_op(self, unary_op: UnaryOp) -> None:
+        # we need to visit the operand
+        self.visit_expr(unary_op.operand)
+
+    def visit_ident(self, ident: Ident) -> None:
+        # we need to make sure the ident is defined prior to its use
+        # we do this by looking up the ident in the symbol table
+        symbol = self.symbol_table.lookup(ident.name)
+        if symbol is None:
+            self.errors.append(
+                NameResolutionError(
+                    f"Undefined variable {ident.name}", ident.line, ident.id
+                )
+            )
+            return
+        # if its defined we check the line of the definition
+        # and compare it to the line of the use
+        decl_node = self.program.get_node(symbol.ast_id)
+        if decl_node is None:  # this should never happen
+            raise RuntimeError("Cannot find node for symbol")
+        decl_line = decl_node.line
+        if decl_line >= ident.line:
+            self.errors.append(
+                NameResolutionError(
+                    f"Variable {ident.name} is used before it is defined",
+                    ident.line,
+                    ident.id,
+                )
+            )
+            return
+        # we are all good here if the use occurs after the definition
+        # we just add the symbol to the ident for later passes
+        ident.symbol = symbol
 
 
 # TODO: implement TypeResolutionPass
