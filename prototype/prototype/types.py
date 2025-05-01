@@ -316,7 +316,7 @@ class TypeVar(Type):
     _next_numeric = 0
 
     def __init__(self) -> None:
-        self.name = f"T{TypeVar._next_alpha}{TypeVar._next_numeric}"
+        self.name = f"{TypeVar._next_alpha}{TypeVar._next_numeric}"
         if TypeVar._next_numeric == 9:
             TypeVar._next_alpha = chr(ord(TypeVar._next_alpha) + 1)
             TypeVar._next_numeric = 0

@@ -1,5 +1,6 @@
-from prototype.parser import Program, parse
+from prototype.parser import parse
 from prototype.passes import TypeResolutionPass, NameDeclarationPass, NameReferencePass
+from prototype.symbol import Symbol
 from prototype.types import (
     ArrayType,
     EnumStructVariantType,
@@ -7,9 +8,11 @@ from prototype.types import (
     EnumType,
     EnumUnitVariantType,
     FloatType,
+    FunctionType,
     StringType,
     StructType,
     IntType,
+    TypeVar,
 )
 import textwrap
 
@@ -196,3 +199,58 @@ def test_enum_struct_res():
     assert enum_type.variants["ChangeColor"] == EnumStructVariantType(
         "ChangeColor", {"r": IntType(), "g": IntType(), "b": IntType()}
     )
+
+
+def test_simple_const():
+    source = textwrap.dedent(
+        """
+    fn test() -> int
+        const a: int = 1
+        return a
+    """
+    )
+    program = parse(source)
+    name_decl_pass = NameDeclarationPass(program)
+    name_decl_pass.run()
+    name_ref_pass = NameReferencePass(name_decl_pass)
+    name_ref_pass.run()
+    type_res_pass = TypeResolutionPass(name_ref_pass)
+    type_res_pass.run()
+    # get the id of the fn
+    fn_id = program.declarations[0].id
+    # lookup the symbol for test and ensure check that it has a type
+    symbol = type_res_pass.symbol_table.lookup("test")
+    assert symbol is not None
+    assert symbol.type == FunctionType([], IntType())
+    # enter the fn's scope
+    type_res_pass.symbol_table.enter_scope(fn_id)
+    # lookup the symbol for a
+    symbol = type_res_pass.symbol_table.lookup("a")
+    assert symbol is not None
+    assert symbol.type == IntType()
+
+
+def test_typevar():
+    source = textwrap.dedent(
+        """
+    fn test() -> int
+        const a = 1
+        return a
+    """
+    )
+    program = parse(source)
+    name_decl_pass = NameDeclarationPass(program)
+    name_decl_pass.run()
+    name_ref_pass = NameReferencePass(name_decl_pass)
+    name_ref_pass.run()
+    type_res_pass = TypeResolutionPass(name_ref_pass)
+    type_res_pass.run()
+    # get the id of the fn
+    fn_id = program.declarations[0].id
+    # enter the fn's scope
+    type_res_pass.symbol_table.enter_scope(fn_id)
+    # lookup the symbol for a
+    symbol = type_res_pass.symbol_table.lookup("a")
+    assert symbol is not None
+    assert isinstance(symbol, Symbol)
+    assert isinstance(symbol.type, TypeVar)
