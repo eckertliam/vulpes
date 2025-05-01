@@ -65,7 +65,7 @@ cuss_grammar = r"""
 
     enum_unit_variant: IDENT
     
-    enum_struct_variant: IDENT "(" enum_struct_field ("," enum_struct_field)* ")"
+    enum_struct_variant: IDENT "{" enum_struct_field ("," enum_struct_field)* "}"
 
     enum_struct_field: IDENT ":" type_annotation
 
@@ -1198,13 +1198,11 @@ class ASTTransformer(Transformer):
         return EnumUnitVariant(items[0].children[0].value, items[0].children[0].line)
 
     def tuple_enum_variant(self, items):
-        # items: IDENT, type_annotation...
-        name_tok, *type_list = items
+        name_tok, *type_list = items[0].children
         return EnumTupleVariant(name_tok.value, type_list, name_tok.line)
 
     def struct_enum_variant(self, items):
-        # items: IDENT, struct_field...
-        name_tok, *fields = items
+        name_tok, *fields = items[0].children
         return EnumStructVariant(name_tok.value, fields, name_tok.line)
 
     # ---------- declarations ----------

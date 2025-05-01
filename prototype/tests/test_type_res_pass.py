@@ -1,6 +1,16 @@
 from prototype.parser import Program, parse
 from prototype.passes import TypeResolutionPass, NameDeclarationPass, NameReferencePass
-from prototype.types import ArrayType, FloatType, StructType, IntType
+from prototype.types import (
+    ArrayType,
+    EnumStructVariantType,
+    EnumTupleVariantType,
+    EnumType,
+    EnumUnitVariantType,
+    FloatType,
+    StringType,
+    StructType,
+    IntType,
+)
 import textwrap
 
 
@@ -128,3 +138,61 @@ def test_recursive_struct_decl():
     assert len(node_type.fields) == 2
     assert node_type.fields["value"] == IntType()
     assert node_type.fields["next"] == node_type
+
+
+def test_enum_resolution():
+    source = textwrap.dedent(
+        """
+        enum Option
+            Some(int)
+            None
+        """
+    )
+    program = parse(source)
+    name_decl_pass = NameDeclarationPass(program)
+    name_decl_pass.run()
+    name_ref_pass = NameReferencePass(name_decl_pass)
+    name_ref_pass.run()
+    type_res_pass = TypeResolutionPass(name_ref_pass)
+    type_res_pass.run()
+
+    assert len(type_res_pass.errors) == 0
+    option_type = type_res_pass.type_env.get_type("Option")
+
+    assert option_type is not None
+    assert isinstance(option_type, EnumType)
+    assert len(option_type.variants) == 2
+    assert option_type.variants["Some"] == EnumTupleVariantType("Some", [IntType()])
+    assert option_type.variants["None"] == EnumUnitVariantType("None")
+
+
+def test_enum_struct_res():
+    source = textwrap.dedent(
+        """
+    enum Message
+        Quit
+        Move { x: int, y: int }
+        Write(string)
+        ChangeColor { r: int, g: int, b: int }
+    """
+    )
+    program = parse(source)
+    name_decl_pass = NameDeclarationPass(program)
+    name_decl_pass.run()
+    name_ref_pass = NameReferencePass(name_decl_pass)
+    name_ref_pass.run()
+    type_res_pass = TypeResolutionPass(name_ref_pass)
+    type_res_pass.run()
+    assert len(type_res_pass.errors) == 0
+    enum_type = type_res_pass.type_env.get_type("Message")
+    assert enum_type is not None
+    assert isinstance(enum_type, EnumType)
+    assert len(enum_type.variants) == 4
+    assert enum_type.variants["Quit"] == EnumUnitVariantType("Quit")
+    assert enum_type.variants["Move"] == EnumStructVariantType(
+        "Move", {"x": IntType(), "y": IntType()}
+    )
+    assert enum_type.variants["Write"] == EnumTupleVariantType("Write", [StringType()])
+    assert enum_type.variants["ChangeColor"] == EnumStructVariantType(
+        "ChangeColor", {"r": IntType(), "g": IntType(), "b": IntType()}
+    )

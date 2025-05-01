@@ -17,7 +17,10 @@ from .parser import (
     Else,
     EnumDecl,
     EnumStructExpr,
+    EnumStructVariant,
     EnumTupleExpr,
+    EnumTupleVariant,
+    EnumUnitVariant,
     Expr,
     FieldInit,
     FnDecl,
@@ -46,7 +49,11 @@ from .parser import (
 )
 from .types import (
     ArrayType,
+    EnumStructVariantType,
+    EnumTupleVariantType,
     EnumType,
+    EnumUnitVariantType,
+    EnumVariantType,
     FunctionType,
     StructType,
     TupleType,
@@ -777,8 +784,39 @@ class TypeResolutionPass(Pass):
         self.type_env.add_type(enum_decl.name, enum_type)
         # we add the enum to the visited set
         self.visited_enums.add(enum_decl.id)
-        # TODO: convert the enum variants
-        # TODO: add the variants to the enum type
+        # we need to convert the enum variants
+        variants: Dict[str, EnumVariantType] = {}
+        for variant in enum_decl.variants:
+            if isinstance(variant, EnumUnitVariant):
+                variants[variant.name] = EnumUnitVariantType(variant.name)
+            elif isinstance(variant, EnumTupleVariant):
+                tuple_types: list[Type] = []
+                for elem_type in variant.types:
+                    elem_type = self.convert_type_annotation_top_level(
+                        elem_type, variant.line, variant.id
+                    )
+                    if elem_type is None:
+                        return
+                    tuple_types.append(elem_type)
+                variants[variant.name] = EnumTupleVariantType(variant.name, tuple_types)
+            elif isinstance(variant, EnumStructVariant):
+                field_types: Dict[str, Type] = {}
+                for field in variant.fields:
+                    field_type = self.convert_type_annotation_top_level(
+                        field.type_annotation, variant.line, variant.id
+                    )
+                    if field_type is None:
+                        return
+                    field_types[field.name] = field_type
+                variants[variant.name] = EnumStructVariantType(
+                    variant.name, field_types
+                )
+            else:
+                raise RuntimeError(f"Unknown enum variant {variant}")
+        # now we set the variants on the enum type
+        enum_type.variants = variants
+        # and add it to the type env
+        self.type_env.add_type(enum_decl.name, enum_type)
 
     def visit_struct_decl(self, struct_decl: StructDecl) -> None:
         # make sure we have not already visited this struct

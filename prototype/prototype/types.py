@@ -201,38 +201,45 @@ class EnumVariantType:
     def __init__(self, name: str) -> None:
         self.name = name
 
-    def __str__(self) -> str:
-        return self.name
-
-    def __eq__(self, other: object) -> bool:
-        return (
-            isinstance(other, EnumVariantType)
-            and self.name == other.name
-            and self.__dict__ == other.__dict__
-        )
-
-    def __ne__(self, other: object) -> bool:
-        return (
-            not isinstance(other, EnumVariantType)
-            or self.name != other.name
-            or self.__dict__ != other.__dict__
-        )
-
-    def __hash__(self) -> int:
-        return hash(
-            (self.__class__.__name__, self.name, tuple(sorted(self.__dict__.items())))
-        )
-
 
 class EnumUnitVariantType(EnumVariantType):
     def __init__(self, name: str) -> None:
         super().__init__(name)
+
+    def __eq__(self, other: "EnumVariantType") -> bool:
+        return isinstance(other, EnumUnitVariantType) and self.name == other.name
+
+    def __ne__(self, other: "EnumVariantType") -> bool:
+        return not isinstance(other, EnumUnitVariantType) or self.name != other.name
+
+    def __hash__(self) -> int:
+        return hash(("enum_unit", self.name))
+
+    def __str__(self) -> str:
+        return self.name
 
 
 class EnumTupleVariantType(EnumVariantType):
     def __init__(self, name: str, types: list[Type]) -> None:
         super().__init__(name)
         self.types = types
+
+    def __eq__(self, other: "EnumVariantType") -> bool:
+        return (
+            isinstance(other, EnumTupleVariantType)
+            and self.name == other.name
+            and self.types == other.types
+        )
+
+    def __ne__(self, other: "EnumVariantType") -> bool:
+        return (
+            not isinstance(other, EnumTupleVariantType)
+            or self.name != other.name
+            or self.types != other.types
+        )
+
+    def __hash__(self) -> int:
+        return hash(("enum_tuple", self.name, tuple(hash(t) for t in self.types)))
 
     def __str__(self) -> str:
         return f"{self.name} ({', '.join(str(t) for t in self.types)})"
@@ -245,6 +252,29 @@ class EnumStructVariantType(EnumVariantType):
 
     def __str__(self) -> str:
         return f"{self.name} {{ {', '.join(f'{k}: {v}' for k, v in self.fields.items())} }}"
+
+    def __eq__(self, other: "EnumVariantType") -> bool:
+        return (
+            isinstance(other, EnumStructVariantType)
+            and self.name == other.name
+            and self.fields == other.fields
+        )
+
+    def __ne__(self, other: "EnumVariantType") -> bool:
+        return (
+            not isinstance(other, EnumStructVariantType)
+            or self.name != other.name
+            or self.fields != other.fields
+        )
+
+    def __hash__(self) -> int:
+        return hash(
+            (
+                "enum_struct",
+                self.name,
+                tuple(sorted((k, hash(v)) for k, v in self.fields.items())),
+            )
+        )
 
 
 # Enum Type

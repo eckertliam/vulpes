@@ -9,8 +9,12 @@ from prototype.parser import (
     Else,
     EnumDecl,
     EnumStructExpr,
+    EnumStructField,
+    EnumStructVariant,
     EnumTupleExpr,
+    EnumTupleVariant,
     EnumUnitExpr,
+    EnumUnitVariant,
     FieldInit,
     GetIndex,
     GetAttr,
@@ -138,8 +142,6 @@ def test_struct_decl():
     )
 
 
-# TODO: test tuple enums
-# TODO: test struct enums
 def test_simple_enum_decl():
     source = textwrap.dedent(
         """
@@ -415,8 +417,6 @@ def test_type_aliases():
     assert isinstance(type_alias.type_annotation.elem_types[1], TypeAnnotation)
 
 
-# TODO: test tuples SEE main.py first
-# TODO: test struct exprs
 def test_struct_exprs():
     source = textwrap.dedent(
         """
@@ -436,7 +436,6 @@ def test_struct_exprs():
     assert isinstance(fn_body[1].expr, GetAttr)
 
 
-# TODO: test enum exprs
 def test_enum_exprs():
     source = textwrap.dedent(
         """
@@ -473,7 +472,6 @@ def test_enum_exprs():
     assert point_enum.elems[1].value == 2
 
 
-# TODO: test method calls
 def test_method_calls():
     source = textwrap.dedent(
         """
@@ -605,3 +603,60 @@ def test_tuple_expr():
     assert tuple_expr.elems[0].value == 1
     assert isinstance(tuple_expr.elems[1], Integer)
     assert tuple_expr.elems[1].value == 2
+
+
+def test_enum_tuple_variant():
+    source = textwrap.dedent(
+        """
+    enum Option
+        Some(int)
+        None
+    """
+    )
+    program = parse(source)
+    enum_decl = program.declarations[0]
+    assert isinstance(enum_decl, EnumDecl)
+    assert enum_decl.name == "Option"
+    assert len(enum_decl.variants) == 2
+    assert isinstance(enum_decl.variants[0], EnumTupleVariant)
+    assert len(enum_decl.variants[0].types) == 1
+    assert isinstance(enum_decl.variants[0].types[0], NamedTypeAnnotation)
+    assert enum_decl.variants[0].types[0].name == "int"
+
+
+def test_enum_struct_variant():
+    source = textwrap.dedent(
+        """
+    enum Message
+        Quit
+        Move { x: int, y: int }
+        Write(string)
+        ChangeColor { r: int, g: int, b: int }
+    """
+    )
+    program = parse(source)
+    enum_decl = program.declarations[0]
+    assert isinstance(enum_decl, EnumDecl)
+    assert enum_decl.name == "Message"
+    assert len(enum_decl.variants) == 4
+    quit_variant = enum_decl.variants[0]
+    assert isinstance(quit_variant, EnumUnitVariant)
+    assert quit_variant.name == "Quit"
+    move_variant = enum_decl.variants[1]
+    assert isinstance(move_variant, EnumStructVariant)
+    assert move_variant.name == "Move"
+    assert len(move_variant.fields) == 2
+    assert isinstance(move_variant.fields[0], EnumStructField)
+    assert move_variant.fields[0].name == "x"
+    assert isinstance(move_variant.fields[0].type_annotation, NamedTypeAnnotation)
+    assert move_variant.fields[0].type_annotation.name == "int"
+    assert isinstance(move_variant.fields[1], EnumStructField)
+    assert move_variant.fields[1].name == "y"
+    assert isinstance(move_variant.fields[1].type_annotation, NamedTypeAnnotation)
+    assert move_variant.fields[1].type_annotation.name == "int"
+    write_variant = enum_decl.variants[2]
+    assert isinstance(write_variant, EnumTupleVariant)
+    assert write_variant.name == "Write"
+    assert len(write_variant.types) == 1
+    assert isinstance(write_variant.types[0], NamedTypeAnnotation)
+    assert write_variant.types[0].name == "string"
