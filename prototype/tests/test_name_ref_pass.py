@@ -1,5 +1,5 @@
 from prototype.passes import NameDeclarationPass, NameReferencePass
-from prototype.parser import Program, parse
+from prototype.parser import parse
 import textwrap
 
 from prototype.errors import NameResolutionError

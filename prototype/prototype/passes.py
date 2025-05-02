@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Set, Union
 from .symbol import Symbol
 
 from .errors import CussError, NameResolutionError, TypeInferenceError
-from .parser import (
+from .ast import (
     ArrayTypeAnnotation,
     Assign,
     BinaryOp,
@@ -65,6 +65,8 @@ from .types import (
 
 # Pass base class
 class Pass(ABC):
+    __slots__ = ["program", "symbol_table", "errors", "type_env"]
+
     def __init__(
         self, program: Optional[Program] = None, previous_pass: Optional["Pass"] = None
     ):

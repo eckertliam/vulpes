@@ -1,4 +1,4 @@
-from prototype.parser import (
+from prototype.ast import (
     Array,
     Assign,
     BinaryOp,
@@ -33,14 +33,13 @@ from prototype.parser import (
     TypeAnnotation,
     VarDecl,
     While,
-    parse,
     Program,
     FnDecl,
-    Statement,
     Return,
     Integer,
 )
-import pytest
+
+from prototype.parser import parse
 import textwrap
 
 
