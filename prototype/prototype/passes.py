@@ -12,7 +12,7 @@ from .ast import (
     Assign,
     BinaryOp,
     Call,
-    CallAttr,
+    CallMethod,
     Declaration,
     Else,
     EnumDecl,
@@ -25,7 +25,7 @@ from .ast import (
     FieldInit,
     FnDecl,
     FunctionTypeAnnotation,
-    GetAttr,
+    AccessField,
     GetIndex,
     Ident,
     If,
@@ -44,8 +44,8 @@ from .ast import (
     UnaryOp,
     VarDecl,
     While,
-    Tuple,
-    Array,
+    TupleExpr,
+    ArrayExpr,
 )
 from .types import (
     ArrayType,
@@ -482,11 +482,11 @@ class NameReferencePass(Pass):
     def visit_expr(self, expr: Expr) -> None:
         if isinstance(expr, Ident):
             self.visit_ident(expr)
-        elif isinstance(expr, GetAttr):
+        elif isinstance(expr, AccessField):
             self.visit_get_attr(expr)
         elif isinstance(expr, Call):
             self.visit_call(expr)
-        elif isinstance(expr, CallAttr):
+        elif isinstance(expr, CallMethod):
             self.visit_call_attr(expr)
         elif isinstance(expr, GetIndex):
             self.visit_get_index(expr)
@@ -496,13 +496,13 @@ class NameReferencePass(Pass):
             self.visit_unary_op(expr)
         elif isinstance(expr, StructExpr):
             self.visit_struct_expr(expr)
-        elif isinstance(expr, Tuple):
+        elif isinstance(expr, TupleExpr):
             self.visit_tuple_expr(expr)
         elif isinstance(expr, EnumStructExpr):
             self.visit_enum_struct_expr(expr)
         elif isinstance(expr, EnumTupleExpr):
             self.visit_enum_tuple_expr(expr)
-        elif isinstance(expr, Array):
+        elif isinstance(expr, ArrayExpr):
             self.visit_array_expr(expr)
 
     def visit_struct_expr(self, struct_expr: StructExpr) -> None:
@@ -514,7 +514,7 @@ class NameReferencePass(Pass):
         # we need to visit the expr
         self.visit_expr(field_init.expr)
 
-    def visit_tuple_expr(self, tuple_expr: Tuple) -> None:
+    def visit_tuple_expr(self, tuple_expr: TupleExpr) -> None:
         # we need to visit all the elements
         for elem in tuple_expr.elems:
             self.visit_expr(elem)
@@ -529,12 +529,12 @@ class NameReferencePass(Pass):
         for elem in enum_tuple_expr.elems:
             self.visit_expr(elem)
 
-    def visit_array_expr(self, array_expr: Array) -> None:
+    def visit_array_expr(self, array_expr: ArrayExpr) -> None:
         # we visit all the elements just like a tuple expr
         for elem in array_expr.elems:
             self.visit_expr(elem)
 
-    def visit_get_attr(self, get_attr: GetAttr) -> None:
+    def visit_get_attr(self, get_attr: AccessField) -> None:
         # we need to ensure the object is defined
         self.visit_expr(get_attr.obj)
 
@@ -546,7 +546,7 @@ class NameReferencePass(Pass):
         for arg in call.args:
             self.visit_expr(arg)
 
-    def visit_call_attr(self, call_attr: CallAttr) -> None:
+    def visit_call_attr(self, call_attr: CallMethod) -> None:
         # we need to ensure the object is defined
         # NOTE: in later passes we will check if the object is an object that contains the method
         self.visit_expr(call_attr.obj)

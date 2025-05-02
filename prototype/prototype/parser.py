@@ -3,14 +3,14 @@ from lark import Lark, Tree, Token, Transformer
 from lark.indenter import Indenter
 
 from .ast import (
-    Array,
+    ArrayExpr,
     ArrayTypeAnnotation,
     Assign,
     BinaryOp,
     Bool,
     Break,
     Call,
-    CallAttr,
+    CallMethod,
     Char,
     Continue,
     EnumDecl,
@@ -25,7 +25,7 @@ from .ast import (
     Float,
     FnDecl,
     FunctionTypeAnnotation,
-    GetAttr,
+    AccessField,
     GetIndex,
     Ident,
     If,
@@ -40,7 +40,7 @@ from .ast import (
     StructDecl,
     StructExpr,
     StructField,
-    Tuple,
+    TupleExpr,
     TupleTypeAnnotation,
     TypeAliasDecl,
     UnaryOp,
@@ -93,7 +93,7 @@ cuss_grammar = r"""
     
     const_def: "const" IDENT [":" type_annotation] "=" expr
     let_def: "let" IDENT [":" type_annotation] "=" expr
-    assign_stmt: (IDENT | getindex | getattr) "=" expr
+    assign_stmt: (IDENT | getindex | get_field) "=" expr
     
     type_alias: [PUB] "type" IDENT "=" type_annotation
 
@@ -165,13 +165,13 @@ cuss_grammar = r"""
     ?molecule: atom
         | getindex
         | call
-        | getattr
-        | callattr
+        | get_field
+        | call_method
         
     call: molecule "(" arglist ")"
-    callattr: molecule "." IDENT "(" arglist ")"
+    call_method: molecule "." IDENT "(" arglist ")"
     getindex: molecule "[" expr "]"
-    getattr: molecule "." IDENT
+    get_field: molecule "." IDENT
         
     ?atom: IDENT -> ident
         | FLOAT -> float
@@ -439,13 +439,13 @@ class ASTTransformer(Transformer):
         callee, args = items
         return Call(callee, args, callee.line)
 
-    def callattr(self, items):
+    def call_method(self, items):
         obj, attr, args = items
-        return CallAttr(obj, attr.value, args, obj.line)
+        return CallMethod(obj, attr.value, args, obj.line)
 
-    def getattr(self, items):
+    def get_field(self, items):
         obj, attr = items
-        return GetAttr(obj, attr, obj.line)
+        return AccessField(obj, attr, obj.line)
 
     def or_(self, items):
         lhs, rhs = items
@@ -531,10 +531,10 @@ class ASTTransformer(Transformer):
         if len(items) == 1:
             return items[0]
         else:
-            return Tuple(items, items[0].line)
+            return TupleExpr(items, items[0].line)
 
     def array_expr(self, items):
-        return Array(items, items[0].line)
+        return ArrayExpr(items, items[0].line)
 
     def field_init(self, items):
         name_tok, expr = items

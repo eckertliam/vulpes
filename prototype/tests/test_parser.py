@@ -1,10 +1,10 @@
 from prototype.ast import (
-    Array,
+    ArrayExpr,
     Assign,
     BinaryOp,
     Break,
     Call,
-    CallAttr,
+    CallMethod,
     Continue,
     Else,
     EnumDecl,
@@ -17,12 +17,12 @@ from prototype.ast import (
     EnumUnitVariant,
     FieldInit,
     GetIndex,
-    GetAttr,
+    AccessField,
     NamedTypeAnnotation,
     String,
     StructExpr,
     StructField,
-    Tuple,
+    TupleExpr,
     TypeAliasDecl,
     Ident,
     If,
@@ -296,7 +296,7 @@ def test_array_expr():
     fn_body = program.declarations[0].body
     assert isinstance(fn_body[0], VarDecl)
     const_a = fn_body[0]
-    assert isinstance(const_a.expr, Array)
+    assert isinstance(const_a.expr, ArrayExpr)
     assert len(const_a.expr.elems) == 3
     assert isinstance(const_a.expr.elems[0], Integer)
     assert const_a.expr.elems[0].value == 1
@@ -432,7 +432,7 @@ def test_struct_exprs():
     assert isinstance(const_p.expr.fields[0], FieldInit)
     assert isinstance(const_p.expr.fields[1], FieldInit)
     assert isinstance(fn_body[1], Return)
-    assert isinstance(fn_body[1].expr, GetAttr)
+    assert isinstance(fn_body[1].expr, AccessField)
 
 
 def test_enum_exprs():
@@ -483,7 +483,7 @@ def test_method_calls():
     fn_body = program.declarations[0].body
     return_stmt = fn_body[1]
     assert isinstance(return_stmt, Return)
-    assert isinstance(return_stmt.expr, CallAttr)
+    assert isinstance(return_stmt.expr, CallMethod)
     call_attr = return_stmt.expr
     assert isinstance(call_attr.obj, Ident)
     assert call_attr.obj.name == "p"
@@ -526,9 +526,9 @@ def test_field_chaining():
     program = parse(source)
     fn_body = program.declarations[0].body
     assert isinstance(fn_body[0], Return)
-    assert isinstance(fn_body[0].expr, GetAttr)
+    assert isinstance(fn_body[0].expr, AccessField)
     get_attr = fn_body[0].expr
-    assert isinstance(get_attr.obj, GetAttr)
+    assert isinstance(get_attr.obj, AccessField)
     assert isinstance(get_attr.obj.obj, Ident)
     assert get_attr.obj.obj.name == "x"
     assert get_attr.obj.attr == "y"
@@ -595,7 +595,7 @@ def test_tuple_expr():
     program = parse(source)
     fn_body = program.declarations[0].body
     assert isinstance(fn_body[0], Return)
-    assert isinstance(fn_body[0].expr, Tuple)
+    assert isinstance(fn_body[0].expr, TupleExpr)
     tuple_expr = fn_body[0].expr
     assert len(tuple_expr.elems) == 2
     assert isinstance(tuple_expr.elems[0], Integer)

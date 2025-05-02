@@ -611,7 +611,7 @@ class Bool(Expr):
         self.value = value
 
 
-class Array(Expr):
+class ArrayExpr(Expr):
     def __init__(self, elems: list[Expr], line: int) -> None:
         super().__init__("array", line)
         self.elems = elems
@@ -635,7 +635,7 @@ class Array(Expr):
         return (min_line, max_line)
 
 
-class Tuple(Expr):
+class TupleExpr(Expr):
     def __init__(self, elems: list[Expr], line: int) -> None:
         super().__init__("tuple", line)
         self.elems = elems
@@ -840,9 +840,9 @@ class GetIndex(AssignableExpr):
         return (min_line, max_line)
 
 
-class GetAttr(AssignableExpr):
+class AccessField(AssignableExpr):
     def __init__(self, obj: Expr, attr: str, line: int) -> None:
-        super().__init__("getattr", line)
+        super().__init__("access_field", line)
         self.obj = obj
         self.attr = attr
 
@@ -863,9 +863,9 @@ class GetAttr(AssignableExpr):
         return (min_line, max_line)
 
 
-class CallAttr(Expr):
+class CallMethod(Expr):
     def __init__(self, obj: Expr, attr: str, args: list[Expr], line: int) -> None:
-        super().__init__("callattr", line)
+        super().__init__("call_method", line)
         self.obj = obj
         self.attr = attr
         self.args = args
