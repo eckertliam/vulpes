@@ -1,5 +1,7 @@
 from prototype.parser import parse
-from prototype.passes import TypeResolutionPass, NameDeclarationPass, NameReferencePass
+from prototype.passes.type_res_pass import TypeResolutionPass
+from prototype.passes.name_decl_pass import NameDeclarationPass
+from prototype.passes.name_ref_pass import NameReferencePass
 from prototype.symbol import Symbol
 from prototype.types import (
     ArrayType,

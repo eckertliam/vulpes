@@ -1,7 +1,8 @@
-from prototype.passes import NameDeclarationPass, NameReferencePass
 from prototype.parser import parse
 import textwrap
 
+from prototype.passes.name_decl_pass import NameDeclarationPass
+from prototype.passes.name_ref_pass import NameReferencePass
 from prototype.errors import NameResolutionError
 
 

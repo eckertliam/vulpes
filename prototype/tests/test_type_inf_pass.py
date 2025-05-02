@@ -1,12 +1,10 @@
 import textwrap
 
 from prototype.parser import parse
-from prototype.passes import (
-    NameDeclarationPass,
-    NameReferencePass,
-    TypeResolutionPass,
-    TypeInferencePass,
-)
+from prototype.passes.name_decl_pass import NameDeclarationPass
+from prototype.passes.name_ref_pass import NameReferencePass
+from prototype.passes.type_res_pass import TypeResolutionPass
+from prototype.passes.type_infer_pass import TypeInferencePass
 from prototype.types import IntType
 from prototype.symbol import Symbol
 

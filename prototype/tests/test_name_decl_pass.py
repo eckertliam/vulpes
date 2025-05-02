@@ -1,8 +1,8 @@
-from prototype.passes import NameDeclarationPass
-from prototype.parser import Program, parse
+from prototype.parser import parse
 import textwrap
 
 from prototype.errors import NameResolutionError
+from prototype.passes.name_decl_pass import NameDeclarationPass
 
 
 def test_struct_decl():
@@ -52,6 +52,7 @@ def test_impl_decl():
     # check self param is in the grow fn scope
     assert decl_pass.symbol_table.table[grow_id].symbols["self"] is not None
 
+
 def test_bad_impl():
     source = textwrap.dedent(
         """
@@ -69,7 +70,8 @@ def test_bad_impl():
     decl_pass.run()
     assert len(decl_pass.errors) == 1
     assert isinstance(decl_pass.errors[0], NameResolutionError)
-    
+
+
 def test_fn_decl():
     source = textwrap.dedent(
         """
@@ -88,6 +90,7 @@ def test_fn_decl():
     main_id = decl_pass.symbol_table.table[-1].symbols["main"].ast_id
     assert decl_pass.symbol_table.table[main_id].symbols["a"] is not None
 
+
 def test_fn_in_fn():
     source = textwrap.dedent(
         """
@@ -105,7 +108,8 @@ def test_fn_in_fn():
     outer_id = decl_pass.symbol_table.table[-1].symbols["outer"].ast_id
     assert decl_pass.symbol_table.table[outer_id].symbols["a"] is not None
     assert decl_pass.symbol_table.table[outer_id].symbols["inner"] is not None
-    
+
+
 def test_var_shadowing_error():
     source = textwrap.dedent(
         """
