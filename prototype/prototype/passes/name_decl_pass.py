@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 from ..ast import (
     Else,
     EnumDecl,
@@ -8,9 +8,11 @@ from ..ast import (
     Loop,
     NamedTypeAnnotation,
     Param,
+    PartialTraitMethod,
     Program,
     Statement,
     StructDecl,
+    TraitDecl,
     TypeAliasDecl,
     VarDecl,
     While,
@@ -93,6 +95,52 @@ class NameDeclarationPass(Pass):
         for method in impl.methods:
             self.method_decl(method, impl_type)
         # we exit the impl's scope
+        self.symbol_table.exit_scope()
+
+    def trait_decl(self, trait: TraitDecl) -> None:
+        # we add the trait to the current scope
+        res = self.add_symbol(trait.name, trait.id, trait.line)
+        if res is None:
+            return
+        # add the symbol to the trait's declaration node
+        trait.symbol = res
+        # we enter the trait's scope
+        self.symbol_table.enter_scope(trait.id)
+        # we add all the methods to the trait's scope
+        for method in trait.methods:
+            self.trait_method_decl(method, trait.symbol)
+        # we exit the trait's scope
+        self.symbol_table.exit_scope()
+
+    def trait_method_decl(
+        self, method: Union[FnDecl, PartialTraitMethod], trait_type: Symbol
+    ) -> None:
+        # we add the method to the current scope
+        res = self.add_symbol(method.name, method.id, method.line)
+        if res is None:
+            return
+        # add the symbol to the method's declaration node
+        method.symbol = res
+        # we enter the method's scope
+        self.symbol_table.enter_scope(method.id)
+        # we add all the params to the method's scope
+        for param in method.params:
+            res = self.add_symbol(param.name, param.id, param.line)
+            if res is None:
+                return
+            # add the symbol to the param node
+            param.symbol = res
+        # add the self param
+        self_type_annotation = NamedTypeAnnotation(trait_type.name, method.line)
+        param = Param("self", self_type_annotation, method.line)
+        method.params.insert(0, param)
+
+        if isinstance(method, FnDecl):
+            # if it is a full method we iterate through the body and all child bodys and add all vars to the symbol table
+            for statement in method.body:
+                self.statement(statement)
+
+        # we exit the method's scope
         self.symbol_table.exit_scope()
 
     def method_decl(self, method: FnDecl, impl_type: Symbol) -> None:

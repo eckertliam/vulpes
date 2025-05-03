@@ -1,5 +1,5 @@
 # Expressive AST we convert the Lark ast into
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 
 from .symbol import Symbol
 from .types import BoolType, CharType, FloatType, IntType, StringType, Type
@@ -410,6 +410,84 @@ class Assign(Statement):
 class ImplDecl(Declaration):
     def __init__(self, name: str, methods: list[FnDecl], line: int) -> None:
         super().__init__("impl_decl", line)
+        self.name = name
+        self.methods = methods
+
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        for method in self.methods:
+            node = method.get_node(id)
+            if node is not None:
+                return node
+        return None
+
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        for method in self.methods:
+            mmin, mmax = method.get_span()
+            min_line = min(min_line, mmin)
+            max_line = max(max_line, mmax)
+        return (min_line, max_line)
+
+
+class PartialTraitMethod(Declaration):
+    """A partial trait method is a method with only a type signaure provided.
+    Must be implemented by impls of the trait. Example:
+
+    trait Animal
+        fn noise() -> string
+
+    struct Dog
+        name: string
+        age: int
+
+    impl Animal for Dog
+        fn noise() -> string
+            return "woof"
+    """
+
+    def __init__(
+        self, name: str, params: list[Param], ret_type: TypeAnnotation, line: int
+    ) -> None:
+        super().__init__("partial_trait_method", line)
+        self.name = name
+        self.params = params
+        self.ret_type = ret_type
+
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        for param in self.params:
+            node = param.get_node(id)
+            if node is not None:
+                return node
+        return self.ret_type.get_node(id)
+
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        for param in self.params:
+            pmin, pmax = param.get_span()
+            min_line = min(min_line, pmin)
+            max_line = max(max_line, pmax)
+        ret_min, ret_max = self.ret_type.get_span()
+        min_line = min(min_line, ret_min)
+        max_line = max(max_line, ret_max)
+        return (min_line, max_line)
+
+
+class TraitDecl(Declaration):
+    def __init__(
+        self,
+        pub: bool,
+        name: str,
+        methods: list[Union[FnDecl, PartialTraitMethod]],
+        line: int,
+    ) -> None:
+        super().__init__("trait_decl", line)
+        self.pub = pub
         self.name = name
         self.methods = methods
 

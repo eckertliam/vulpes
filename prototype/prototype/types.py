@@ -353,3 +353,17 @@ class TypeEnv:
 
     def get_type(self, name: str) -> Optional[Type]:
         return self.types.get(name)
+
+
+class Trait:
+    __slot__ = ["name", "methods"]
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.methods: Dict[str, FunctionType] = {}
+
+    def add_method(self, name: str, fn_type: FunctionType) -> None:
+        self.methods[name] = fn_type
+
+    def get_method(self, name: str) -> Optional[FunctionType]:
+        return self.methods.get(name)

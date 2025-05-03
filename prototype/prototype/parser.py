@@ -40,6 +40,7 @@ from .ast import (
     StructDecl,
     StructExpr,
     StructField,
+    TraitDecl,
     TupleExpr,
     TupleTypeAnnotation,
     TypeAliasDecl,
@@ -52,6 +53,8 @@ from .types import BoolType, CharType, FloatType, IntType, StringType, Type
 
 from .symbol import Symbol
 
+# TODO: add partial trait methods
+# TODO: add trait impls
 cuss_grammar = r"""
     %import common.INT
     %import common.FLOAT 
@@ -126,6 +129,8 @@ cuss_grammar = r"""
     struct_field: [PUB] IDENT ":" type_annotation
     
     impl_def: "impl" IDENT _NL _INDENT fn_def (_NL* fn_def)* [_NL*] _DEDENT
+    
+    trait_def: [PUB] "trait" IDENT _NL _INDENT fn_def (_NL* fn_def)* [_NL*] _DEDENT
     
     type_annotation: IDENT -> named_type
         | "[" type_annotation "]" -> array_type
@@ -360,6 +365,15 @@ class ASTTransformer(Transformer):
         name_tok = items[0]
         methods = items[1:]
         return ImplDecl(name_tok.value, methods, name_tok.line)
+
+    def trait_def(self, items):
+        idx = 0
+        pub = items[idx] != None and items[idx].type == "PUB"
+        idx += 1
+        name_tok = items[idx]
+        idx += 1
+        methods = items[idx:]
+        return TraitDecl(pub, name_tok.value, methods, name_tok.line)
 
     # ---------- statements ----------
     def statement(self, items):
