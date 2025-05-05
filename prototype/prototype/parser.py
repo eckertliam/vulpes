@@ -380,12 +380,14 @@ class ASTTransformer(Transformer):
         if isinstance(items[idx], Token) and items[idx].type == "IDENT":
             trait = first_ident.value
             name = items[idx].value
-        else: # if there isnt a second ident the first ident is the name of the data structure
+        else:  # if there isnt a second ident the first ident is the name of the data structure
             name = first_ident.value
-        idx += 1 # skip over the name or none either way
-        methods = items[idx:] # methods are the rest of the items
+        idx += 1  # skip over the name or none either way
+        methods = items[idx:]  # methods are the rest of the items
         assert isinstance(name, str), "name is not a str in impl_def"
-        assert isinstance(first_ident.line, int), "first_ident.line is not an int in impl_def"
+        assert isinstance(
+            first_ident.line, int
+        ), "first_ident.line is not an int in impl_def"
         return ImplDecl(name, methods, first_ident.line, trait)
 
     def trait_method_body(self, items):
@@ -393,7 +395,6 @@ class ASTTransformer(Transformer):
             return None
         elif len(items) == 1:
             return items[0]
-        
 
     def trait_def(self, items):
         idx = 0
@@ -418,7 +419,9 @@ class ASTTransformer(Transformer):
         idx += 1
         body = items[idx]
         if body is None:
-            return PartialTraitMethod(pub, name_tok.value, params, ret_type, name_tok.line)
+            return PartialTraitMethod(
+                pub, name_tok.value, params, ret_type, name_tok.line
+            )
         else:
             return FnDecl(pub, name_tok.value, params, ret_type, body, name_tok.line)
 

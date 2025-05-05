@@ -1,3 +1,4 @@
+from typing import Union
 from ..ast import (
     AccessField,
     ArrayExpr,
@@ -16,6 +17,7 @@ from ..ast import (
     If,
     ImplDecl,
     Loop,
+    PartialTraitMethod,
     Return,
     Statement,
     StructExpr,
@@ -61,17 +63,27 @@ class NameReferencePass(Pass):
         self.symbol_table.exit_scope()
 
     def visit_impl_decl(self, impl_decl: ImplDecl) -> None:
-        # TODO: add trait handling
         # dont enter the impl's scope
         # all the impl's functions are scoped to their respective type's namespace
         # so we dont need to do anything
         # just loop through the methods and visit them
         for method in impl_decl.methods:
             self.visit_fn_decl(method)
-            
+
     def visit_trait_decl(self, trait_decl: TraitDecl) -> None:
-        # TODO: implement trait_decl
-        raise NotImplementedError("TraitDecl not implemented in name_ref_pass")
+        # we need to enter the trait's scope
+        self.symbol_table.enter_scope(trait_decl.id)
+        # we iterate through the methods and visit them
+        for method in trait_decl.methods:
+            self.visit_trait_method(method)
+        # we exit the trait's scope
+        self.symbol_table.exit_scope()
+
+    def visit_trait_method(self, method: Union[FnDecl, PartialTraitMethod]) -> None:
+        # we dont need to do anything for partial trait methods here
+        # just check the fn decl if it exists
+        if isinstance(method, FnDecl):
+            self.visit_fn_decl(method)
 
     def visit_statement(self, statement: Statement) -> None:
         if isinstance(statement, FnDecl):

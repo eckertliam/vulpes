@@ -172,8 +172,10 @@ class TypeResolutionPass(Pass):
                 self.visit_fn_decl(declaration)
             elif isinstance(declaration, ImplDecl):
                 self.visit_impl_decl(declaration)
-                
-    def visit_type_decl(self, type_decl: Union[TypeAliasDecl, EnumDecl, StructDecl, TraitDecl]) -> None:
+
+    def visit_type_decl(
+        self, type_decl: Union[TypeAliasDecl, EnumDecl, StructDecl, TraitDecl]
+    ) -> None:
         if isinstance(type_decl, TypeAliasDecl):
             self.visit_type_alias_decl(type_decl)
         elif isinstance(type_decl, EnumDecl):
@@ -184,7 +186,7 @@ class TypeResolutionPass(Pass):
             self.visit_trait_decl(type_decl)
 
     def visit_trait_decl(self, trait_decl: TraitDecl) -> None:
-        # TODO: implement trait_decl        
+        # TODO: implement trait_decl
         # NOTE: we need to handle params with the Self type
         raise NotImplementedError("TraitDecl not implemented in type_res_pass")
 

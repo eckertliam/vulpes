@@ -4,6 +4,7 @@ from typing import Optional, List
 
 from ..types import TypeEnv
 
+
 from ..errors import CussError
 
 from ..ast import Program

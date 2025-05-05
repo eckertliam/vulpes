@@ -162,6 +162,25 @@ class FunctionType(Type):
         return hash(("fn", tuple(hash(t) for t in self.params), hash(self.ret_type)))
 
 
+class SelfType(Type):
+    """
+    Self type is used inside trait declarations to refer to the type of the implementing type
+    This is useful for traits such as add that take a second Self as a parameter
+    """
+
+    def __str__(self) -> str:
+        return "Self"
+
+    def __eq__(self, other: "Type") -> bool:
+        return isinstance(other, SelfType)
+
+    def __ne__(self, other: "Type") -> bool:
+        return not isinstance(other, SelfType)
+
+    def __hash__(self) -> int:
+        return hash("Self")
+
+
 # Struct Type
 class StructType(Type):
     def __init__(self, name: str, fields: Dict[str, Type]) -> None:

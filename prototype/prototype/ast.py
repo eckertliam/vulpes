@@ -408,7 +408,9 @@ class Assign(Statement):
 
 
 class ImplDecl(Declaration):
-    def __init__(self, name: str, methods: list[FnDecl], line: int, trait: Optional[str] = None) -> None:
+    def __init__(
+        self, name: str, methods: list[FnDecl], line: int, trait: Optional[str] = None
+    ) -> None:
         super().__init__("impl_decl", line)
         self.name = name
         self.methods = methods
@@ -448,8 +450,14 @@ class PartialTraitMethod(Declaration):
         fn noise() -> string
             return "woof"
     """
+
     def __init__(
-        self, pub: bool, name: str, params: list[Param], ret_type: TypeAnnotation, line: int
+        self,
+        pub: bool,
+        name: str,
+        params: list[Param],
+        ret_type: TypeAnnotation,
+        line: int,
     ) -> None:
         super().__init__("partial_trait_method", line)
         self.pub = pub

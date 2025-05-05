@@ -124,3 +124,45 @@ def test_var_shadowing_error():
     decl_pass.run()
     assert len(decl_pass.errors) == 1
     assert isinstance(decl_pass.errors[0], NameResolutionError)
+
+
+def test_trait_decl():
+    source = textwrap.dedent(
+        """
+    trait Animal
+        fn make_sound() -> str
+    """
+    )
+    program = parse(source)
+    decl_pass = NameDeclarationPass(program)
+    decl_pass.run()
+    assert len(decl_pass.errors) == 0
+    assert decl_pass.symbol_table.table[-1].symbols["Animal"] is not None
+    animal_id = decl_pass.symbol_table.table[-1].symbols["Animal"].ast_id
+    assert decl_pass.symbol_table.table[animal_id].symbols["make_sound"] is not None
+
+
+def test_trait_impl_decl():
+    source = textwrap.dedent(
+        """
+    trait Animal
+        fn make_sound() -> str
+    
+    struct Dog
+        name: str
+        age: int
+        
+    impl Animal for Dog
+        fn make_sound() -> str
+            return "Woof!"
+    """
+    )
+    program = parse(source)
+    decl_pass = NameDeclarationPass(program)
+    decl_pass.run()
+    assert len(decl_pass.errors) == 0
+    assert decl_pass.symbol_table.table[-1].symbols["Dog"] is not None
+    dog_id = decl_pass.symbol_table.table[-1].symbols["Dog"].ast_id
+    assert decl_pass.symbol_table.table[dog_id].symbols["make_sound"] is not None
+    make_sound_id = decl_pass.symbol_table.table[dog_id].symbols["make_sound"].ast_id
+    assert decl_pass.symbol_table.table[make_sound_id].symbols["self"] is not None
