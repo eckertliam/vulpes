@@ -21,10 +21,15 @@ from ..errors import CussError, NameResolutionError
 from .base_pass import Pass
 from .symbol_table import Symbol
 
+# TODO: add docstrings to all methods
+
 
 # Pass 1: Name Declaration Pass
-# This pass enters all variable declarations into their respective scopes in a symbol table
 class NameDeclarationPass(Pass):
+    """
+    This pass enters all variable declarations into their respective scopes in a symbol table
+    """
+
     def __init__(self, program: Program) -> None:
         super().__init__(program=program)
 
@@ -64,7 +69,7 @@ class NameDeclarationPass(Pass):
                     return
                 # add the symbol to the type alias declaration node
                 declaration.symbol = res
-            
+
         # now we add all impls and fns to the symbol table
         for declaration in self.program.declarations:
             if isinstance(declaration, ImplDecl):

@@ -7,9 +7,11 @@ if TYPE_CHECKING:
     from .types import Type
 
 
-@dataclass
+@dataclass(slots=True)
 class Symbol:
+    """Represents a symbol. A symbol is a name for a variable, its ast id, and its parent scope id"""
+
     name: str
     ast_id: int
     parent_scope_id: int
-    type: Optional["Type"] = None
+    type: Optional[Type] = None

@@ -4,20 +4,29 @@ from typing import Dict, Optional, Union
 from .symbol import Symbol
 from .types import BoolType, CharType, FloatType, IntType, StringType, Type
 
+# TODO: add docstrings for all nodes
+# TODO: add __slots__ to all nodes
 
 class Program:
+    """Represents a program. A program is a collection of declarations"""
+
+    __slots__ = ["declarations", "source", "nodes"]
+
     def __init__(self, source: Optional[str] = None) -> None:
-        self.declarations = []
-        self.source = source
+        self.declarations: list[Declaration] = []
+        self.source: Optional[str] = source
         # memoize nodes by id to improve perf when grabbing nodes by id a lot
         self.nodes: Dict[int, Node] = {}
 
     def push(self, declaration: "Declaration"):
+        """Add a declaration to the program"""
         self.declarations.append(declaration)
 
     # get a node by id
     def get_node(self, id: int) -> Optional["Node"]:
+        """Get a node by id. Memoized for performance"""
         # check memoized nodes first
+        # saves us time over traversing the entire program
         if id in self.nodes:
             return self.nodes[id]
 
@@ -31,13 +40,20 @@ class Program:
 
     # get the top level declaration that contains the node id
     def get_decl(self, id: int) -> Optional["Declaration"]:
+        """Get the top level declaration that contains the node id.
+        Returns None if the node is not found in any top level declaration"""
         for declaration in self.declarations:
+            # while we're here checking out the nodes we add them to the memoized nodes
             if declaration.get_node(id) is not None:
                 return declaration
         return None
 
 
 class Node:
+    """Base class for all AST nodes"""
+
+    __slots__ = ["kind", "line", "id", "symbol"]
+
     _next_id = 0  # class variable to track the next available ID
 
     def __init__(self, kind: str, line: int) -> None:
@@ -50,34 +66,51 @@ class Node:
         Node._next_id += 1
 
     def get_node(self, id: int) -> Optional["Node"]:
+        """Get a node by id.
+        Returns None if the node is not found"""
         if self.id == id:
             return self
         else:
             return None
 
     def get_span(self) -> tuple[int, int]:
+        """Get the span of the node. The span is the line number of the first and last line of the node"""
         return (self.line, self.line)
 
 
 class Declaration(Node):
+    """Unifies all top level declarations in the program"""
+
     pass
 
 
 class Statement(Node):
+    """Unifies all statements in the program"""
+
     pass
 
 
 class TypeAnnotation(Node):
+    """Unifies all type annotations in the program"""
+
     pass
 
 
 class NamedTypeAnnotation(TypeAnnotation):
+    """A simple named type annotation"""
+
+    __slots__ = ["name", "kind", "line", "id", "symbol"]
+
     def __init__(self, name: str, line: int) -> None:
         super().__init__("named_type", line)
         self.name = name
 
 
 class ArrayTypeAnnotation(TypeAnnotation):
+    """A type annotation for an array type"""
+
+    __slots__ = ["elem_type", "kind", "line", "id", "symbol"]
+
     def __init__(self, elem_type: TypeAnnotation, line: int) -> None:
         super().__init__("array_type", line)
         self.elem_type = elem_type
@@ -90,6 +123,10 @@ class ArrayTypeAnnotation(TypeAnnotation):
 
 
 class TupleTypeAnnotation(TypeAnnotation):
+    """A type annotation for a tuple type"""
+
+    __slots__ = ["elem_types", "kind", "line", "id", "symbol"]
+
     def __init__(self, elem_types: list[TypeAnnotation], line: int) -> None:
         super().__init__("tuple_type", line)
         self.elem_types = elem_types
@@ -106,6 +143,10 @@ class TupleTypeAnnotation(TypeAnnotation):
 
 
 class FunctionTypeAnnotation(TypeAnnotation):
+    """A type annotation for a function type"""
+
+    __slots__ = ["params", "ret_type", "kind", "line", "id", "symbol"]
+
     def __init__(
         self, params: list[TypeAnnotation], ret_type: TypeAnnotation, line: int
     ) -> None:
@@ -124,6 +165,20 @@ class FunctionTypeAnnotation(TypeAnnotation):
 
 
 class FnDecl(Declaration, Statement):
+    """A function declaration"""
+
+    __slots__ = [
+        "pub",
+        "name",
+        "params",
+        "ret_type",
+        "body",
+        "kind",
+        "line",
+        "id",
+        "symbol",
+    ]
+
     def __init__(
         self,
         pub: bool,
@@ -178,11 +233,14 @@ class FnDecl(Declaration, Statement):
 
 
 class Param(Node):
+    """A parameter of a function"""
+
+    __slots__ = ["name", "type_annotation", "kind", "line", "id", "symbol"]
+
     def __init__(self, name: str, type_annotation: TypeAnnotation, line: int) -> None:
         super().__init__("param", line)
         self.name = name
         self.type_annotation = type_annotation
-        self.line = line
 
     def get_node(self, id: int) -> Optional[Node]:
         if self.id == id:
@@ -191,6 +249,10 @@ class Param(Node):
 
 
 class StructDecl(Declaration):
+    """A struct declaration"""
+
+    __slots__ = ["pub", "name", "fields", "kind", "line", "id", "symbol"]
+
     def __init__(
         self, pub: bool, name: str, fields: list["StructField"], line: int
     ) -> None:
@@ -219,6 +281,10 @@ class StructDecl(Declaration):
 
 
 class StructField(Node):
+    """A field of a struct"""
+
+    __slots__ = ["pub", "name", "type_annotation", "kind", "line", "id", "symbol"]
+
     def __init__(
         self, pub: bool, name: str, type_annotation: TypeAnnotation, line: int
     ) -> None:
@@ -238,6 +304,10 @@ class StructField(Node):
 
 
 class EnumDecl(Declaration):
+    """An enum declaration"""
+
+    __slots__ = ["pub", "name", "variants", "kind", "line", "id", "symbol"]
+
     def __init__(
         self, pub: bool, name: str, variants: list["EnumVariant"], line: int
     ) -> None:
@@ -266,17 +336,27 @@ class EnumDecl(Declaration):
 
 
 class EnumVariant(Node):
+    """An enum variant"""
+
+    __slots__ = ["name", "kind", "line", "id", "symbol"]
+
     def __init__(self, kind: str, name: str, line: int) -> None:
         super().__init__(kind, line)
         self.name = name
 
 
 class EnumUnitVariant(EnumVariant):
+    """An enum unit variant"""
+
     def __init__(self, name: str, line: int) -> None:
         super().__init__("enum_unit_variant", name, line)
 
 
 class EnumTupleVariant(EnumVariant):
+    """An enum tuple variant"""
+
+    __slots__ = ["types", "name", "kind", "line", "id", "symbol"]
+
     def __init__(self, name: str, types: list[TypeAnnotation], line: int) -> None:
         super().__init__("enum_tuple_variant", name, line)
         self.types = types

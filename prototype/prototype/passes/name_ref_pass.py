@@ -32,10 +32,12 @@ from .base_pass import Pass
 from .name_decl_pass import NameDeclarationPass
 
 
-# This pass checks that all variable references, fn calls, method calls, etc are valid
-# This means checking that names are defined prior to their use
-# and that field accesses, method calls, are accessing valid fields/methods
 class NameReferencePass(Pass):
+    """
+    This pass checks that all variable references, fn calls, method calls, etc are valid
+    This means checking that names are defined prior to their use
+    """
+
     def __init__(self, previous_pass: NameDeclarationPass):
         super().__init__(previous_pass=previous_pass)
 

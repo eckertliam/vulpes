@@ -12,6 +12,11 @@ from .symbol_table import SymbolTable
 
 
 class Pass(ABC):
+    """
+    Abstract base class for all passes.
+    Passes are used to transform the AST.
+    """
+
     __slots__ = ["program", "symbol_table", "errors", "type_env"]
 
     def __init__(

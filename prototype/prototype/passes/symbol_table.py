@@ -6,16 +6,28 @@ from ..ast import Program
 from ..errors import CussError, NameResolutionError
 from ..symbol import Symbol
 
+# TODO: add docstrings to all methods
+
 
 @dataclass(slots=True)
 class Scope:
+    """
+    A scope is a collection of symbols.
+    Scope IDs are derived from the ast id of the scope they represent.
+    """
+
     id: int
     parent_id: Optional[int]
     symbols: Dict[str, Symbol]
 
 
-# The symbol table is a dictionary that maps scope ids to scopes
 class SymbolTable:
+    """
+    Maps scope ids to scopes.
+    The symbol table is used to store the symbols for a given scope.
+    Scope IDs are derived from the ast ids of the scopes.
+    """
+
     __slots__ = ["table", "current_scope_id"]
 
     def __init__(self) -> None:

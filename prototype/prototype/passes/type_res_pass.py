@@ -5,6 +5,7 @@ from .name_ref_pass import NameReferencePass
 from .base_pass import Pass
 from ..ast import (
     ArrayTypeAnnotation,
+    Declaration,
     Else,
     EnumDecl,
     EnumStructVariant,
@@ -40,10 +41,16 @@ from ..types import (
 )
 
 
-# This pass adds type definitions to the type env
-# it then attaches types to ast nodes that are typed
-# it adds type vars to ast nodes that will need to be inferred in the next pass
+# TODO: add docstrings to all methods
+
+
 class TypeResolutionPass(Pass):
+    """
+    This pass adds type definitions to the type env
+    it then attaches types to ast nodes that are typed
+    it adds type vars to ast nodes that will need to be inferred in the next pass
+    """
+
     def __init__(self, previous_pass: NameReferencePass):
         super().__init__(previous_pass=previous_pass)
         # we need to keep track of the type aliases, enums, and structs
@@ -173,9 +180,7 @@ class TypeResolutionPass(Pass):
             elif isinstance(declaration, ImplDecl):
                 self.visit_impl_decl(declaration)
 
-    def visit_type_decl(
-        self, type_decl: Union[TypeAliasDecl, EnumDecl, StructDecl, TraitDecl]
-    ) -> None:
+    def visit_type_decl(self, type_decl: Declaration) -> None:
         if isinstance(type_decl, TypeAliasDecl):
             self.visit_type_alias_decl(type_decl)
         elif isinstance(type_decl, EnumDecl):
@@ -184,6 +189,8 @@ class TypeResolutionPass(Pass):
             self.visit_struct_decl(type_decl)
         elif isinstance(type_decl, TraitDecl):
             self.visit_trait_decl(type_decl)
+        else:
+            raise RuntimeError(f"Unknown type declaration {type_decl}")
 
     def visit_trait_decl(self, trait_decl: TraitDecl) -> None:
         # TODO: implement trait_decl

@@ -1,108 +1,118 @@
 # Internal Type Representation
+from abc import ABC, abstractmethod
 from typing import Dict, Optional
 
 from .symbol import Symbol
 
 
-class Type:
-    def __str__(self) -> str:
-        raise NotImplementedError("Subclasses must implement __str__")
+class Type(ABC):
+    """Abstract base class for all types"""
 
+    __slots__ = []
+
+    @abstractmethod
+    def __str__(self) -> str:
+        """Returns a string representation of the type"""
+        pass
+
+    @abstractmethod
     def __eq__(self, other: "Type") -> bool:
-        raise NotImplementedError("Subclasses must implement __eq__")
+        """Check equality of two types"""
+        pass
 
     def __ne__(self, other: "Type") -> bool:
-        raise NotImplementedError("Subclasses must implement __ne__")
+        """Check inequality of two types"""
+        return not self.__eq__(other)
 
+    @abstractmethod
     def __hash__(self) -> int:
-        raise NotImplementedError("Subclasses must implement __hash__")
+        """Returns a hash value for the type"""
+        pass
 
 
 class VoidType(Type):
+    """Represents the void type"""
+
     def __str__(self) -> str:
         return "void"
 
     def __eq__(self, other: "Type") -> bool:
         return isinstance(other, VoidType)
 
-    def __ne__(self, other: "Type") -> bool:
-        return not isinstance(other, VoidType)
-
     def __hash__(self) -> int:
         return hash("void")
 
 
 class IntType(Type):
+    """Represents the int type"""
+
     def __str__(self) -> str:
         return "int"
 
     def __eq__(self, other: "Type") -> bool:
         return isinstance(other, IntType)
 
-    def __ne__(self, other: "Type") -> bool:
-        return not isinstance(other, IntType)
-
     def __hash__(self) -> int:
         return hash("int")
 
 
 class FloatType(Type):
+    """Represents the float type"""
+
     def __str__(self) -> str:
         return "float"
 
     def __eq__(self, other: "Type") -> bool:
         return isinstance(other, FloatType)
 
-    def __ne__(self, other: "Type") -> bool:
-        return not isinstance(other, FloatType)
-
     def __hash__(self) -> int:
         return hash("float")
 
 
 class StringType(Type):
+    """Represents the string type"""
+
     def __str__(self) -> str:
         return "string"
 
     def __eq__(self, other: "Type") -> bool:
         return isinstance(other, StringType)
 
-    def __ne__(self, other: "Type") -> bool:
-        return not isinstance(other, StringType)
-
     def __hash__(self) -> int:
         return hash("string")
 
 
 class BoolType(Type):
+    """Represents the bool type"""
+
     def __str__(self) -> str:
         return "bool"
 
     def __eq__(self, other: "Type") -> bool:
         return isinstance(other, BoolType)
 
-    def __ne__(self, other: "Type") -> bool:
-        return not isinstance(other, BoolType)
-
     def __hash__(self) -> int:
         return hash("bool")
 
 
 class CharType(Type):
+    """Represents the char type"""
+
     def __str__(self) -> str:
         return "char"
 
     def __eq__(self, other: "Type") -> bool:
         return isinstance(other, CharType)
 
-    def __ne__(self, other: "Type") -> bool:
-        return not isinstance(other, CharType)
-
     def __hash__(self) -> int:
         return hash("char")
 
 
 class ArrayType(Type):
+    """Represents an array type"""
+
+    __slots__ = ["elem_type"]
+
     def __init__(self, elem_type: Type) -> None:
         self.elem_type = elem_type
 
@@ -112,14 +122,15 @@ class ArrayType(Type):
     def __eq__(self, other: "Type") -> bool:
         return isinstance(other, ArrayType) and self.elem_type == other.elem_type
 
-    def __ne__(self, other: "Type") -> bool:
-        return not isinstance(other, ArrayType) or self.elem_type != other.elem_type
-
     def __hash__(self) -> int:
         return hash(("array", hash(self.elem_type)))
 
 
 class TupleType(Type):
+    """Represents a tuple type"""
+
+    __slots__ = ["elem_types"]
+
     def __init__(self, elem_types: list[Type]) -> None:
         self.elem_types = elem_types
 
@@ -129,14 +140,15 @@ class TupleType(Type):
     def __eq__(self, other: "Type") -> bool:
         return isinstance(other, TupleType) and self.elem_types == other.elem_types
 
-    def __ne__(self, other: "Type") -> bool:
-        return not isinstance(other, TupleType) or self.elem_types != other.elem_types
-
     def __hash__(self) -> int:
         return hash(("tuple", tuple(hash(t) for t in self.elem_types)))
 
 
 class FunctionType(Type):
+    """Represents a function type"""
+
+    __slots__ = ["params", "ret_type"]
+
     def __init__(self, params: list[Type], ret_type: Type) -> None:
         self.params = params
         self.ret_type = ret_type
@@ -149,13 +161,6 @@ class FunctionType(Type):
             isinstance(other, FunctionType)
             and self.params == other.params
             and self.ret_type == other.ret_type
-        )
-
-    def __ne__(self, other: "Type") -> bool:
-        return (
-            not isinstance(other, FunctionType)
-            or self.params != other.params
-            or self.ret_type != other.ret_type
         )
 
     def __hash__(self) -> int:
@@ -174,15 +179,16 @@ class SelfType(Type):
     def __eq__(self, other: "Type") -> bool:
         return isinstance(other, SelfType)
 
-    def __ne__(self, other: "Type") -> bool:
-        return not isinstance(other, SelfType)
-
     def __hash__(self) -> int:
         return hash("Self")
 
 
 # Struct Type
 class StructType(Type):
+    """Represents a struct type. Tracks methods and traits implemented by the struct"""
+
+    __slots__ = ["name", "fields", "methods", "traits"]
+
     def __init__(self, name: str, fields: Dict[str, Type]) -> None:
         self.name = name
         self.fields = fields
@@ -199,13 +205,6 @@ class StructType(Type):
             and self.fields == other.fields
         )
 
-    def __ne__(self, other: "Type") -> bool:
-        return (
-            not isinstance(other, StructType)
-            or self.name != other.name
-            or self.fields != other.fields
-        )
-
     def __hash__(self) -> int:
         return hash(
             (
@@ -217,20 +216,40 @@ class StructType(Type):
 
 
 # Handling enum variant types
-class EnumVariantType:
+class EnumVariantType(ABC):
+    """Abstract base class for all enum variant types"""
+
+    __slots__ = ["name"]
+
     def __init__(self, name: str) -> None:
         self.name = name
 
+    @abstractmethod
+    def __str__(self) -> str:
+        pass
+
+    @abstractmethod
+    def __eq__(self, other: "EnumVariantType") -> bool:
+        pass
+
+    def __ne__(self, other: "EnumVariantType") -> bool:
+        return not self.__eq__(other)
+
+    @abstractmethod
+    def __hash__(self) -> int:
+        pass
+
 
 class EnumUnitVariantType(EnumVariantType):
+    """Represents a unit variant type"""
+
+    __slots__ = ["name"]
+
     def __init__(self, name: str) -> None:
         super().__init__(name)
 
     def __eq__(self, other: "EnumVariantType") -> bool:
         return isinstance(other, EnumUnitVariantType) and self.name == other.name
-
-    def __ne__(self, other: "EnumVariantType") -> bool:
-        return not isinstance(other, EnumUnitVariantType) or self.name != other.name
 
     def __hash__(self) -> int:
         return hash(("enum_unit", self.name))
@@ -240,6 +259,10 @@ class EnumUnitVariantType(EnumVariantType):
 
 
 class EnumTupleVariantType(EnumVariantType):
+    """Represents a tuple variant type"""
+
+    __slots__ = ["name", "types"]
+
     def __init__(self, name: str, types: list[Type]) -> None:
         super().__init__(name)
         self.types = types
@@ -251,13 +274,6 @@ class EnumTupleVariantType(EnumVariantType):
             and self.types == other.types
         )
 
-    def __ne__(self, other: "EnumVariantType") -> bool:
-        return (
-            not isinstance(other, EnumTupleVariantType)
-            or self.name != other.name
-            or self.types != other.types
-        )
-
     def __hash__(self) -> int:
         return hash(("enum_tuple", self.name, tuple(hash(t) for t in self.types)))
 
@@ -266,6 +282,10 @@ class EnumTupleVariantType(EnumVariantType):
 
 
 class EnumStructVariantType(EnumVariantType):
+    """Represents a struct variant type"""
+
+    __slots__ = ["name", "fields"]
+
     def __init__(self, name: str, fields: Dict[str, Type]) -> None:
         super().__init__(name)
         self.fields = fields
@@ -280,13 +300,6 @@ class EnumStructVariantType(EnumVariantType):
             and self.fields == other.fields
         )
 
-    def __ne__(self, other: "EnumVariantType") -> bool:
-        return (
-            not isinstance(other, EnumStructVariantType)
-            or self.name != other.name
-            or self.fields != other.fields
-        )
-
     def __hash__(self) -> int:
         return hash(
             (
@@ -299,6 +312,10 @@ class EnumStructVariantType(EnumVariantType):
 
 # Enum Type
 class EnumType(Type):
+    """Represents an enum type. Tracks methods and traits implemented by the enum"""
+
+    __slots__ = ["name", "variants", "methods", "traits"]
+
     def __init__(self, name: str, variants: list[EnumVariantType]) -> None:
         self.name = name
         self.variants: Dict[str, EnumVariantType] = {v.name: v for v in variants}
@@ -315,13 +332,6 @@ class EnumType(Type):
             and self.variants == other.variants
         )
 
-    def __ne__(self, other: "Type") -> bool:
-        return (
-            not isinstance(other, EnumType)
-            or self.name != other.name
-            or self.variants != other.variants
-        )
-
     def __hash__(self) -> int:
         return hash(
             (
@@ -333,6 +343,10 @@ class EnumType(Type):
 
 
 class TypeVar(Type):
+    """Represents a type variable. A unique identifier for a type that is not known until type inference"""
+
+    __slots__ = ["name"]
+
     _next_alpha = "a"
     _next_numeric = 0
 
@@ -350,15 +364,15 @@ class TypeVar(Type):
     def __eq__(self, other: "Type") -> bool:
         return isinstance(other, TypeVar) and self.name == other.name
 
-    def __ne__(self, other: "Type") -> bool:
-        return not self.__eq__(other)
-
     def __hash__(self) -> int:
         return hash(self.name)
 
 
-# Type Env is a helper type that contains a mapping of type name to their corresponding type
 class TypeEnv:
+    """Contains a mapping of type name to their corresponding type"""
+
+    __slots__ = ["types"]
+
     def __init__(self) -> None:
         self.types: Dict[str, Type] = {
             "int": IntType(),
@@ -377,7 +391,9 @@ class TypeEnv:
 
 
 class Trait:
-    __slot__ = ["name", "methods"]
+    """Represents a trait. A trait is a collection of methods that can be implemented by a type"""
+
+    __slots__ = ["name", "methods"]
 
     def __init__(self, name: str) -> None:
         self.name = name

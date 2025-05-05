@@ -50,12 +50,6 @@ from .ast import (
     While,
 )
 
-from .types import BoolType, CharType, FloatType, IntType, StringType, Type
-
-from .symbol import Symbol
-
-# TODO: add partial trait methods
-# TODO: add trait impls
 cuss_grammar = r"""
     %import common.INT
     %import common.FLOAT 
