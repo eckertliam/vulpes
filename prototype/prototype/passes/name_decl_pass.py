@@ -64,6 +64,9 @@ class NameDeclarationPass(Pass):
                     return
                 # add the symbol to the type alias declaration node
                 declaration.symbol = res
+            elif isinstance(declaration, TraitDecl):
+                # TODO: add the trait to the symbol table
+                raise NotImplementedError("TraitDecl not implemented in name_decl_pass")
 
         # now we add all impls and fns to the symbol table
         for declaration in self.program.declarations:
@@ -78,6 +81,7 @@ class NameDeclarationPass(Pass):
                 error.report(self.program)
 
     def impl_decl(self, impl: ImplDecl) -> None:
+        # TODO: add trait handling
         # we look up the impl's type in the symbol table
         # and enter its scope
         impl_type: Optional[Symbol] = self.symbol_table.lookup(impl.name)

@@ -134,11 +134,11 @@ class FnDecl(Declaration, Statement):
         line: int,
     ) -> None:
         super().__init__("fn_decl", line)
-        self.pub = pub
-        self.name = name
-        self.params = params
-        self.ret_type = ret_type
-        self.body = body
+        self.pub: bool = pub
+        self.name: str = name
+        self.params: list["Param"] = params
+        self.ret_type: TypeAnnotation = ret_type
+        self.body: list[Statement] = body
 
     def get_node(self, id: int) -> Optional[Node]:
         if self.id == id:
@@ -408,10 +408,11 @@ class Assign(Statement):
 
 
 class ImplDecl(Declaration):
-    def __init__(self, name: str, methods: list[FnDecl], line: int) -> None:
+    def __init__(self, name: str, methods: list[FnDecl], line: int, trait: Optional[str] = None) -> None:
         super().__init__("impl_decl", line)
         self.name = name
         self.methods = methods
+        self.trait = trait
 
     def get_node(self, id: int) -> Optional[Node]:
         if self.id == id:
@@ -447,11 +448,11 @@ class PartialTraitMethod(Declaration):
         fn noise() -> string
             return "woof"
     """
-
     def __init__(
-        self, name: str, params: list[Param], ret_type: TypeAnnotation, line: int
+        self, pub: bool, name: str, params: list[Param], ret_type: TypeAnnotation, line: int
     ) -> None:
         super().__init__("partial_trait_method", line)
+        self.pub = pub
         self.name = name
         self.params = params
         self.ret_type = ret_type

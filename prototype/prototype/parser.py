@@ -34,6 +34,7 @@ from .ast import (
     Loop,
     NamedTypeAnnotation,
     Param,
+    PartialTraitMethod,
     Program,
     Return,
     String,
@@ -73,6 +74,7 @@ cuss_grammar = r"""
                 | struct_def
                 | type_alias
                 | impl_def
+                | trait_def
                 
     statement_list: (statement (_NL* statement)* [_NL*])?
     
@@ -100,7 +102,7 @@ cuss_grammar = r"""
     
     type_alias: [PUB] "type" IDENT "=" type_annotation
 
-    fn_def: [PUB] "fn" IDENT "(" param_list ")" "->" type_annotation _NL _INDENT statement_list _DEDENT
+    fn_def: [PUB] "fn" IDENT "(" param_list ")" "->" type_annotation _NL* _INDENT statement_list _DEDENT
     
     param_list: [param ("," param)*]
     
@@ -128,10 +130,15 @@ cuss_grammar = r"""
     
     struct_field: [PUB] IDENT ":" type_annotation
     
-    impl_def: "impl" IDENT _NL _INDENT fn_def (_NL* fn_def)* [_NL*] _DEDENT
+    impl_def: "impl" IDENT ["for" IDENT] _NL _INDENT _NL* fn_def (_NL* fn_def)* [_NL*] _DEDENT
     
-    trait_def: [PUB] "trait" IDENT _NL _INDENT fn_def (_NL* fn_def)* [_NL*] _DEDENT
+    trait_def: [PUB] "trait" IDENT _NL _INDENT _NL* trait_method (_NL* trait_method)* [_NL*] _DEDENT
     
+    trait_method: [PUB] "fn" IDENT "(" param_list ")" "->" type_annotation trait_method_body
+
+    trait_method_body: _NL _INDENT statement_list _DEDENT
+                    | _NL
+
     type_annotation: IDENT -> named_type
         | "[" type_annotation "]" -> array_type
         | "(" [type_annotation ("," type_annotation)*] ")" -> tuple_type
@@ -332,6 +339,7 @@ class ASTTransformer(Transformer):
         ret_type = items[idx]
         idx += 1
         body = items[idx]
+        assert isinstance(name_tok.value, str), "name_tok.value is not a str in fn_def"
         return FnDecl(pub, name_tok.value, params, ret_type, body, name_tok.line)
 
     def struct_def(self, items):
@@ -362,9 +370,30 @@ class ASTTransformer(Transformer):
         return TypeAliasDecl(pub, name_tok.value, type_ann, name_tok.line)
 
     def impl_def(self, items):
-        name_tok = items[0]
-        methods = items[1:]
-        return ImplDecl(name_tok.value, methods, name_tok.line)
+        idx = 0
+        # get the first ident
+        first_ident = items[idx]
+        idx += 1
+        name = None
+        trait = None
+        # if the next token is an IDENT its the name of data structure impling the trait
+        if isinstance(items[idx], Token) and items[idx].type == "IDENT":
+            trait = first_ident.value
+            name = items[idx].value
+        else: # if there isnt a second ident the first ident is the name of the data structure
+            name = first_ident.value
+        idx += 1 # skip over the name or none either way
+        methods = items[idx:] # methods are the rest of the items
+        assert isinstance(name, str), "name is not a str in impl_def"
+        assert isinstance(first_ident.line, int), "first_ident.line is not an int in impl_def"
+        return ImplDecl(name, methods, first_ident.line, trait)
+
+    def trait_method_body(self, items):
+        if len(items) == 0:
+            return None
+        elif len(items) == 1:
+            return items[0]
+        
 
     def trait_def(self, items):
         idx = 0
@@ -374,6 +403,24 @@ class ASTTransformer(Transformer):
         idx += 1
         methods = items[idx:]
         return TraitDecl(pub, name_tok.value, methods, name_tok.line)
+
+    def trait_method(self, items):
+        idx = 0
+        pub = items[idx] != None and items[idx].type == "PUB"
+        idx += 1
+        name_tok = items[idx]
+        idx += 1
+        params = items[idx]
+        # filter None from params
+        params = [param for param in params if param is not None]
+        idx += 1
+        ret_type = items[idx]
+        idx += 1
+        body = items[idx]
+        if body is None:
+            return PartialTraitMethod(pub, name_tok.value, params, ret_type, name_tok.line)
+        else:
+            return FnDecl(pub, name_tok.value, params, ret_type, body, name_tok.line)
 
     # ---------- statements ----------
     def statement(self, items):

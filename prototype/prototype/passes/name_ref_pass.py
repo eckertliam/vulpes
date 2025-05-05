@@ -19,6 +19,7 @@ from ..ast import (
     Return,
     Statement,
     StructExpr,
+    TraitDecl,
     TupleExpr,
     UnaryOp,
     VarDecl,
@@ -42,6 +43,8 @@ class NameReferencePass(Pass):
                 self.visit_fn_decl(declaration)
             elif isinstance(declaration, ImplDecl):
                 self.visit_impl_decl(declaration)
+            elif isinstance(declaration, TraitDecl):
+                self.visit_trait_decl(declaration)
 
         # check for any errors that may have been added
         if len(self.errors) > 0:
@@ -58,12 +61,17 @@ class NameReferencePass(Pass):
         self.symbol_table.exit_scope()
 
     def visit_impl_decl(self, impl_decl: ImplDecl) -> None:
+        # TODO: add trait handling
         # dont enter the impl's scope
         # all the impl's functions are scoped to their respective type's namespace
         # so we dont need to do anything
         # just loop through the methods and visit them
         for method in impl_decl.methods:
             self.visit_fn_decl(method)
+            
+    def visit_trait_decl(self, trait_decl: TraitDecl) -> None:
+        # TODO: implement trait_decl
+        raise NotImplementedError("TraitDecl not implemented in name_ref_pass")
 
     def visit_statement(self, statement: Statement) -> None:
         if isinstance(statement, FnDecl):

@@ -19,9 +19,11 @@ from prototype.ast import (
     GetIndex,
     AccessField,
     NamedTypeAnnotation,
+    PartialTraitMethod,
     String,
     StructExpr,
     StructField,
+    TraitDecl,
     TupleExpr,
     TypeAliasDecl,
     Ident,
@@ -659,3 +661,51 @@ def test_enum_struct_variant():
     assert len(write_variant.types) == 1
     assert isinstance(write_variant.types[0], NamedTypeAnnotation)
     assert write_variant.types[0].name == "string"
+
+
+def test_trait():
+    source = textwrap.dedent(
+        """
+    trait Animal
+        fn make_sound() -> string
+        fn move() -> void
+        
+    struct Dog
+        name: string
+        age: int
+
+    impl Animal for Dog
+        fn make_sound() -> string
+            return "Woof"
+            
+        fn move() -> void
+            print("Moving")
+    """
+    )
+    program = parse(source)
+    trait_decl = program.declarations[0]
+    assert isinstance(trait_decl, TraitDecl)
+    assert trait_decl.name == "Animal"
+    assert len(trait_decl.methods) == 2
+    assert isinstance(trait_decl.methods[0], PartialTraitMethod)
+    assert trait_decl.methods[0].name == "make_sound"
+    assert isinstance(trait_decl.methods[0].ret_type, NamedTypeAnnotation)
+    assert trait_decl.methods[0].ret_type.name == "string"
+    assert isinstance(trait_decl.methods[1], PartialTraitMethod)
+    assert trait_decl.methods[1].name == "move"
+    assert isinstance(trait_decl.methods[1].ret_type, NamedTypeAnnotation)
+    assert trait_decl.methods[1].ret_type.name == "void"
+
+    impl_decl = program.declarations[2]
+    assert isinstance(impl_decl, ImplDecl)
+    assert impl_decl.name == "Dog"
+    assert impl_decl.trait == "Animal"
+    assert len(impl_decl.methods) == 2
+    assert isinstance(impl_decl.methods[0], FnDecl)
+    assert impl_decl.methods[0].name == "make_sound"
+    assert isinstance(impl_decl.methods[0].ret_type, NamedTypeAnnotation)
+    assert impl_decl.methods[0].ret_type.name == "string"
+    assert isinstance(impl_decl.methods[1], FnDecl)
+    assert impl_decl.methods[1].name == "move"
+    assert isinstance(impl_decl.methods[1].ret_type, NamedTypeAnnotation)
+    assert impl_decl.methods[1].ret_type.name == "void"

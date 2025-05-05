@@ -18,6 +18,7 @@ from ..ast import (
     NamedTypeAnnotation,
     Statement,
     StructDecl,
+    TraitDecl,
     TupleTypeAnnotation,
     TypeAliasDecl,
     TypeAnnotation,
@@ -162,12 +163,7 @@ class TypeResolutionPass(Pass):
         # it is important that we add all aliases, enums, and structs to the type env
         # before we do any type resolution
         for declaration in self.program.declarations:
-            if (
-                isinstance(declaration, TypeAliasDecl)
-                or isinstance(declaration, EnumDecl)
-                or isinstance(declaration, StructDecl)
-            ):
-                self.visit_type_decl(declaration)
+            self.visit_type_decl(declaration)
 
         # now we can go through the function and impl declarations
         # and add types to the ast nodes that need them
@@ -176,16 +172,21 @@ class TypeResolutionPass(Pass):
                 self.visit_fn_decl(declaration)
             elif isinstance(declaration, ImplDecl):
                 self.visit_impl_decl(declaration)
-
-    def visit_type_decl(
-        self, type_decl: Union[TypeAliasDecl, EnumDecl, StructDecl]
-    ) -> None:
+                
+    def visit_type_decl(self, type_decl: Union[TypeAliasDecl, EnumDecl, StructDecl, TraitDecl]) -> None:
         if isinstance(type_decl, TypeAliasDecl):
             self.visit_type_alias_decl(type_decl)
         elif isinstance(type_decl, EnumDecl):
             self.visit_enum_decl(type_decl)
         elif isinstance(type_decl, StructDecl):
             self.visit_struct_decl(type_decl)
+        elif isinstance(type_decl, TraitDecl):
+            self.visit_trait_decl(type_decl)
+
+    def visit_trait_decl(self, trait_decl: TraitDecl) -> None:
+        # TODO: implement trait_decl        
+        # NOTE: we need to handle params with the Self type
+        raise NotImplementedError("TraitDecl not implemented in type_res_pass")
 
     def visit_type_alias_decl(self, type_alias_decl: TypeAliasDecl) -> None:
         # check if this alias is already being visited (i.e. recursion)
@@ -321,6 +322,7 @@ class TypeResolutionPass(Pass):
         self.symbol_table.exit_scope()
 
     def visit_impl_decl(self, impl_decl: ImplDecl) -> None:
+        # TODO: add trait handling we need to get the trait from the type env and validate that the impl is implementing all the methods required by the trait and also that the impl is not implementing any methods that are not required by the trait
         # we need to get the type the impl is implementing
         # we do this by looking up the type in the type env
         impl_type = self.type_env.get_type(impl_decl.name)

@@ -168,6 +168,7 @@ class StructType(Type):
         self.name = name
         self.fields = fields
         self.methods: Dict[str, Symbol] = {}
+        self.traits: Dict[str, Trait] = {}
 
     def __str__(self) -> str:
         return f"{self.name} {{ {', '.join(f'{k}: {v}' for k, v in self.fields.items())} }}"
@@ -283,6 +284,7 @@ class EnumType(Type):
         self.name = name
         self.variants: Dict[str, EnumVariantType] = {v.name: v for v in variants}
         self.methods: Dict[str, Symbol] = {}
+        self.traits: Dict[str, Trait] = {}
 
     def __str__(self) -> str:
         return f"{self.name} {{ {', '.join(str(v) for v in self.variants.values())} }}"
