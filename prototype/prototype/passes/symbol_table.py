@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Dict, Optional, Union
 
 from ..ast import Program
-from ..errors import CussError, NameResolutionError
+from ..errors import VulpesError, NameResolutionError
 from ..symbol import Symbol
 
 # TODO: add docstrings to all methods
@@ -63,7 +63,7 @@ class SymbolTable:
         ast_id: int,
         line: int,
         program: Program,
-    ) -> Union[Symbol, CussError]:
+    ) -> Union[Symbol, VulpesError]:
         # check for shadowing
         if name in self.table[self.current_scope_id].symbols:
             # get the existing symbol

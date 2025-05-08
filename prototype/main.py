@@ -1,4 +1,4 @@
-# This is a messy prototype of a Cuss compiler.
+# This is a messy prototype of a Vulpes compiler.
 # It is a loose example of what the final C++ compiler will look like.
 # It is not intended to be a full implementation of the language.
 # It is only intended to be a minimal proof of concept.

@@ -2,7 +2,7 @@
 from .parser import Program
 
 
-class CussError(Exception):
+class VulpesError(Exception):
     def __init__(self, message: str, line: int, ast_id: int) -> None:
         super().__init__(f"[Line {line}] {message}")
         self.message = message
@@ -36,10 +36,10 @@ class CussError(Exception):
 
 
 # Cannot infer type
-class TypeInferenceError(CussError):
+class TypeInferenceError(VulpesError):
     pass
 
 
 # Cannot resolve name
-class NameResolutionError(CussError):
+class NameResolutionError(VulpesError):
     pass

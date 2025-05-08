@@ -52,7 +52,7 @@ from .ast import (
     While,
 )
 
-cuss_grammar = r"""
+grammar = r"""
     %import common.INT
     %import common.FLOAT 
     %import common.ESCAPED_STRING -> STRING
@@ -228,7 +228,7 @@ cuss_grammar = r"""
 
 
 # Indentation handling
-class CussIndenter(Indenter):
+class VulpesIndenter(Indenter):
     @property
     def NL_type(self) -> str:
         return "_NL"
@@ -258,7 +258,7 @@ class CussIndenter(Indenter):
 class ASTTransformer(Transformer):
     """
     Bottom‑up conversion from the raw Lark parse tree to the strongly‑typed
-    CUSS AST defined below.  Every method corresponds to a grammar rule.
+    AST defined below.  Every method corresponds to a grammar rule.
     """
 
     # ---------- entry points ----------
@@ -653,9 +653,9 @@ class ASTTransformer(Transformer):
 
 
 PARSER = Lark(
-    cuss_grammar,
+    grammar,
     parser="lalr",
-    postlex=CussIndenter(),
+    postlex=VulpesIndenter(),
     transformer=ASTTransformer(),
 )
 

@@ -5,7 +5,7 @@ from typing import Optional, List
 from ..types import TypeEnv
 
 
-from ..errors import CussError
+from ..errors import VulpesError
 
 from ..ast import Program
 from .symbol_table import SymbolTable
@@ -25,7 +25,7 @@ class Pass(ABC):
         if program:
             self.program = program
             self.symbol_table = SymbolTable()
-            self.errors: List[CussError] = []
+            self.errors: List[VulpesError] = []
             self.type_env = TypeEnv()
         elif previous_pass:
             self.program = previous_pass.program

@@ -17,7 +17,7 @@ from ..ast import (
     VarDecl,
     While,
 )
-from ..errors import CussError, NameResolutionError
+from ..errors import VulpesError, NameResolutionError
 from .base_pass import Pass
 from .symbol_table import Symbol
 
@@ -35,7 +35,7 @@ class NameDeclarationPass(Pass):
 
     def add_symbol(self, name: str, ast_id: int, line: int) -> Optional[Symbol]:
         res = self.symbol_table.add_symbol(name, ast_id, line, self.program)
-        if isinstance(res, CussError):
+        if isinstance(res, VulpesError):
             self.errors.append(res)
             return None
         else:
