@@ -180,6 +180,7 @@ def test_if_stmt():
     """
     )
     program = parse(source)
+    assert isinstance(program.declarations[0], FnDecl)
     fn_body = program.declarations[0].body
     const_a = fn_body[0]
     assert isinstance(const_a, VarDecl)
@@ -212,6 +213,7 @@ def test_while_stmt():
     """
     )
     program = parse(source)
+    assert isinstance(program.declarations[0], FnDecl)
     fn_body = program.declarations[0].body
     while_stmt = fn_body[1]
     assert isinstance(while_stmt, While)
@@ -233,6 +235,7 @@ def test_continue_stmt():
     """
     )
     program = parse(source)
+    assert isinstance(program.declarations[0], FnDecl)
     fn_body = program.declarations[0].body
     assert isinstance(fn_body[0], Loop)
     loop_body = fn_body[0].body
@@ -251,6 +254,7 @@ def test_assigns():
     """
     )
     program = parse(source)
+    assert isinstance(program.declarations[0], FnDecl)
     fn_body = program.declarations[0].body
     assert isinstance(fn_body[0], VarDecl)
     assert fn_body[0].name == "a"
@@ -274,6 +278,7 @@ def test_loop():
     """
     )
     program = parse(source)
+    assert isinstance(program.declarations[0], FnDecl)
     fn_body = program.declarations[0].body
     assert isinstance(fn_body[0], VarDecl)
     assert isinstance(fn_body[1], Loop)
@@ -295,6 +300,7 @@ def test_array_expr():
     """
     )
     program = parse(source)
+    assert isinstance(program.declarations[0], FnDecl)
     fn_body = program.declarations[0].body
     assert isinstance(fn_body[0], VarDecl)
     const_a = fn_body[0]
@@ -324,6 +330,7 @@ def test_binary_expr_chaining():
     """
     )
     program = parse(source)
+    assert isinstance(program.declarations[0], FnDecl)
     fn_body = program.declarations[0].body
     const_result = fn_body[0]
     assert isinstance(const_result, VarDecl)
@@ -353,6 +360,7 @@ def test_paren_expr_binding():
     """
     )
     program = parse(source)
+    assert isinstance(program.declarations[0], FnDecl)
     fn_body = program.declarations[0].body
     const_result = fn_body[0]
     assert isinstance(const_result, VarDecl)
@@ -427,6 +435,7 @@ def test_struct_exprs():
     """
     )
     program = parse(source)
+    assert isinstance(program.declarations[0], FnDecl)
     fn_body = program.declarations[0].body
     assert isinstance(fn_body[0], VarDecl)
     const_p = fn_body[0]
@@ -448,6 +457,7 @@ def test_enum_exprs():
     """
     )
     program = parse(source)
+    assert isinstance(program.declarations[0], FnDecl)
     fn_body = program.declarations[0].body
     assert isinstance(fn_body[0], VarDecl)
     color_enum = fn_body[0].expr
@@ -482,6 +492,7 @@ def test_method_calls():
     """
     )
     program = parse(source)
+    assert isinstance(program.declarations[0], FnDecl)
     fn_body = program.declarations[0].body
     return_stmt = fn_body[1]
     assert isinstance(return_stmt, Return)
@@ -505,6 +516,7 @@ def test_fn_calls():
     """
     )
     program = parse(source)
+    assert isinstance(program.declarations[0], FnDecl)
     fn_body = program.declarations[0].body
     assert isinstance(fn_body[0], Return)
     assert isinstance(fn_body[0].expr, Call)
@@ -526,6 +538,7 @@ def test_field_chaining():
     """
     )
     program = parse(source)
+    assert isinstance(program.declarations[0], FnDecl)
     fn_body = program.declarations[0].body
     assert isinstance(fn_body[0], Return)
     assert isinstance(fn_body[0].expr, AccessField)
@@ -547,6 +560,7 @@ def test_expr_stmt():
     """
     )
     program = parse(source)
+    assert isinstance(program.declarations[0], FnDecl)
     fn_body = program.declarations[0].body
     assert isinstance(fn_body[0], BinaryOp)
     binary_op = fn_body[0]
@@ -569,6 +583,7 @@ def test_fn_ret_fn():
     """
     )
     program = parse(source)
+    assert isinstance(program.declarations[0], FnDecl)
     fn_body = program.declarations[0].body
     assert isinstance(fn_body[0], Return)
     assert isinstance(fn_body[0].expr, Call)
@@ -595,6 +610,7 @@ def test_tuple_expr():
     """
     )
     program = parse(source)
+    assert isinstance(program.declarations[0], FnDecl)
     fn_body = program.declarations[0].body
     assert isinstance(fn_body[0], Return)
     assert isinstance(fn_body[0].expr, TupleExpr)
@@ -686,6 +702,7 @@ def test_trait():
     trait_decl = program.declarations[0]
     assert isinstance(trait_decl, TraitDecl)
     assert trait_decl.name == "Animal"
+    assert trait_decl.bounds == None
     assert len(trait_decl.methods) == 2
     assert isinstance(trait_decl.methods[0], PartialTraitMethod)
     assert trait_decl.methods[0].name == "make_sound"
@@ -709,3 +726,19 @@ def test_trait():
     assert impl_decl.methods[1].name == "move"
     assert isinstance(impl_decl.methods[1].ret_type, NamedTypeAnnotation)
     assert impl_decl.methods[1].ret_type.name == "void"
+
+
+def test_trait_bounds():
+    source = textwrap.dedent(
+        """
+    trait Animal: Dog
+        fn make_sound() -> string
+        fn move() -> void
+    """
+    )
+    program = parse(source)
+    trait_decl = program.declarations[0]
+    assert isinstance(trait_decl, TraitDecl)
+    assert trait_decl.name == "Animal"
+    assert trait_decl.bounds == ["Dog"]
+    assert len(trait_decl.methods) == 2

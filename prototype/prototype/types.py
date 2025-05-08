@@ -1,6 +1,6 @@
 # Internal Type Representation
 from abc import ABC, abstractmethod
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 from .symbol import Symbol
 
@@ -368,10 +368,34 @@ class TypeVar(Type):
         return hash(self.name)
 
 
+class Trait:
+    """Represents a trait. A trait is a collection of methods that can be implemented by a type"""
+
+    __slots__ = ["name", "partial_methods", "required_traits", "methods"]
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.required_traits: List["Trait"] = []
+        self.methods: Dict[str, FunctionType] = {}
+        self.partial_methods: Dict[str, FunctionType] = {}
+
+    def add_method(self, name: str, fn_type: FunctionType) -> None:
+        self.methods[name] = fn_type
+
+    def get_method(self, name: str) -> Optional[FunctionType]:
+        return self.methods.get(name)
+
+    def add_partial_method(self, name: str, fn_type: FunctionType) -> None:
+        self.partial_methods[name] = fn_type
+
+    def get_partial_method(self, name: str) -> Optional[FunctionType]:
+        return self.partial_methods.get(name)
+
+
 class TypeEnv:
     """Contains a mapping of type name to their corresponding type"""
 
-    __slots__ = ["types"]
+    __slots__ = ["types", "traits"]
 
     def __init__(self) -> None:
         self.types: Dict[str, Type] = {
@@ -382,6 +406,7 @@ class TypeEnv:
             "char": CharType(),
             "void": VoidType(),
         }
+        self.traits: Dict[str, Trait] = {}
 
     def add_type(self, name: str, type: Type) -> None:
         self.types[name] = type
@@ -389,18 +414,8 @@ class TypeEnv:
     def get_type(self, name: str) -> Optional[Type]:
         return self.types.get(name)
 
+    def add_trait(self, name: str, trait: Trait) -> None:
+        self.traits[name] = trait
 
-class Trait:
-    """Represents a trait. A trait is a collection of methods that can be implemented by a type"""
-
-    __slots__ = ["name", "methods"]
-
-    def __init__(self, name: str) -> None:
-        self.name = name
-        self.methods: Dict[str, FunctionType] = {}
-
-    def add_method(self, name: str, fn_type: FunctionType) -> None:
-        self.methods[name] = fn_type
-
-    def get_method(self, name: str) -> Optional[FunctionType]:
-        return self.methods.get(name)
+    def get_trait(self, name: str) -> Optional[Trait]:
+        return self.traits.get(name)

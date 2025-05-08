@@ -26,6 +26,7 @@ from .ast import (
     FnDecl,
     FunctionTypeAnnotation,
     AccessField,
+    GenericTypeAnnotation,
     GetIndex,
     Ident,
     If,
@@ -45,6 +46,7 @@ from .ast import (
     TupleExpr,
     TupleTypeAnnotation,
     TypeAliasDecl,
+    TypeParam,
     UnaryOp,
     VarDecl,
     While,
@@ -94,15 +96,15 @@ cuss_grammar = r"""
     let_def: "let" IDENT [":" type_annotation] "=" expr
     assign_stmt: (IDENT | getindex | get_field) "=" expr
     
-    type_alias: [PUB] "type" IDENT "=" type_annotation
+    type_alias: [PUB] "type" IDENT [type_param_list] "=" type_annotation
 
-    fn_def: [PUB] "fn" IDENT "(" param_list ")" "->" type_annotation _NL* _INDENT statement_list _DEDENT
+    fn_def: [PUB] "fn" IDENT [type_param_list] "(" param_list ")" "->" type_annotation _NL* _INDENT statement_list _DEDENT
     
     param_list: [param ("," param)*]
     
     param: IDENT ":" type_annotation
     
-    enum_def: [PUB] "enum" IDENT _NL enum_variant_list
+    enum_def: [PUB] "enum" IDENT [type_param_list] _NL enum_variant_list
     
     ?enum_variant_list: [_INDENT (enum_variant _NL)* _DEDENT]
     
@@ -118,28 +120,37 @@ cuss_grammar = r"""
         | enum_unit_variant -> unit_enum_variant
         | enum_struct_variant -> struct_enum_variant
 
-    struct_def: [PUB] "struct" IDENT _NL struct_field_list
+    struct_def: [PUB] "struct" IDENT [type_param_list] _NL struct_field_list
     
     ?struct_field_list: [_INDENT (struct_field _NL)* _DEDENT]
     
     struct_field: [PUB] IDENT ":" type_annotation
     
-    impl_def: "impl" IDENT ["for" IDENT] _NL _INDENT _NL* fn_def (_NL* fn_def)* [_NL*] _DEDENT
+    impl_def: "impl" [type_param_list] type_annotation ["for" type_annotation] _NL _INDENT _NL* fn_def (_NL* fn_def)* [_NL*] _DEDENT
     
-    trait_def: [PUB] "trait" IDENT _NL _INDENT _NL* trait_method (_NL* trait_method)* [_NL*] _DEDENT
+    trait_def: [PUB] "trait" IDENT [type_param_list] [":" trait_bounds] _NL _INDENT _NL* trait_method (_NL* trait_method)* [_NL*] _DEDENT
+    
+    trait_bounds: IDENT ("+" IDENT)*
     
     trait_method: [PUB] "fn" IDENT "(" param_list ")" "->" type_annotation trait_method_body
 
     trait_method_body: _NL _INDENT statement_list _DEDENT
                     | _NL
 
+    type_param: IDENT [":" trait_bounds]
+    
+    type_param_list: "<" type_param ("," type_param)* ">"
+
     type_annotation: IDENT -> named_type
         | "[" type_annotation "]" -> array_type
         | "(" [type_annotation ("," type_annotation)*] ")" -> tuple_type
         | function_type -> function_type
+        | generic_type -> generic_type
     
     function_type: "(" [type_annotation ("," type_annotation)*] ")" "->" type_annotation
     
+    generic_type: IDENT "<" type_annotation ("," type_annotation)* ">"
+
     ?expr: logical_or
 
     ?logical_or: logical_and
@@ -274,8 +285,16 @@ class ASTTransformer(Transformer):
     def function_type(self, items):
         *params, ret = items
         return FunctionTypeAnnotation(params, ret, ret.line)
+    
+    def generic_type(self, items):
+        name_tok, *type_params = items
+        return GenericTypeAnnotation(name_tok.value, type_params, name_tok.line)
 
     # ---------- parameters / fields ----------
+    def type_param(self, items):
+        name_tok, bounds = items
+        return TypeParam(name_tok.value, bounds, name_tok.line)
+    
     def param(self, items):
         name_tok, type_ann = items
         return Param(name_tok.value, type_ann, type_ann.line)
@@ -321,6 +340,7 @@ class ASTTransformer(Transformer):
 
     # ---------- declarations ----------
     def fn_def(self, items):
+        # TODO: add type params
         idx = 0
         pub = items[idx] != None and items[idx].type == "PUB"
         idx += 1
@@ -337,6 +357,7 @@ class ASTTransformer(Transformer):
         return FnDecl(pub, name_tok.value, params, ret_type, body, name_tok.line)
 
     def struct_def(self, items):
+        # TODO: add type params
         idx = 0
         pub = items[idx] != None and items[idx].type == "PUB"
         idx += 1
@@ -346,6 +367,7 @@ class ASTTransformer(Transformer):
         return StructDecl(pub, name_tok.value, fields, name_tok.line)
 
     def enum_def(self, items):
+        # TODO: add type params
         idx = 0
         pub = items[idx] != None and items[idx].type == "PUB"
         idx += 1
@@ -355,6 +377,7 @@ class ASTTransformer(Transformer):
         return EnumDecl(pub, name_tok.value, variants, name_tok.line)
 
     def type_alias(self, items):
+        # TODO: add type params
         idx = 0
         pub = items[idx] != None and items[idx].type == "PUB"
         idx += 1
@@ -364,6 +387,7 @@ class ASTTransformer(Transformer):
         return TypeAliasDecl(pub, name_tok.value, type_ann, name_tok.line)
 
     def impl_def(self, items):
+        # TODO: add type params
         idx = 0
         # get the first ident
         first_ident = items[idx]
@@ -391,13 +415,19 @@ class ASTTransformer(Transformer):
             return items[0]
 
     def trait_def(self, items):
+        # TODO: add type params
         idx = 0
         pub = items[idx] != None and items[idx].type == "PUB"
         idx += 1
         name_tok = items[idx]
         idx += 1
+        bounds = items[idx]
+        idx += 1
         methods = items[idx:]
-        return TraitDecl(pub, name_tok.value, methods, name_tok.line)
+        return TraitDecl(pub, name_tok.value, bounds, methods, name_tok.line)
+
+    def trait_bounds(self, items):
+        return items
 
     def trait_method(self, items):
         idx = 0
@@ -417,6 +447,7 @@ class ASTTransformer(Transformer):
                 pub, name_tok.value, params, ret_type, name_tok.line
             )
         else:
+            # TODO: add type params
             return FnDecl(pub, name_tok.value, params, ret_type, body, name_tok.line)
 
     # ---------- statements ----------

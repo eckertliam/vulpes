@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Set, Union
+from typing import Dict, Optional, Set, Tuple, Union
 
 from ..errors import TypeInferenceError
 from .name_ref_pass import NameReferencePass
@@ -17,6 +17,7 @@ from ..ast import (
     ImplDecl,
     Loop,
     NamedTypeAnnotation,
+    PartialTraitMethod,
     Statement,
     StructDecl,
     TraitDecl,
@@ -35,6 +36,7 @@ from ..types import (
     EnumVariantType,
     FunctionType,
     StructType,
+    Trait,
     TupleType,
     Type,
     TypeVar,
@@ -42,7 +44,7 @@ from ..types import (
 
 
 # TODO: add docstrings to all methods
-
+# TODO: add type param handling and resolution
 
 class TypeResolutionPass(Pass):
     """
@@ -59,6 +61,7 @@ class TypeResolutionPass(Pass):
         self.visited_type_aliases: Set[int] = set()
         self.visited_enums: Set[int] = set()
         self.visited_structs: Set[int] = set()
+        self.visited_traits: Set[int] = set()
 
     def convert_type_annotation_top_level(
         self, type_annotation: TypeAnnotation, decl_line: int, decl_id: int
@@ -190,12 +193,76 @@ class TypeResolutionPass(Pass):
         elif isinstance(type_decl, TraitDecl):
             self.visit_trait_decl(type_decl)
         else:
-            raise RuntimeError(f"Unknown type declaration {type_decl}")
+            pass  # just ignore other declarations
 
     def visit_trait_decl(self, trait_decl: TraitDecl) -> None:
-        # TODO: implement trait_decl
-        # NOTE: we need to handle params with the Self type
-        raise NotImplementedError("TraitDecl not implemented in type_res_pass")
+        # make sure we have not already visited this trait
+        if trait_decl.id in self.visited_traits:
+            return
+        # mark as being visited
+        self.visited_traits.add(trait_decl.id)
+        # we create the trait
+        trait = Trait(trait_decl.name)
+        # we add the trait to the type env
+        self.type_env.add_trait(trait_decl.name, trait)
+        # we need to convert the bounds
+        if trait_decl.bounds is not None:
+            for bound in trait_decl.bounds:
+                bound_trait = self.type_env.get_trait(bound)
+                if bound_trait is None:
+                    # look the bound up in the global scope
+                    # run visit trait on it
+                    trait_symbol = self.symbol_table.lookup_global(bound)
+                    if trait_symbol is None:
+                        self.errors.append(
+                            TypeInferenceError(
+                                f"Undefined trait {bound}",
+                                trait_decl.line,
+                                trait_decl.id,
+                            )
+                        )
+                        return
+                    # get the ast node of the trait declaration
+                    trait_decl_node = self.program.get_node(trait_symbol.ast_id)
+                    if trait_decl_node is None:
+                        raise RuntimeError("Cannot find node for trait declaration")
+                    if not isinstance(trait_decl_node, TraitDecl):
+                        self.errors.append(
+                            TypeInferenceError(
+                                f"Trait {bound} is not a trait",
+                                trait_decl.line,
+                                trait_decl.id,
+                            )
+                        )
+                        return
+                    # run visit trait on it
+                    self.visit_trait_decl(trait_decl_node)
+                    # now set the bound trait by looking it up in the type env
+                    bound_trait = self.type_env.get_trait(bound)
+                    if bound_trait is None:  # if its still none its unresolvable
+                        self.errors.append(
+                            TypeInferenceError(
+                                f"Trait {bound} cannot be resolved",
+                                trait_decl.line,
+                                trait_decl.id,
+                            )
+                        )
+                        return
+                # now we add the bound trait to the trait
+                trait.required_traits.append(bound_trait)
+        # we enter the trait's scope
+        self.symbol_table.enter_scope(trait_decl.id)
+        # we visit the methods
+        for method in trait_decl.methods:
+            self.visit_trait_method(method, trait)
+        # we exit the trait's scope and everything has been handled
+        self.symbol_table.exit_scope()
+
+    def visit_trait_method(
+        self, method: Union[FnDecl, PartialTraitMethod], trait: Trait
+    ) -> None:
+        # TODO: add trait method handling
+        raise NotImplementedError("Trait method handling not implemented")
 
     def visit_type_alias_decl(self, type_alias_decl: TypeAliasDecl) -> None:
         # check if this alias is already being visited (i.e. recursion)

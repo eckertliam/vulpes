@@ -22,7 +22,7 @@ from .base_pass import Pass
 from .symbol_table import Symbol
 
 # TODO: add docstrings to all methods
-
+# TODO: add type param handling
 
 # Pass 1: Name Declaration Pass
 class NameDeclarationPass(Pass):
@@ -115,13 +115,11 @@ class NameDeclarationPass(Pass):
         self.symbol_table.enter_scope(trait.id)
         # we add all the methods to the trait's scope
         for method in trait.methods:
-            self.trait_method_decl(method, trait.symbol)
+            self.trait_method_decl(method)
         # we exit the trait's scope
         self.symbol_table.exit_scope()
 
-    def trait_method_decl(
-        self, method: Union[FnDecl, PartialTraitMethod], trait_type: Symbol
-    ) -> None:
+    def trait_method_decl(self, method: Union[FnDecl, PartialTraitMethod]) -> None:
         # we add the method to the current scope
         res = self.add_symbol(method.name, method.id, method.line)
         if res is None:
