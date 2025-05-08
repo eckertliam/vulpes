@@ -132,7 +132,7 @@ grammar = r"""
     
     trait_bounds: IDENT ("+" IDENT)*
     
-    trait_method: [PUB] "fn" IDENT "(" param_list ")" "->" type_annotation trait_method_body
+    trait_method: [PUB] "fn" IDENT [type_param_list] "(" param_list ")" "->" type_annotation trait_method_body
 
     trait_method_body: _NL _INDENT statement_list _DEDENT
                     | _NL
@@ -149,8 +149,10 @@ grammar = r"""
     
     function_type: "(" [type_annotation ("," type_annotation)*] ")" "->" type_annotation
     
-    generic_type: IDENT "<" type_annotation ("," type_annotation)* ">"
-
+    generic_type: IDENT type_arg_list
+    
+    type_arg_list: "<" type_annotation ("," type_annotation)* ">"
+    
     ?expr: logical_or
 
     ?logical_or: logical_and
@@ -185,8 +187,8 @@ grammar = r"""
         | get_field
         | call_method
         
-    call: molecule "(" arglist ")"
-    call_method: molecule "." IDENT "(" arglist ")"
+    call: molecule [type_arg_list] "(" arglist ")"
+    call_method: molecule "." IDENT [type_arg_list] "(" arglist ")"
     getindex: molecule "[" expr "]"
     get_field: molecule "." IDENT
         
@@ -199,10 +201,10 @@ grammar = r"""
         | TRUE -> true
         | FALSE -> false
         | "[" [expr ("," expr)*] "]" -> array_expr
-        | IDENT "{" field_init_list "}" -> struct_expr
-        | IDENT "::" IDENT "{" field_init_list "}" -> enum_struct_expr
-        | IDENT "::" IDENT "(" [expr ("," expr)*] ")" -> enum_tuple_expr
-        | IDENT "::" IDENT -> enum_unit_expr
+        | IDENT [type_arg_list] "{" field_init_list "}" -> struct_expr
+        | IDENT [type_arg_list] "::" IDENT "{" field_init_list "}" -> enum_struct_expr
+        | IDENT [type_arg_list] "::" IDENT "(" [expr ("," expr)*] ")" -> enum_tuple_expr
+        | IDENT [type_arg_list] "::" IDENT -> enum_unit_expr
         
     field_init_list: [ field_init ("," field_init)* ]
     field_init: IDENT ":" expr
@@ -285,16 +287,22 @@ class ASTTransformer(Transformer):
     def function_type(self, items):
         *params, ret = items
         return FunctionTypeAnnotation(params, ret, ret.line)
-    
+
     def generic_type(self, items):
-        name_tok, *type_params = items
-        return GenericTypeAnnotation(name_tok.value, type_params, name_tok.line)
+        if isinstance(items[0], GenericTypeAnnotation):
+            return items[0]
+        else:
+            name_tok, *type_params = items
+            return GenericTypeAnnotation(name_tok.value, type_params, name_tok.line)
 
     # ---------- parameters / fields ----------
     def type_param(self, items):
         name_tok, bounds = items
         return TypeParam(name_tok.value, bounds, name_tok.line)
-    
+
+    def type_param_list(self, items):
+        return items
+
     def param(self, items):
         name_tok, type_ann = items
         return Param(name_tok.value, type_ann, type_ann.line)
@@ -340,11 +348,12 @@ class ASTTransformer(Transformer):
 
     # ---------- declarations ----------
     def fn_def(self, items):
-        # TODO: add type params
         idx = 0
         pub = items[idx] != None and items[idx].type == "PUB"
         idx += 1
         name_tok = items[idx]
+        idx += 1
+        type_params = items[idx]
         idx += 1
         params = items[idx]
         # filter None from params
@@ -354,59 +363,69 @@ class ASTTransformer(Transformer):
         idx += 1
         body = items[idx]
         assert isinstance(name_tok.value, str), "name_tok.value is not a str in fn_def"
-        return FnDecl(pub, name_tok.value, params, ret_type, body, name_tok.line)
+        return FnDecl(
+            pub, name_tok.value, type_params, params, ret_type, body, name_tok.line
+        )
 
     def struct_def(self, items):
-        # TODO: add type params
         idx = 0
         pub = items[idx] != None and items[idx].type == "PUB"
         idx += 1
         name_tok = items[idx]
         idx += 1
-        fields = items[idx] if len(items) > idx else []
-        return StructDecl(pub, name_tok.value, fields, name_tok.line)
+        type_params = items[idx]
+        idx += 1
+        fields = items[idx:] if len(items) > idx else []
+        # flatten the fields
+        new_fields = []
+        for field in fields:
+            if isinstance(field, list):
+                new_fields.extend(field)
+            else:
+                new_fields.append(field)
+        fields = new_fields
+        return StructDecl(pub, name_tok.value, type_params, fields, name_tok.line)
 
     def enum_def(self, items):
-        # TODO: add type params
         idx = 0
         pub = items[idx] != None and items[idx].type == "PUB"
         idx += 1
         name_tok = items[idx]
+        idx += 1
+        type_params = items[idx]
         idx += 1
         variants = items[idx] if len(items) > idx else []
-        return EnumDecl(pub, name_tok.value, variants, name_tok.line)
+        return EnumDecl(pub, name_tok.value, type_params, variants, name_tok.line)
 
     def type_alias(self, items):
-        # TODO: add type params
         idx = 0
         pub = items[idx] != None and items[idx].type == "PUB"
         idx += 1
         name_tok = items[idx]
         idx += 1
+        type_params = items[idx]
+        idx += 1
         type_ann = items[idx]
-        return TypeAliasDecl(pub, name_tok.value, type_ann, name_tok.line)
+        return TypeAliasDecl(pub, name_tok.value, type_params, type_ann, name_tok.line)
 
     def impl_def(self, items):
-        # TODO: add type params
         idx = 0
-        # get the first ident
-        first_ident = items[idx]
+        type_params = items[idx]
         idx += 1
-        name = None
-        trait = None
-        # if the next token is an IDENT its the name of data structure impling the trait
-        if isinstance(items[idx], Token) and items[idx].type == "IDENT":
-            trait = first_ident.value
-            name = items[idx].value
-        else:  # if there isnt a second ident the first ident is the name of the data structure
-            name = first_ident.value
-        idx += 1  # skip over the name or none either way
+        # get the first type annotation
+        first_type_ann = items[idx]
+        idx += 1
+        impl_type = None
+        trait_type = None
+        # if the next token not None then it is the impl type
+        if items[idx] is not None:
+            impl_type = items[idx]
+            trait_type = first_type_ann
+        else:
+            impl_type = first_type_ann
+        idx += 1  # skip over the type annotation
         methods = items[idx:]  # methods are the rest of the items
-        assert isinstance(name, str), "name is not a str in impl_def"
-        assert isinstance(
-            first_ident.line, int
-        ), "first_ident.line is not an int in impl_def"
-        return ImplDecl(name, methods, first_ident.line, trait)
+        return ImplDecl(type_params, trait_type, impl_type, methods, impl_type.line)
 
     def trait_method_body(self, items):
         if len(items) == 0:
@@ -415,16 +434,19 @@ class ASTTransformer(Transformer):
             return items[0]
 
     def trait_def(self, items):
-        # TODO: add type params
         idx = 0
         pub = items[idx] != None and items[idx].type == "PUB"
         idx += 1
         name_tok = items[idx]
         idx += 1
+        type_params = items[idx]
+        idx += 1
         bounds = items[idx]
         idx += 1
         methods = items[idx:]
-        return TraitDecl(pub, name_tok.value, bounds, methods, name_tok.line)
+        return TraitDecl(
+            pub, name_tok.value, type_params, bounds, methods, name_tok.line
+        )
 
     def trait_bounds(self, items):
         return items
@@ -435,6 +457,8 @@ class ASTTransformer(Transformer):
         idx += 1
         name_tok = items[idx]
         idx += 1
+        type_params = items[idx]
+        idx += 1
         params = items[idx]
         # filter None from params
         params = [param for param in params if param is not None]
@@ -444,11 +468,12 @@ class ASTTransformer(Transformer):
         body = items[idx]
         if body is None:
             return PartialTraitMethod(
-                pub, name_tok.value, params, ret_type, name_tok.line
+                pub, name_tok.value, type_params, params, ret_type, name_tok.line
             )
         else:
-            # TODO: add type params
-            return FnDecl(pub, name_tok.value, params, ret_type, body, name_tok.line)
+            return FnDecl(
+                pub, name_tok.value, type_params, params, ret_type, body, name_tok.line
+            )
 
     # ---------- statements ----------
     def statement(self, items):
@@ -525,12 +550,12 @@ class ASTTransformer(Transformer):
         return GetIndex(obj, index, obj.line)
 
     def call(self, items):
-        callee, args = items
-        return Call(callee, args, callee.line)
+        callee, type_args, args = items
+        return Call(callee, type_args, args, callee.line)
 
     def call_method(self, items):
-        obj, attr, args = items
-        return CallMethod(obj, attr.value, args, obj.line)
+        obj, type_args, attr, args = items
+        return CallMethod(obj, type_args, attr.value, args, obj.line)
 
     def get_field(self, items):
         obj, attr = items
@@ -633,20 +658,24 @@ class ASTTransformer(Transformer):
         return items
 
     def struct_expr(self, items):
-        name_tok, fields = items
-        return StructExpr(name_tok.value, fields, name_tok.line)
+        name_tok, type_args, fields = items
+        return StructExpr(name_tok.value, type_args, fields, name_tok.line)
 
     def enum_struct_expr(self, items):
-        name_tok, unit_tok, fields = items
-        return EnumStructExpr(name_tok.value, unit_tok.value, fields, name_tok.line)
+        name_tok, type_args, unit_tok, fields = items
+        return EnumStructExpr(
+            name_tok.value, type_args, unit_tok.value, fields, name_tok.line
+        )
 
     def enum_tuple_expr(self, items):
-        name_tok, unit_tok, *elems = items
-        return EnumTupleExpr(name_tok.value, unit_tok.value, elems, name_tok.line)
+        name_tok, type_args, unit_tok, *elems = items
+        return EnumTupleExpr(
+            name_tok.value, type_args, unit_tok.value, elems, name_tok.line
+        )
 
     def enum_unit_expr(self, items):
-        name_tok, unit_tok = items
-        return EnumUnitExpr(name_tok.value, unit_tok.value, name_tok.line)
+        name_tok, type_args, unit_tok = items
+        return EnumUnitExpr(name_tok.value, type_args, unit_tok.value, name_tok.line)
 
     def arglist(self, items):
         return items

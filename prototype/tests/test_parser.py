@@ -1,5 +1,6 @@
 from prototype.ast import (
     ArrayExpr,
+    ArrayTypeAnnotation,
     Assign,
     BinaryOp,
     Break,
@@ -16,9 +17,11 @@ from prototype.ast import (
     EnumUnitExpr,
     EnumUnitVariant,
     FieldInit,
+    GenericTypeAnnotation,
     GetIndex,
     AccessField,
     NamedTypeAnnotation,
+    Param,
     PartialTraitMethod,
     String,
     StructExpr,
@@ -33,6 +36,7 @@ from prototype.ast import (
     StructDecl,
     TupleTypeAnnotation,
     TypeAnnotation,
+    TypeParam,
     VarDecl,
     While,
     Program,
@@ -395,7 +399,9 @@ def test_impl():
     program = parse(source)
     impl_decl = program.declarations[0]
     assert isinstance(impl_decl, ImplDecl)
-    assert impl_decl.name == "Animal"
+    assert impl_decl.type_params == None
+    assert isinstance(impl_decl.impl_type, NamedTypeAnnotation)
+    assert impl_decl.impl_type.name == "Animal"
     assert len(impl_decl.methods) == 2
     method = impl_decl.methods[0]
     assert isinstance(method, FnDecl)
@@ -715,8 +721,11 @@ def test_trait():
 
     impl_decl = program.declarations[2]
     assert isinstance(impl_decl, ImplDecl)
-    assert impl_decl.name == "Dog"
-    assert impl_decl.trait == "Animal"
+    assert impl_decl.type_params == None
+    assert isinstance(impl_decl.impl_type, NamedTypeAnnotation)
+    assert impl_decl.impl_type.name == "Dog"
+    assert isinstance(impl_decl.trait, NamedTypeAnnotation)
+    assert impl_decl.trait.name == "Animal"
     assert len(impl_decl.methods) == 2
     assert isinstance(impl_decl.methods[0], FnDecl)
     assert impl_decl.methods[0].name == "make_sound"
@@ -742,3 +751,125 @@ def test_trait_bounds():
     assert trait_decl.name == "Animal"
     assert trait_decl.bounds == ["Dog"]
     assert len(trait_decl.methods) == 2
+
+
+def test_type_alias_type_params():
+    source = textwrap.dedent(
+        """
+    type Vec<T> = [T]
+    """
+    )
+    program = parse(source)
+    type_alias_decl = program.declarations[0]
+    assert isinstance(type_alias_decl, TypeAliasDecl)
+    assert type_alias_decl.name == "Vec"
+    assert isinstance(type_alias_decl.type_params, list)
+    assert len(type_alias_decl.type_params) == 1
+    type_param = type_alias_decl.type_params[0]
+    assert isinstance(type_param, TypeParam)
+    assert type_param.name == "T"
+    assert type_param.bounds == None
+    assert isinstance(type_alias_decl.type_annotation, ArrayTypeAnnotation)
+    assert isinstance(type_alias_decl.type_annotation.elem_type, NamedTypeAnnotation)
+    assert type_alias_decl.type_annotation.elem_type.name == "T"
+
+
+def test_fn_type_params():
+    source = textwrap.dedent(
+        """
+    fn add<T: Add>(a: T, b: T) -> T
+        return a + b
+    """
+    )
+    program = parse(source)
+    fn_decl = program.declarations[0]
+    assert isinstance(fn_decl, FnDecl)
+    assert isinstance(fn_decl.type_params, list)
+    assert len(fn_decl.type_params) == 1
+    type_param = fn_decl.type_params[0]
+    assert isinstance(type_param, TypeParam)
+    assert type_param.name == "T"
+    assert type_param.bounds == ["Add"]
+    assert isinstance(fn_decl.ret_type, NamedTypeAnnotation)
+    assert fn_decl.ret_type.name == "T"
+    assert len(fn_decl.params) == 2
+    assert isinstance(fn_decl.params[0], Param)
+    assert isinstance(fn_decl.params[1], Param)
+
+
+def test_impl_type_params():
+    source = textwrap.dedent(
+        """
+    struct Point
+        x: int
+        y: int
+    
+    impl Add<Point> for Point
+        fn add(a: Point, b: Point) -> Point
+            return Point { x: a.x + b.x, y: a.y + b.y }
+    """
+    )
+    program = parse(source)
+    impl_decl = program.declarations[1]
+    assert isinstance(impl_decl, ImplDecl)
+    assert impl_decl.type_params == None
+    assert isinstance(impl_decl.impl_type, NamedTypeAnnotation)
+    assert impl_decl.impl_type.name == "Point"
+    assert isinstance(impl_decl.trait, GenericTypeAnnotation)
+    assert impl_decl.trait.name == "Add"
+    assert len(impl_decl.trait.type_args) == 1
+    type_arg = impl_decl.trait.type_args[0]
+    assert isinstance(type_arg, NamedTypeAnnotation)
+    assert type_arg.name == "Point"
+
+
+def test_generic_enum():
+    source = textwrap.dedent(
+        """
+    enum Option<T>
+        Some(T)
+        None
+    """
+    )
+    program = parse(source)
+    enum_decl = program.declarations[0]
+    assert isinstance(enum_decl, EnumDecl)
+    assert isinstance(enum_decl.type_params, list)
+    assert len(enum_decl.type_params) == 1
+    type_param = enum_decl.type_params[0]
+    assert isinstance(type_param, TypeParam)
+    assert type_param.name == "T"
+    assert type_param.bounds == None
+    assert len(enum_decl.variants) == 2
+    some_variant = enum_decl.variants[0]
+    assert isinstance(some_variant, EnumTupleVariant)
+    assert some_variant.name == "Some"
+    assert len(some_variant.types) == 1
+    assert isinstance(some_variant.types[0], NamedTypeAnnotation)
+    assert some_variant.types[0].name == "T"
+    none_variant = enum_decl.variants[1]
+    assert isinstance(none_variant, EnumUnitVariant)
+    assert none_variant.name == "None"
+
+
+def test_generic_struct():
+    source = textwrap.dedent(
+        """
+    struct Container<T>
+        value: T
+    """
+    )
+    program = parse(source)
+    struct_decl = program.declarations[0]
+    assert isinstance(struct_decl, StructDecl)
+    assert isinstance(struct_decl.type_params, list)
+    assert len(struct_decl.type_params) == 1
+    type_param = struct_decl.type_params[0]
+    assert isinstance(type_param, TypeParam)
+    assert type_param.name == "T"
+    assert type_param.bounds == None
+    assert len(struct_decl.fields) == 1
+    assert isinstance(struct_decl.fields[0], StructField)
+    assert struct_decl.fields[0].name == "value"
+    assert isinstance(struct_decl.fields[0].type_annotation, NamedTypeAnnotation)
+    assert struct_decl.fields[0].type_annotation.name == "T"

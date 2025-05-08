@@ -1,6 +1,6 @@
 # Internal Type Representation
 from abc import ABC, abstractmethod
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Union
 
 from .symbol import Symbol
 
@@ -147,24 +147,40 @@ class TupleType(Type):
 class FunctionType(Type):
     """Represents a function type"""
 
-    __slots__ = ["params", "ret_type"]
+    __slots__ = ["type_vars", "params", "ret_type"]
 
-    def __init__(self, params: list[Type], ret_type: Type) -> None:
+    def __init__(
+        self, type_vars: Dict[str, "TypeVar"], params: list[Type], ret_type: Type
+    ) -> None:
+        self.type_vars = type_vars
         self.params = params
         self.ret_type = ret_type
 
     def __str__(self) -> str:
-        return f"({', '.join(str(t) for t in self.params)}) -> {self.ret_type}"
+        tvs = (
+            f"<{', '.join(str(t) for t in self.type_vars.values())}>"
+            if self.type_vars
+            else ""
+        )
+        return f"{tvs}({', '.join(str(t) for t in self.params)}) -> {self.ret_type}"
 
     def __eq__(self, other: "Type") -> bool:
         return (
             isinstance(other, FunctionType)
+            and self.type_vars == other.type_vars
             and self.params == other.params
             and self.ret_type == other.ret_type
         )
 
     def __hash__(self) -> int:
-        return hash(("fn", tuple(hash(t) for t in self.params), hash(self.ret_type)))
+        return hash(
+            (
+                "fn",
+                tuple(hash(t) for t in self.params),
+                hash(self.ret_type),
+                tuple(hash(t) for t in self.type_vars.values()),
+            )
+        )
 
 
 class SelfType(Type):
@@ -187,10 +203,13 @@ class SelfType(Type):
 class StructType(Type):
     """Represents a struct type. Tracks methods and traits implemented by the struct"""
 
-    __slots__ = ["name", "fields", "methods", "traits"]
+    __slots__ = ["name", "type_vars", "fields", "methods", "traits"]
 
-    def __init__(self, name: str, fields: Dict[str, Type]) -> None:
+    def __init__(
+        self, name: str, type_vars: Dict[str, "TypeVar"], fields: Dict[str, Type]
+    ) -> None:
         self.name = name
+        self.type_vars = type_vars
         self.fields = fields
         self.methods: Dict[str, Symbol] = {}
         self.traits: Dict[str, Trait] = {}
@@ -314,10 +333,16 @@ class EnumStructVariantType(EnumVariantType):
 class EnumType(Type):
     """Represents an enum type. Tracks methods and traits implemented by the enum"""
 
-    __slots__ = ["name", "variants", "methods", "traits"]
+    __slots__ = ["name", "type_vars", "variants", "methods", "traits"]
 
-    def __init__(self, name: str, variants: list[EnumVariantType]) -> None:
+    def __init__(
+        self,
+        name: str,
+        type_vars: Dict[str, "TypeVar"],
+        variants: list[EnumVariantType],
+    ) -> None:
         self.name = name
+        self.type_vars = type_vars
         self.variants: Dict[str, EnumVariantType] = {v.name: v for v in variants}
         self.methods: Dict[str, Symbol] = {}
         self.traits: Dict[str, Trait] = {}
@@ -342,8 +367,31 @@ class EnumType(Type):
         )
 
 
-class TypeVar(Type):
-    """Represents a type variable. A unique identifier for a type that is not known until type inference"""
+class GenericType(Type):
+    """Represents an instantiation of a generic type, will be monomorphized during type checking"""
+
+    __slots__ = ["base_type", "type_args"]
+
+    def __init__(self, base_type: Union[StructType, EnumType], type_args: List[Type]) -> None:
+        self.base_type = base_type
+        self.type_args = type_args
+
+    def __str__(self) -> str:
+        return f"{self.base_type.name}<{', '.join(str(t) for t in self.type_args)}>"
+
+    def __eq__(self, other: "Type") -> bool:
+        return (
+            isinstance(other, GenericType)
+            and self.base_type == other.base_type
+            and self.type_args == other.type_args
+        )
+
+    def __hash__(self) -> int:
+        return hash(("generic", self.base_type, tuple(hash(t) for t in self.type_args)))
+
+
+class TypeHole(Type):
+    """Represents a type hole. A unique identifier for a type that is not known until type inference"""
 
     __slots__ = ["name"]
 
@@ -351,31 +399,82 @@ class TypeVar(Type):
     _next_numeric = 0
 
     def __init__(self) -> None:
-        self.name = f"{TypeVar._next_alpha}{TypeVar._next_numeric}"
-        if TypeVar._next_numeric == 9:
-            TypeVar._next_alpha = chr(ord(TypeVar._next_alpha) + 1)
-            TypeVar._next_numeric = 0
+        self.name = f"{TypeHole._next_alpha}{TypeHole._next_numeric}"
+        if TypeHole._next_numeric == 9:
+            TypeHole._next_alpha = chr(ord(TypeHole._next_alpha) + 1)
+            TypeHole._next_numeric = 0
         else:
-            TypeVar._next_numeric += 1
+            TypeHole._next_numeric += 1
 
     def __str__(self) -> str:
         return self.name
 
     def __eq__(self, other: "Type") -> bool:
-        return isinstance(other, TypeVar) and self.name == other.name
+        return isinstance(other, TypeHole) and self.name == other.name
 
     def __hash__(self) -> int:
         return hash(self.name)
 
 
+class TraitBound(Type):
+    """Represents a trait bound. A trait bound is a type that is a trait"""
+
+    __slots__ = ["name", "type_args"]
+
+    def __init__(self, name: str, type_args: Optional[List[Type]] = None) -> None:
+        self.name = name
+        self.type_args = type_args
+
+    def __str__(self) -> str:
+        tas = f"<{', '.join(str(t) for t in self.type_args)}>" if self.type_args else ""
+        return f"{self.name}{tas}"
+
+    def __eq__(self, other: "Type") -> bool:
+        return (
+            isinstance(other, TraitBound)
+            and self.name == other.name
+            and self.type_args == other.type_args
+        )
+
+    def __hash__(self) -> int:
+        if self.type_args:
+            return hash(("trait_bound", self.name, tuple(hash(t) for t in self.type_args)))
+        else:
+            return hash(("trait_bound", self.name))
+
+
+class TypeVar(Type):
+    """Represent a type variable. Derived from type parameters, contains trait bounds and a name"""
+
+    __slots__ = ["name", "bounds"]
+
+    def __init__(self, name: str, bounds: Dict[str, TraitBound]) -> None:
+        self.name = name
+        self.bounds = bounds
+
+    def __str__(self) -> str:
+        return f"{self.name} : {', '.join(str(b) for b in self.bounds)}"
+
+    def __eq__(self, other: "Type") -> bool:
+        return (
+            isinstance(other, TypeVar)
+            and self.name == other.name
+            and self.bounds == other.bounds
+        )
+
+    def __hash__(self) -> int:
+        return hash(("type_var", self.name, tuple(hash(b) for b in self.bounds.values())))
+
+
 class Trait:
     """Represents a trait. A trait is a collection of methods that can be implemented by a type"""
 
-    __slots__ = ["name", "partial_methods", "required_traits", "methods"]
+    __slots__ = ["name", "type_vars", "bounds", "methods", "partial_methods"]
 
     def __init__(self, name: str) -> None:
         self.name = name
-        self.required_traits: List["Trait"] = []
+        self.type_vars: Dict[str, TypeVar] = {}
+        self.bounds: Dict[str, TraitBound] = {}
         self.methods: Dict[str, FunctionType] = {}
         self.partial_methods: Dict[str, FunctionType] = {}
 

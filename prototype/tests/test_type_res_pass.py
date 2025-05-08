@@ -14,7 +14,7 @@ from prototype.types import (
     StringType,
     StructType,
     IntType,
-    TypeVar,
+    TypeHole,
 )
 import textwrap
 
@@ -255,4 +255,4 @@ def test_typevar():
     symbol = type_res_pass.symbol_table.lookup("a")
     assert symbol is not None
     assert isinstance(symbol, Symbol)
-    assert isinstance(symbol.type, TypeVar)
+    assert isinstance(symbol.type, TypeHole)

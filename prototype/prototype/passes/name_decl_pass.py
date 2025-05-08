@@ -3,6 +3,7 @@ from ..ast import (
     Else,
     EnumDecl,
     FnDecl,
+    GenericTypeAnnotation,
     If,
     ImplDecl,
     Loop,
@@ -21,8 +22,6 @@ from ..errors import VulpesError, NameResolutionError
 from .base_pass import Pass
 from .symbol_table import Symbol
 
-# TODO: add docstrings to all methods
-# TODO: add type param handling
 
 # Pass 1: Name Declaration Pass
 class NameDeclarationPass(Pass):
@@ -87,12 +86,18 @@ class NameDeclarationPass(Pass):
     def impl_decl(self, impl: ImplDecl) -> None:
         # we look up the impl's type in the symbol table
         # and enter its scope
-        impl_type: Optional[Symbol] = self.symbol_table.lookup(impl.name)
+        impl_type = None
+        if isinstance(impl.impl_type, NamedTypeAnnotation):
+            impl_type = self.symbol_table.lookup(impl.impl_type.name)
+        elif isinstance(impl.impl_type, GenericTypeAnnotation):
+            impl_type = self.symbol_table.lookup(impl.impl_type.name)
         # if the impl's type is not found we add an error and exit
         if impl_type is None:
             self.errors.append(
                 NameResolutionError(
-                    f"Cannot impl on undefined type {impl.name}", impl.line, impl.id
+                    f"Cannot impl on undefined type {impl.impl_type}",
+                    impl.line,
+                    impl.id,
                 )
             )
             return
@@ -158,10 +163,6 @@ class NameDeclarationPass(Pass):
         method.symbol = res
         # we enter the method's scope
         self.symbol_table.enter_scope(method.id)
-        # we add the self param
-        self_type_annotation = NamedTypeAnnotation(impl_type.name, method.line)
-        param = Param("self", self_type_annotation, method.line)
-        method.params.insert(0, param)
         # we add all the params to the method's scope
         for param in method.params:
             res = self.add_symbol(param.name, param.id, param.line)

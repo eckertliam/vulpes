@@ -32,8 +32,6 @@ from .base_pass import Pass
 from .name_decl_pass import NameDeclarationPass
 
 
-# TODO: add type param handling
-
 class NameReferencePass(Pass):
     """
     This pass checks that all variable references, fn calls, method calls, etc are valid
