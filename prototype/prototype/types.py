@@ -696,19 +696,19 @@ class Trait:
         self.symbol = symbol
         self.type_vars: Dict[str, TypeVar] = {}
         self.bounds: Dict[str, TraitBound] = {}
-        self.methods: Dict[str, FunctionType] = {}
-        self.partial_methods: Dict[str, FunctionType] = {}
+        self.methods: Dict[str, Symbol] = {}
+        self.partial_methods: Dict[str, Symbol] = {}
 
-    def add_method(self, name: str, fn_type: FunctionType) -> None:
+    def add_method(self, name: str, fn_type: Symbol) -> None:
         self.methods[name] = fn_type
 
-    def get_method(self, name: str) -> Optional[FunctionType]:
+    def get_method(self, name: str) -> Optional[Symbol]:
         return self.methods.get(name)
 
-    def add_partial_method(self, name: str, fn_type: FunctionType) -> None:
+    def add_partial_method(self, name: str, fn_type: Symbol) -> None:
         self.partial_methods[name] = fn_type
 
-    def get_partial_method(self, name: str) -> Optional[FunctionType]:
+    def get_partial_method(self, name: str) -> Optional[Symbol]:
         return self.partial_methods.get(name)
 
 

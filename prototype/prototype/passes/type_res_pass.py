@@ -507,8 +507,44 @@ class TypeResolutionPass(Pass):
         Raises:
             NotImplementedError: Always, as trait method handling is not yet implemented.
         """
-        # TODO: add trait method handling
-        raise NotImplementedError("Trait method handling not implemented")
+        # instantiate the type vars from the type params
+        type_vars = self.instantiate_type_vars(
+            method.type_params, method.name, method.line, method.id
+        )
+        if type_vars is None:
+            return  # error already recorded
+        param_types: list[Type] = []
+        for param in method.params:
+            param_type = self.resolve_type_var(
+                param.type_annotation, type_vars, method.line, method.id
+            )
+            if param_type is None:
+                return  # error already recorded
+            param_types.append(param_type)
+        ret_type = self.resolve_type_var(
+            method.ret_type, type_vars, method.line, method.id
+        )
+        if ret_type is None:
+            return  # error already recorded
+        method_type = FunctionType(type_vars, param_types, ret_type)
+        method_symbol = method.assert_symbol()
+        # attach the type to the method's symbol
+        method_symbol.type = method_type
+        # check that the method name is not already in the trait
+        if method.name in trait.methods:
+            self.errors.append(
+                TypeInferenceError(
+                    f"Trait {trait.name} has multiple methods with the same name {method.name}",
+                    method.line,
+                    method.id,
+                )
+            )
+            return
+        # add the the method's symbol to the trait type
+        trait.methods[method.name] = method_symbol
+        # if the method is a full method, visit the body
+        if isinstance(method, FnDecl):
+            self.visit_block_with_scope(method.id, method.body)
 
     def visit_type_alias_decl(self, type_alias_decl: TypeAliasDecl) -> None:
         """

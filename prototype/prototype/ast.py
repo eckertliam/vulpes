@@ -4,11 +4,6 @@ from typing import Dict, Optional, Union
 from .symbol import Symbol
 from .types import BoolType, CharType, FloatType, IntType, StringType, Type
 
-# TODO: add docstrings for all nodes
-# TODO: add __slots__ to all nodes
-# TODO: add generic type annotation node
-# TODO: add type param node
-
 
 class Program:
     """
