@@ -45,6 +45,7 @@ from ..types import (
     TraitBound,
     TupleType,
     Type,
+    TypeAlias,
     TypeHole,
     TypeVar,
 )
@@ -517,28 +518,46 @@ class TypeResolutionPass(Pass):
             - Adds the alias to the type environment.
             - Accumulates errors for recursion or invalid types.
         """
-        # TODO: add type alias wrapper type in order to handle type params and allow for monomorphization
-        # Protect against recursion in type aliases.
         if type_alias_decl.id in self.visited_type_aliases:
+            return
+        self.visited_type_aliases.add(type_alias_decl.id)
+        # get the name of the type alias
+        type_alias_name = type_alias_decl.name
+        # instantiate the type vars from the type params
+        type_vars = self.instantiate_type_vars(
+            type_alias_decl.type_params, type_alias_name, type_alias_decl.line, type_alias_decl.id
+        )
+        if type_vars is None:
+            return  # error already recorded
+        # resolve the type annotation
+        type_ = self.resolve_type_var(
+            type_alias_decl.type_annotation, type_vars, type_alias_decl.line, type_alias_decl.id
+        )
+        if type_ is None:
+            return  # error already recorded
+        # create the type alias
+        type_alias = TypeAlias(type_alias_name, type_vars, type_, type_alias_decl.assert_symbol())
+        # now make sure there is not a type alias cycle and that no other type holds the name
+        if self.type_env.find_type(type_alias_name) is not None:
             self.errors.append(
                 TypeInferenceError(
-                    f"Recursive type alias detected for {type_alias_decl.name}",
+                    f"Type alias {type_alias_name} using name of existing type",
                     type_alias_decl.line,
-                    type_alias_decl.id,
+                    type_alias_decl.id
                 )
             )
             return
-        self.visited_type_aliases.add(type_alias_decl.id)
-        # Convert the alias's type annotation to a type.
-        type_annotation = self.convert_type_annotation_top_level(
-            type_alias_decl.type_annotation, type_alias_decl.line, type_alias_decl.id
-        )
-        if type_annotation is None:
-            # Error already recorded.
-            self.visited_type_aliases.remove(type_alias_decl.id)
-            return None
-        self.type_env.add_type(type_alias_decl.name, type_annotation)
-        self.visited_type_aliases.remove(type_alias_decl.id)
+        # check for type alias cycles
+        if self.type_env.detect_cycle(type_alias_name, type_):
+            self.errors.append(
+                TypeInferenceError(
+                    f"Type alias {type_alias_name} has a cycle",
+                    type_alias_decl.line,
+                    type_alias_decl.id
+                )
+            )
+        # add the type alias to the type env
+        self.type_env.add_type_alias(type_alias)
 
     def visit_enum_decl(self, enum_decl: EnumDecl) -> None:
         """

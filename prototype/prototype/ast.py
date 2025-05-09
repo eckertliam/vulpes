@@ -594,6 +594,17 @@ class EnumStructField(Node):
 
 
 class TypeAliasDecl(Declaration):
+    """
+    Represents a type alias declaration in the program.
+
+    Attributes:
+        pub (bool): Indicates if the type alias is public.
+        name (str): The name of the type alias.
+        type_params (Optional[list[TypeParam]]): The type parameters for the alias, if any.
+        type_annotation (TypeAnnotation): The type annotation associated with the alias.
+        line (int): The line number where the alias is declared.
+    """
+
     def __init__(
         self,
         pub: bool,
@@ -602,6 +613,16 @@ class TypeAliasDecl(Declaration):
         type_annotation: TypeAnnotation,
         line: int,
     ) -> None:
+        """
+        Initializes a TypeAliasDecl instance.
+
+        Args:
+            pub (bool): Whether the type alias is public.
+            name (str): The name of the type alias.
+            type_params (Optional[list[TypeParam]]): The type parameters for the alias, if any.
+            type_annotation (TypeAnnotation): The type annotation associated with the alias.
+            line (int): The line number where the alias is declared.
+        """
         super().__init__("type_alias_decl", line)
         self.pub = pub
         self.name = name
@@ -609,6 +630,15 @@ class TypeAliasDecl(Declaration):
         self.type_annotation = type_annotation
 
     def get_node(self, id: int) -> Optional[Node]:
+        """
+        Retrieves a node by its ID.
+
+        Args:
+            id (int): The ID of the node to retrieve.
+
+        Returns:
+            Optional[Node]: The node with the specified ID, or None if not found.
+        """
         if self.id == id:
             return self
         if self.type_params is not None:
@@ -619,6 +649,12 @@ class TypeAliasDecl(Declaration):
         return self.type_annotation.get_node(id)
 
     def get_span(self) -> tuple[int, int]:
+        """
+        Gets the span of the type alias declaration.
+
+        Returns:
+            tuple[int, int]: A tuple containing the start and end line numbers of the declaration.
+        """
         min_line = self.line
         max_line = self.line
         if self.type_params is not None:
