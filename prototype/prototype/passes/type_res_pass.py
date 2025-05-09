@@ -40,6 +40,7 @@ from ..types import (
     EnumVariantType,
     FunctionType,
     GenericType,
+    Impl,
     StructType,
     Trait,
     TraitBound,
@@ -740,14 +741,45 @@ class TypeResolutionPass(Pass):
         self.symbol_table.exit_scope()
 
     def visit_impl_decl(self, impl_decl: ImplDecl) -> None:
-        # TODO: rewrite this method to create an impl and add it to the type env
+        # TODO: get the type vars from the impl type type params
+        # TODO: resolve the impl type
+        # TODO: resolve the trait if it exists
+        # TODO: instantiate the impl type and add it to the type env
+        # TODO: add the impl to the type env
+        # TODO: visit the methods and add their symbols to the impl type
         raise NotImplementedError("Impl handling not implemented")
 
     def visit_method_decl(
-        self, method_decl: FnDecl, impl_type: Union[StructType, EnumType]
+        self, method_decl: FnDecl, impl: Impl
     ) -> None:
-        # TODO: rewrite this method to follow the new logic for impl handling
-        raise NotImplementedError("Impl handling not implemented")
+        # instantiate the type vars from the type params
+        type_vars = self.instantiate_type_vars(
+            method_decl.type_params, method_decl.name, method_decl.line, method_decl.id
+        )
+        if type_vars is None:
+            return  # error already recorded
+        # get the function type
+        param_types: list[Type] = []
+        for param in method_decl.params:
+            param_type = self.resolve_type_var(
+                param.type_annotation, type_vars, method_decl.line, method_decl.id
+            )
+            if param_type is None:
+                return  # error already recorded
+            param_types.append(param_type)
+        ret_type = self.resolve_type_var(
+            method_decl.ret_type, type_vars, method_decl.line, method_decl.id
+        )
+        if ret_type is None:
+            return  # error already recorded
+        method_type = FunctionType(type_vars, param_types, ret_type)
+        # attach the type to the method's symbol
+        method_decl.assert_symbol().type = method_type
+        # add the method's symbol to the impl type
+        impl.methods[method_decl.name] = method_decl.assert_symbol()
+        # enter the method's scope and visit the body
+        self.visit_block_with_scope(method_decl.id, method_decl.body)
+
 
     def visit_statement(self, statement: Statement) -> None:
         """
