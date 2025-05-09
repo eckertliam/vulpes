@@ -454,7 +454,7 @@ class TypeResolutionPass(Pass):
         # mark as being visited
         self.visited_traits.add(trait_decl.id)
         # we create the trait
-        trait = Trait(trait_decl.name)
+        trait = Trait(trait_decl.name, trait_decl.assert_symbol())
         # we add the trait to the type env
         self.type_env.add_trait(trait_decl.name, trait)
         # instantiate the type vars from the type params
@@ -484,6 +484,8 @@ class TypeResolutionPass(Pass):
                         )
                         return
                     trait_bounds[resolved_bound.name] = resolved_bound
+                else:
+                    return  # the attempt to resolve the trait bound will have added an error
         trait.bounds = trait_bounds
 
         # Enter trait scope and process each method signature.
@@ -525,25 +527,33 @@ class TypeResolutionPass(Pass):
         type_alias_name = type_alias_decl.name
         # instantiate the type vars from the type params
         type_vars = self.instantiate_type_vars(
-            type_alias_decl.type_params, type_alias_name, type_alias_decl.line, type_alias_decl.id
+            type_alias_decl.type_params,
+            type_alias_name,
+            type_alias_decl.line,
+            type_alias_decl.id,
         )
         if type_vars is None:
             return  # error already recorded
         # resolve the type annotation
         type_ = self.resolve_type_var(
-            type_alias_decl.type_annotation, type_vars, type_alias_decl.line, type_alias_decl.id
+            type_alias_decl.type_annotation,
+            type_vars,
+            type_alias_decl.line,
+            type_alias_decl.id,
         )
         if type_ is None:
             return  # error already recorded
         # create the type alias
-        type_alias = TypeAlias(type_alias_name, type_vars, type_, type_alias_decl.assert_symbol())
+        type_alias = TypeAlias(
+            type_alias_name, type_vars, type_, type_alias_decl.assert_symbol()
+        )
         # now make sure there is not a type alias cycle and that no other type holds the name
         if self.type_env.find_type(type_alias_name) is not None:
             self.errors.append(
                 TypeInferenceError(
                     f"Type alias {type_alias_name} using name of existing type",
                     type_alias_decl.line,
-                    type_alias_decl.id
+                    type_alias_decl.id,
                 )
             )
             return
@@ -553,7 +563,7 @@ class TypeResolutionPass(Pass):
                 TypeInferenceError(
                     f"Type alias {type_alias_name} has a cycle",
                     type_alias_decl.line,
-                    type_alias_decl.id
+                    type_alias_decl.id,
                 )
             )
         # add the type alias to the type env
@@ -694,86 +704,14 @@ class TypeResolutionPass(Pass):
         self.symbol_table.exit_scope()
 
     def visit_impl_decl(self, impl_decl: ImplDecl) -> None:
-        # TODO: add impl type and impls: Dict[Type, List[Impl]] to the type env and rewrite this method
-        impl_type = self.type_env.get_type(impl_decl.name)
-        if impl_type is None:
-            self.errors.append(
-                TypeInferenceError(
-                    f"Type {impl_decl.name} is not defined",
-                    impl_decl.line,
-                    impl_decl.id,
-                )
-            )
-            return
-        elif not isinstance(impl_type, (StructType, EnumType)):
-            self.errors.append(
-                TypeInferenceError(
-                    f"Type {impl_decl.name} is not a struct or enum cannot implement methods",
-                    impl_decl.line,
-                    impl_decl.id,
-                )
-            )
-            return
-        # now we need to visit the methods
-        for method in impl_decl.methods:
-            self.visit_method_decl(method, impl_type)
+        # TODO: rewrite this method to create an impl and add it to the type env
+        raise NotImplementedError("Impl handling not implemented")
 
     def visit_method_decl(
         self, method_decl: FnDecl, impl_type: Union[StructType, EnumType]
     ) -> None:
-        """
-        Processes a method declaration within an impl block, resolving its type parameters,
-        parameter types, and return type, and attaches the resulting type to the method's symbol.
-        Adds the method to the implementation type's method map.
-        Differs from visit_fn_decl in that it uses resolve_type_var for parameters (to support type vars).
-        Enters the method's scope to process its body statements.
-        Args:
-            method_decl (FnDecl): The method declaration node.
-            impl_type (StructType | EnumType): The type being implemented.
-        Side effects:
-            - Attaches a FunctionType to the method's symbol.
-            - Registers the method in the impl type's method dictionary.
-            - Assigns types to parameter symbols.
-            - Enters/exits the method's symbol table scope.
-            - Accumulates errors for duplicate methods or invalid types.
-        """
-        type_vars: Dict[str, TypeVar] = self.instantiate_type_vars(
-            method_decl.type_params, method_decl.name, method_decl.line, method_decl.id
-        )
-        if type_vars is None:
-            return
-        param_types: list[Type] = []
-        for param in method_decl.params:
-            param_type = self.resolve_type_var(
-                param.type_annotation, type_vars, param.line, param.id
-            )
-            if param_type is None:
-                return
-            param_types.append(param_type)
-            param.assert_symbol().type = param_type
-        ret_type = self.convert_type_annotation_top_level(
-            method_decl.ret_type, method_decl.line, method_decl.id
-        )
-        if ret_type is None:
-            return
-        method_type = FunctionType(type_vars, param_types, ret_type)
-        method_decl.assert_symbol().type = method_type
-        # Prevent duplicate method names in the impl type.
-        if method_decl.name in impl_type.methods:
-            self.errors.append(
-                TypeInferenceError(
-                    f"Method {method_decl.name} already exists in impl type {impl_type.name}",
-                    method_decl.line,
-                    method_decl.id,
-                )
-            )
-            return
-        impl_type.methods[method_decl.name] = method_decl.assert_symbol()
-        # Enter method scope and process body statements.
-        self.symbol_table.enter_scope(method_decl.id)
-        for statement in method_decl.body:
-            self.visit_statement(statement)
-        self.symbol_table.exit_scope()
+        # TODO: rewrite this method to follow the new logic for impl handling
+        raise NotImplementedError("Impl handling not implemented")
 
     def visit_statement(self, statement: Statement) -> None:
         """

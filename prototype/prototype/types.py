@@ -780,7 +780,9 @@ class TypeAlias:
 
     __slots__ = ["name", "type_vars", "type", "symbol"]
 
-    def __init__(self, name: str, type_vars: Dict[str, TypeVar], type: Type, symbol: Symbol) -> None:
+    def __init__(
+        self, name: str, type_vars: Dict[str, TypeVar], type: Type, symbol: Symbol
+    ) -> None:
         """
         Initializes a TypeAlias instance.
 
@@ -952,9 +954,7 @@ class TypeEnv:
         visited = set()
         return self._has_cycle(alias_name, type_, visited)
 
-    def add_type_alias(
-        self, type_alias: TypeAlias
-    ) -> None:
+    def add_type_alias(self, type_alias: TypeAlias) -> None:
         """
         Adds a type alias to the environment.
 
