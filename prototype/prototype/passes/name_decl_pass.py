@@ -1,24 +1,19 @@
 from typing import Optional, Union
 from ..ast import (
     Else,
-    EnumDecl,
     FnDecl,
-    GenericTypeAnnotation,
     If,
-    ImplDecl,
     Loop,
     NamedTypeAnnotation,
     Param,
-    PartialTraitMethod,
     Program,
     Statement,
     StructDecl,
-    TraitDecl,
     TypeAliasDecl,
     VarDecl,
     While,
 )
-from ..errors import VulpesError, NameResolutionError
+from ..errors import VulpesError
 from .base_pass import Pass
 from .symbol_table import Symbol
 
@@ -52,14 +47,6 @@ class NameDeclarationPass(Pass):
                     return
                 # add the symbol to the struct declaration node
                 declaration.symbol = res
-            elif isinstance(declaration, EnumDecl):
-                res = self.add_symbol(
-                    declaration.name, declaration.id, declaration.line
-                )
-                if res is None:
-                    return
-                # add the symbol to the enum declaration node
-                declaration.symbol = res
             elif isinstance(declaration, TypeAliasDecl):
                 res = self.add_symbol(
                     declaration.name, declaration.id, declaration.line
@@ -71,110 +58,13 @@ class NameDeclarationPass(Pass):
 
         # now we add all impls and fns to the symbol table
         for declaration in self.program.declarations:
-            if isinstance(declaration, ImplDecl):
-                self.impl_decl(declaration)
-            elif isinstance(declaration, FnDecl):
+            if isinstance(declaration, FnDecl):
                 self.fn_decl(declaration)
-            elif isinstance(declaration, TraitDecl):
-                self.trait_decl(declaration)
 
         # check for any errors that may have been added
         if len(self.errors) > 0:
             for error in self.errors:
                 error.report(self.program)
-
-    def impl_decl(self, impl: ImplDecl) -> None:
-        # we look up the impl's type in the symbol table
-        # and enter its scope
-        impl_type = None
-        if isinstance(impl.impl_type, NamedTypeAnnotation):
-            impl_type = self.symbol_table.lookup(impl.impl_type.name)
-        elif isinstance(impl.impl_type, GenericTypeAnnotation):
-            impl_type = self.symbol_table.lookup(impl.impl_type.name)
-        # if the impl's type is not found we add an error and exit
-        if impl_type is None:
-            self.errors.append(
-                NameResolutionError(
-                    f"Cannot impl on undefined type {impl.impl_type}",
-                    impl.line,
-                    impl.id,
-                )
-            )
-            return
-        # we enter the impl's scope
-        self.symbol_table.enter_scope(impl_type.ast_id)
-        # we add all the methods to the impl's scope
-        for method in impl.methods:
-            self.method_decl(method, impl_type)
-        # we exit the impl's scope
-        self.symbol_table.exit_scope()
-
-    def trait_decl(self, trait: TraitDecl) -> None:
-        # we add the trait to the current scope
-        res = self.add_symbol(trait.name, trait.id, trait.line)
-        if res is None:
-            return
-        # add the symbol to the trait's declaration node
-        trait.symbol = res
-        # we enter the trait's scope
-        self.symbol_table.enter_scope(trait.id)
-        # we add all the methods to the trait's scope
-        for method in trait.methods:
-            self.trait_method_decl(method)
-        # we exit the trait's scope
-        self.symbol_table.exit_scope()
-
-    def trait_method_decl(self, method: Union[FnDecl, PartialTraitMethod]) -> None:
-        # we add the method to the current scope
-        res = self.add_symbol(method.name, method.id, method.line)
-        if res is None:
-            return
-        # add the symbol to the method's declaration node
-        method.symbol = res
-        # we enter the method's scope
-        self.symbol_table.enter_scope(method.id)
-        # we add all the params to the method's scope
-        for param in method.params:
-            res = self.add_symbol(param.name, param.id, param.line)
-            if res is None:
-                return
-            # add the symbol to the param node
-            param.symbol = res
-        # add the self param to the trait method
-        # uses the Self in place of the type being implemented
-        self_type_annotation = NamedTypeAnnotation("Self", method.line)
-        param = Param("self", self_type_annotation, method.line)
-        method.params.insert(0, param)
-
-        if isinstance(method, FnDecl):
-            # if it is a full method we iterate through the body and all child bodys and add all vars to the symbol table
-            for statement in method.body:
-                self.statement(statement)
-
-        # we exit the method's scope
-        self.symbol_table.exit_scope()
-
-    def method_decl(self, method: FnDecl, impl_type: Symbol) -> None:
-        # we add the method to the current scope
-        res = self.add_symbol(method.name, method.id, method.line)
-        if res is None:
-            return
-        # add the symbol to the method's declaration node
-        method.symbol = res
-        # we enter the method's scope
-        self.symbol_table.enter_scope(method.id)
-        # we add all the params to the method's scope
-        for param in method.params:
-            res = self.add_symbol(param.name, param.id, param.line)
-            if res is None:
-                return
-            # add the symbol to the param node
-            param.symbol = res
-        # we iterate through the body and all child bodys and add all vars to the symbol table
-        for statement in method.body:
-            self.statement(statement)
-        # we exit the method's scope
-        self.symbol_table.exit_scope()
 
     def fn_decl(self, fn: FnDecl) -> None:
         # we add the fn to the current scope

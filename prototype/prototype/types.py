@@ -211,40 +211,29 @@ class FunctionType(Type):
     Represents a function type, which includes parameter types and a return type.
 
     Attributes:
-        type_vars (Dict[str, TypeVar]): Type variables used in the function.
         params (list[Type]): The types of parameters the function accepts.
         ret_type (Type): The return type of the function.
     """
 
-    __slots__ = ["type_vars", "params", "ret_type"]
+    __slots__ = ["params", "ret_type"]
 
-    def __init__(
-        self, type_vars: Dict[str, "TypeVar"], params: list[Type], ret_type: Type
-    ) -> None:
+    def __init__(self, params: list[Type], ret_type: Type) -> None:
         """
         Initializes a FunctionType instance.
 
         Args:
-            type_vars (Dict[str, TypeVar]): Type variables used in the function.
             params (list[Type]): The types of parameters the function accepts.
             ret_type (Type): The return type of the function.
         """
-        self.type_vars = type_vars
         self.params = params
         self.ret_type = ret_type
 
     def __str__(self) -> str:
-        tvs = (
-            f"<{', '.join(str(t) for t in self.type_vars.values())}>"
-            if self.type_vars
-            else ""
-        )
-        return f"{tvs}({', '.join(str(t) for t in self.params)}) -> {self.ret_type}"
+        return f"({', '.join(str(t) for t in self.params)}) -> {self.ret_type}"
 
     def __eq__(self, other: "Type") -> bool:
         return (
             isinstance(other, FunctionType)
-            and self.type_vars == other.type_vars
             and self.params == other.params
             and self.ret_type == other.ret_type
         )
@@ -255,7 +244,6 @@ class FunctionType(Type):
                 "fn",
                 tuple(hash(t) for t in self.params),
                 hash(self.ret_type),
-                tuple(hash(t) for t in self.type_vars.values()),
             )
         )
 
@@ -282,25 +270,20 @@ class StructType(Type):
 
     Attributes:
         name (str): The name of the struct.
-        type_vars (Dict[str, TypeVar]): Type variables used in the struct.
         fields (Dict[str, Type]): The fields of the struct and their types.
     """
 
-    __slots__ = ["name", "type_vars", "fields"]
+    __slots__ = ["name", "fields"]
 
-    def __init__(
-        self, name: str, type_vars: Dict[str, "TypeVar"], fields: Dict[str, Type]
-    ) -> None:
+    def __init__(self, name: str, fields: Dict[str, Type]) -> None:
         """
         Initializes a StructType instance.
 
         Args:
             name (str): The name of the struct.
-            type_vars (Dict[str, TypeVar]): Type variables used in the struct.
             fields (Dict[str, Type]): The fields of the struct and their types.
         """
         self.name = name
-        self.type_vars = type_vars
         self.fields = fields
 
     def __str__(self) -> str:
@@ -773,27 +756,22 @@ class TypeAlias:
 
     Attributes:
         name (str): The name of the type alias.
-        type_vars (Dict[str, TypeVar]): Type variables used in the type alias.
         type (Type): The type that the alias represents.
         symbol (Symbol): The symbol representing the type alias declaration.
     """
 
-    __slots__ = ["name", "type_vars", "type", "symbol"]
+    __slots__ = ["name", "type", "symbol"]
 
-    def __init__(
-        self, name: str, type_vars: Dict[str, TypeVar], type: Type, symbol: Symbol
-    ) -> None:
+    def __init__(self, name: str, type: Type, symbol: Symbol) -> None:
         """
         Initializes a TypeAlias instance.
 
         Args:
             name (str): The name of the type alias.
-            type_vars (Dict[str, TypeVar]): Type variables used in the type alias.
             type (Type): The type that the alias represents.
             symbol (Symbol): The symbol representing the type alias declaration.
         """
         self.name = name
-        self.type_vars = type_vars
         self.type = type
         self.symbol = symbol
 
@@ -801,14 +779,11 @@ class TypeAlias:
         return (
             isinstance(other, TypeAlias)
             and self.name == other.name
-            and self.type_vars == other.type_vars
             and self.type == other.type
         )
 
     def __hash__(self) -> int:
-        return hash(
-            ("type_alias", self.name, tuple(hash(t) for t in self.type_vars), self.type)
-        )
+        return hash(("type_alias", self.name, self.type))
 
 
 class TypeEnv:

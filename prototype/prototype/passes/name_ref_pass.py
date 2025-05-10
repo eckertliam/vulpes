@@ -5,23 +5,17 @@ from ..ast import (
     Assign,
     BinaryOp,
     Call,
-    CallMethod,
     Else,
-    EnumStructExpr,
-    EnumTupleExpr,
     Expr,
     FieldInit,
     FnDecl,
     GetIndex,
     Ident,
     If,
-    ImplDecl,
     Loop,
-    PartialTraitMethod,
     Return,
     Statement,
     StructExpr,
-    TraitDecl,
     TupleExpr,
     UnaryOp,
     VarDecl,
@@ -45,10 +39,6 @@ class NameReferencePass(Pass):
         for declaration in self.program.declarations:
             if isinstance(declaration, FnDecl):
                 self.visit_fn_decl(declaration)
-            elif isinstance(declaration, ImplDecl):
-                self.visit_impl_decl(declaration)
-            elif isinstance(declaration, TraitDecl):
-                self.visit_trait_decl(declaration)
 
         # check for any errors that may have been added
         if len(self.errors) > 0:
@@ -63,29 +53,6 @@ class NameReferencePass(Pass):
             self.visit_statement(statement)
         # exit the fn's scope
         self.symbol_table.exit_scope()
-
-    def visit_impl_decl(self, impl_decl: ImplDecl) -> None:
-        # dont enter the impl's scope
-        # all the impl's functions are scoped to their respective type's namespace
-        # so we dont need to do anything
-        # just loop through the methods and visit them
-        for method in impl_decl.methods:
-            self.visit_fn_decl(method)
-
-    def visit_trait_decl(self, trait_decl: TraitDecl) -> None:
-        # we need to enter the trait's scope
-        self.symbol_table.enter_scope(trait_decl.id)
-        # we iterate through the methods and visit them
-        for method in trait_decl.methods:
-            self.visit_trait_method(method)
-        # we exit the trait's scope
-        self.symbol_table.exit_scope()
-
-    def visit_trait_method(self, method: Union[FnDecl, PartialTraitMethod]) -> None:
-        # we dont need to do anything for partial trait methods here
-        # just check the fn decl if it exists
-        if isinstance(method, FnDecl):
-            self.visit_fn_decl(method)
 
     def visit_statement(self, statement: Statement) -> None:
         if isinstance(statement, FnDecl):
@@ -172,8 +139,6 @@ class NameReferencePass(Pass):
             self.visit_access_field(expr)
         elif isinstance(expr, Call):
             self.visit_call(expr)
-        elif isinstance(expr, CallMethod):
-            self.visit_call_method(expr)
         elif isinstance(expr, GetIndex):
             self.visit_get_index(expr)
         elif isinstance(expr, BinaryOp):
@@ -184,10 +149,6 @@ class NameReferencePass(Pass):
             self.visit_struct_expr(expr)
         elif isinstance(expr, TupleExpr):
             self.visit_tuple_expr(expr)
-        elif isinstance(expr, EnumStructExpr):
-            self.visit_enum_struct_expr(expr)
-        elif isinstance(expr, EnumTupleExpr):
-            self.visit_enum_tuple_expr(expr)
         elif isinstance(expr, ArrayExpr):
             self.visit_array_expr(expr)
 
@@ -205,16 +166,6 @@ class NameReferencePass(Pass):
         for elem in tuple_expr.elems:
             self.visit_expr(elem)
 
-    def visit_enum_struct_expr(self, enum_struct_expr: EnumStructExpr) -> None:
-        # we visit all the field inits just like a struct expr
-        for field in enum_struct_expr.fields:
-            self.visit_field_init(field)
-
-    def visit_enum_tuple_expr(self, enum_tuple_expr: EnumTupleExpr) -> None:
-        # we visit all the elements just like a tuple expr
-        for elem in enum_tuple_expr.elems:
-            self.visit_expr(elem)
-
     def visit_array_expr(self, array_expr: ArrayExpr) -> None:
         # we visit all the elements just like a tuple expr
         for elem in array_expr.elems:
@@ -230,14 +181,6 @@ class NameReferencePass(Pass):
         self.visit_expr(call.callee)
         # then we visit all the args
         for arg in call.args:
-            self.visit_expr(arg)
-
-    def visit_call_method(self, call_attr: CallMethod) -> None:
-        # we need to ensure the object is defined
-        # NOTE: in later passes we will check if the object is an object that contains the method
-        self.visit_expr(call_attr.obj)
-        # then we visit all the args
-        for arg in call_attr.args:
             self.visit_expr(arg)
 
     def visit_get_index(self, get_index: GetIndex) -> None:

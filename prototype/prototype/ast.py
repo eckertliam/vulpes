@@ -202,7 +202,6 @@ class FunctionTypeAnnotation(TypeAnnotation):
         return self.ret_type.get_node(id)
 
 
-
 class FnDecl(Declaration, Statement):
     """A function declaration
 
@@ -330,9 +329,7 @@ class StructField(Node):
 
     __slots__ = ["name", "type_annotation", "line", "id", "symbol"]
 
-    def __init__(
-        self, name: str, type_annotation: TypeAnnotation, line: int
-    ) -> None:
+    def __init__(self, name: str, type_annotation: TypeAnnotation, line: int) -> None:
         super().__init__(line)
         self.name = name
         self.type_annotation = type_annotation
@@ -345,7 +342,6 @@ class StructField(Node):
     def get_span(self) -> tuple[int, int]:
         tmin, tmax = self.type_annotation.get_span()
         return (self.line, max(self.line, tmax))
-
 
 
 class TypeAliasDecl(Declaration):
@@ -460,8 +456,6 @@ class Assign(Statement):
         lhs_min, lhs_max = self.lhs.get_span()
         rhs_min, rhs_max = self.rhs.get_span()
         return (min(lhs_min, rhs_min), max(lhs_max, rhs_max))
-
-
 
 
 class Return(Statement):
@@ -751,7 +745,6 @@ class StructExpr(Expr):
         return (min_line, max_line)
 
 
-
 class Ident(AssignableExpr):
     def __init__(self, name: str, line: int) -> None:
         super().__init__(line)
@@ -867,7 +860,6 @@ class AccessField(AssignableExpr):
         min_line = min(min_line, obj_min)
         max_line = max(max_line, obj_max)
         return (min_line, max_line)
-
 
 
 class BinaryOp(Expr):

@@ -7,27 +7,17 @@ from ..ast import (
     ArrayTypeAnnotation,
     Declaration,
     Else,
-    EnumDecl,
-    EnumStructField,
-    EnumStructVariant,
-    EnumTupleVariant,
-    EnumUnitVariant,
     FnDecl,
     FunctionTypeAnnotation,
-    GenericTypeAnnotation,
     If,
-    ImplDecl,
     Loop,
     NamedTypeAnnotation,
-    PartialTraitMethod,
     Statement,
     StructDecl,
     StructField,
-    TraitDecl,
     TupleTypeAnnotation,
     TypeAliasDecl,
     TypeAnnotation,
-    TypeParam,
     VarDecl,
     While,
 )
@@ -53,7 +43,6 @@ from ..types import (
 
 
 # TODO: add docstrings to all methods
-# TODO: add type param handling and resolution
 
 
 class TypeResolutionPass(Pass):
@@ -101,7 +90,6 @@ class TypeResolutionPass(Pass):
                 # check if the type declaration is a type alias, enum, or struct
                 if not (
                     isinstance(type_decl_node, TypeAliasDecl)
-                    or isinstance(type_decl_node, EnumDecl)
                     or isinstance(type_decl_node, StructDecl)
                 ):
                     self.errors.append(
@@ -174,55 +162,16 @@ class TypeResolutionPass(Pass):
             if ret_type is None:
                 return None
             # we return the function type
-            return FunctionType({}, param_types, ret_type)
-        elif isinstance(type_annotation, GenericTypeAnnotation):
-            # we treat the name of the generic type as a NamedTypeAnnotation
-            existing_type = self.convert_type_annotation_top_level(
-                NamedTypeAnnotation(type_annotation.name, decl_line), decl_line, decl_id
-            )
-            if existing_type is None:
-                return None  # the attempt to convert the type annotation will have added an error
-            # make sure the type is a struct or enum that takes generic parameters
-            if not (
-                isinstance(existing_type, StructType)
-                or isinstance(existing_type, EnumType)
-            ):
-                self.errors.append(
-                    TypeInferenceError(
-                        f"Type {type_annotation.name} is not a struct or enum cannot take generic parameters",
-                        decl_line,
-                        decl_id,
-                    )
-                )
-                return None
-            type_args: List[Type] = []
-            for type_arg in type_annotation.type_args:
-                type_arg_type = self.convert_type_annotation_top_level(
-                    type_arg, decl_line, decl_id
-                )
-                if type_arg_type is None:
-                    return None  # the attempt to convert the type argument will have added an error
-                type_args.append(type_arg_type)
-            # we now have to check the arity of the generic type
-            if len(type_args) != len(existing_type.type_vars):
-                self.errors.append(
-                    TypeInferenceError(
-                        f"Generic type {type_annotation.name} expects {len(existing_type.type_vars)} parameters but got {len(type_args)}",
-                        decl_line,
-                        decl_id,
-                    )
-                )
-                return None
-            return GenericType(existing_type, type_args)
+            return FunctionType(param_types, ret_type)
         else:
             raise RuntimeError(f"Unknown type annotation {type_annotation}")
 
     def run(self) -> None:
         """
         Executes the type resolution pass for the program.
-        This pass first collects and registers all top-level type declarations (aliases, enums, structs, traits)
+        This pass first collects and registers all top-level type declarations (aliases, structs)
         into the type environment, ensuring that all types are available for later resolution.
-        Then, it processes function and implementation declarations to resolve their types and attach them
+        Then, it processes function declarations to resolve their types and attach them
         to AST nodes, preparing the program for type inference in subsequent passes.
         Side effects:
             - Populates the type environment with all type definitions.
@@ -237,8 +186,6 @@ class TypeResolutionPass(Pass):
         for declaration in self.program.declarations:
             if isinstance(declaration, FnDecl):
                 self.visit_fn_decl(declaration)
-            elif isinstance(declaration, ImplDecl):
-                self.visit_impl_decl(declaration)
 
     def visit_type_decl(self, type_decl: Declaration) -> None:
         """
@@ -253,160 +200,14 @@ class TypeResolutionPass(Pass):
         """
         if isinstance(type_decl, TypeAliasDecl):
             self.visit_type_alias_decl(type_decl)
-        elif isinstance(type_decl, EnumDecl):
-            self.visit_enum_decl(type_decl)
         elif isinstance(type_decl, StructDecl):
             self.visit_struct_decl(type_decl)
-        elif isinstance(type_decl, TraitDecl):
-            self.visit_trait_decl(type_decl)
         else:
             pass  # just ignore other declarations
 
-    def resolve_trait_bound(
-        self,
-        bound: Union[NamedTypeAnnotation, GenericTypeAnnotation],
-        decl_line: int,
-        decl_id: int,
-    ) -> Optional[TraitBound]:
-        bound_trait = self.type_env.get_trait(bound.name)
-        if bound_trait is None:
-            # look the bound up in the global scope
-            trait_symbol = self.symbol_table.lookup_global(bound.name)
-            if trait_symbol is None:
-                self.errors.append(
-                    TypeInferenceError(
-                        f"Undefined trait {bound.name}",
-                        decl_line,
-                        decl_id,
-                    )
-                )
-                return None
-            # get the ast node of the trait declaration
-            trait_decl_node = self.program.get_node(trait_symbol.ast_id)
-            if trait_decl_node is None:
-                raise RuntimeError("Cannot find node for trait declaration")
-            if not isinstance(trait_decl_node, TraitDecl):
-                self.errors.append(
-                    TypeInferenceError(
-                        f"Trait {bound.name} is not a trait",
-                        decl_line,
-                        decl_id,
-                    )
-                )
-                return None
-            # run visit_trait_decl on it
-            self.visit_trait_decl(trait_decl_node)
-            bound_trait = self.type_env.get_trait(bound.name)
-            if bound_trait is None:
-                self.errors.append(
-                    TypeInferenceError(
-                        f"Trait {bound.name} cannot be resolved",
-                        decl_line,
-                        decl_id,
-                    )
-                )
-                return None
-        type_args: List[Type] = []
-        if isinstance(bound, GenericTypeAnnotation):
-            for type_arg in bound.type_args:
-                type_arg_type = self.convert_type_annotation_top_level(
-                    type_arg, decl_line, decl_id
-                )
-                if type_arg_type is None:
-                    return None  # error already appended
-                type_args.append(type_arg_type)
-        return TraitBound(bound.name, type_args)
-
-    def resolve_type_var(
-        self,
-        annotation: TypeAnnotation,
-        type_vars: Dict[str, TypeVar],
-        decl_line: int,
-        decl_id: int,
-    ) -> Optional[Type]:
-        """This function attempts to resolve a type into a TypeVar from its local scope and if it passes the type to convert_type_annotation_top_level
-
-        Args:
-            annotation (TypeAnnotation): The type annotation to resolve
-            type_vars (Dict[str, TypeVar]): The type vars in the local scope
-            decl_line (int): The line number of the declaration
-            decl_id (int): The declaration id
-
-        Returns:
-            Optional[Type]: The resolved type or None if it is not a type var and cannot be resolved by convert_type_annotation_top_level
-        """
-        if isinstance(annotation, NamedTypeAnnotation):
-            return type_vars.get(annotation.name)
-        else:
-            return self.convert_type_annotation_top_level(
-                annotation, decl_line, decl_id
-            )
-
-    def instantiate_type_vars(
-        self,
-        type_params: Optional[List[TypeParam]],
-        decl_name: str,
-        decl_line: int,
-        decl_id: int,
-    ) -> Optional[Dict[str, TypeVar]]:
-        """This function builds a dict of type vars from a list of type params
-
-        Args:
-            type_params (List[TypeParam]): The type params to instantiate
-            decl_name (str): The name of the declaration
-            decl_line (int): The line number of the declaration
-            decl_id (int): The declaration id
-
-        Returns:
-            Optional[Dict[str, TypeVar]]: A dict of type vars with the type param name as the key or None if an error occurs
-        """
-        type_vars: Dict[str, TypeVar] = {}
-        if type_params is not None:
-            for type_param in type_params:
-                type_var = self.visit_type_param(type_param)
-                if type_var is None:
-                    return None  # the attempt to instantiate the type var will have added an error
-                if type_var.name in type_vars:
-                    self.errors.append(
-                        TypeInferenceError(
-                            f"{decl_name} has multiple type params with the same name {type_var.name}",
-                            decl_line,
-                            decl_id,
-                        )
-                    )
-                    return None
-                type_vars[type_var.name] = type_var
-        return type_vars
-
-    def visit_type_param(self, type_param: TypeParam) -> Optional[TypeVar]:
-        """This function visits a type param and instantiates a TypeVar from it
-
-        Args:
-            type_param (TypeParam): The type param to visit
-
-        Returns:
-            Optional[TypeVar]: The instantiated type var or None if it is not a type var and cannot be resolved by resolve_type_var
-        """
-        # we need to instantiate the type var from the type param
-        type_var = TypeVar(type_param.name, {})
-        # we need to instantiate the trait bounds
-        trait_bounds: Dict[str, TraitBound] = {}
-        if type_param.bounds is not None:
-            for bound in type_param.bounds:
-                resolved_bound = self.resolve_trait_bound(
-                    bound, type_param.line, type_param.id
-                )
-                if resolved_bound is not None:
-                    trait_bounds[bound.name] = resolved_bound
-                else:
-                    return None  # the attempt to resolve the trait bound will have added an error
-        type_var.bounds = trait_bounds
-        return type_var
-
     def resolve_field_annotations(
         self,
-        fields: Union[List[StructField], List[EnumStructField]],
-        type_vars: Dict[str, TypeVar],
+        fields: List[StructField],
         decl_name: str,
         decl_line: int,
         decl_id: int,
@@ -414,16 +215,18 @@ class TypeResolutionPass(Pass):
         """This function resolves the type annotations of the fields of a struct or enum
 
         Args:
-            fields (Union[List[StructField], List[EnumStructField]]): The fields to resolve the type annotations of
-            type_vars (Dict[str, TypeVar]): The type vars in the local scope
+            fields (List[StructField]): The fields to resolve the type annotations of
+            decl_name (str): The name of the declaration
+            decl_line (int): The line number of the declaration
+            decl_id (int): The id of the declaration
 
         Returns:
             Optional[Dict[str, TypeAnnotation]]: A dict of field names and their resolved type annotations or None if an error occurs
         """
         field_types: Dict[str, TypeAnnotation] = {}
         for field in fields:
-            field_type = self.resolve_type_var(
-                field.type_annotation, type_vars, decl_line, decl_id
+            field_type = self.convert_type_annotation_top_level(
+                field.type_annotation, decl_line, decl_id
             )
             if field_type is None:
                 return None  # the attempt to resolve the field type will have added an error
@@ -436,116 +239,6 @@ class TypeResolutionPass(Pass):
                     )
                 )
         return field_types
-
-    def visit_trait_decl(self, trait_decl: TraitDecl) -> None:
-        """
-        Processes a trait declaration, resolving its type parameters and trait bounds,
-        and registers it in the type environment. Enters the trait's scope to process
-        method signatures.
-        Args:
-            trait_decl (TraitDecl): The trait declaration node.
-        Side effects:
-            - Adds the trait and its type vars/bounds to the type environment.
-            - Enters/exits the trait's symbol table scope.
-            - Accumulates errors for duplicate bounds or type param issues.
-        """
-        # make sure we have not already visited this trait
-        if trait_decl.id in self.visited_traits:
-            return
-        # mark as being visited
-        self.visited_traits.add(trait_decl.id)
-        # we create the trait
-        trait = Trait(trait_decl.name, trait_decl.assert_symbol())
-        # we add the trait to the type env
-        self.type_env.add_trait(trait_decl.name, trait)
-        # instantiate the type vars from the type params
-        type_vars = self.instantiate_type_vars(
-            trait_decl.type_params, trait_decl.name, trait_decl.line, trait_decl.id
-        )
-        if type_vars is None:
-            return  # error already recorded
-        # add type vars to trait
-        trait.type_vars = type_vars
-        # instantiate trait bounds
-        trait_bounds: Dict[str, TraitBound] = {}
-        # resolve and check trait bounds
-        if trait_decl.bounds is not None:
-            for bound in trait_decl.bounds:
-                resolved_bound = self.resolve_trait_bound(
-                    bound, trait_decl.line, trait_decl.id
-                )
-                if resolved_bound is not None:
-                    if resolved_bound.name in trait_bounds:
-                        self.errors.append(
-                            TypeInferenceError(
-                                f"Trait {trait_decl.name} has multiple bounds with the same name {resolved_bound.name}",
-                                trait_decl.line,
-                                trait_decl.id,
-                            )
-                        )
-                        return
-                    trait_bounds[resolved_bound.name] = resolved_bound
-                else:
-                    return  # the attempt to resolve the trait bound will have added an error
-        trait.bounds = trait_bounds
-
-        # Enter trait scope and process each method signature.
-        self.symbol_table.enter_scope(trait_decl.id)
-        for method in trait_decl.methods:
-            self.visit_trait_method(method, trait)
-        self.symbol_table.exit_scope()
-
-    def visit_trait_method(
-        self, method: Union[FnDecl, PartialTraitMethod], trait: Trait
-    ) -> None:
-        """
-        Handles trait method declarations within a trait.
-        This is a stub for handling trait methods; actual implementation should
-        resolve method signatures and attach them to the trait as needed.
-        Args:
-            method (FnDecl | PartialTraitMethod): The method node within the trait.
-            trait (Trait): The trait object being built.
-        Raises:
-            NotImplementedError: Always, as trait method handling is not yet implemented.
-        """
-        # instantiate the type vars from the type params
-        type_vars = self.instantiate_type_vars(
-            method.type_params, method.name, method.line, method.id
-        )
-        if type_vars is None:
-            return  # error already recorded
-        param_types: list[Type] = []
-        for param in method.params:
-            param_type = self.resolve_type_var(
-                param.type_annotation, type_vars, method.line, method.id
-            )
-            if param_type is None:
-                return  # error already recorded
-            param_types.append(param_type)
-        ret_type = self.resolve_type_var(
-            method.ret_type, type_vars, method.line, method.id
-        )
-        if ret_type is None:
-            return  # error already recorded
-        method_type = FunctionType(type_vars, param_types, ret_type)
-        method_symbol = method.assert_symbol()
-        # attach the type to the method's symbol
-        method_symbol.type = method_type
-        # check that the method name is not already in the trait
-        if method.name in trait.methods:
-            self.errors.append(
-                TypeInferenceError(
-                    f"Trait {trait.name} has multiple methods with the same name {method.name}",
-                    method.line,
-                    method.id,
-                )
-            )
-            return
-        # add the the method's symbol to the trait type
-        trait.methods[method.name] = method_symbol
-        # if the method is a full method, visit the body
-        if isinstance(method, FnDecl):
-            self.visit_block_with_scope(method.id, method.body)
 
     def visit_type_alias_decl(self, type_alias_decl: TypeAliasDecl) -> None:
         """
@@ -562,28 +255,14 @@ class TypeResolutionPass(Pass):
         self.visited_type_aliases.add(type_alias_decl.id)
         # get the name of the type alias
         type_alias_name = type_alias_decl.name
-        # instantiate the type vars from the type params
-        type_vars = self.instantiate_type_vars(
-            type_alias_decl.type_params,
-            type_alias_name,
-            type_alias_decl.line,
-            type_alias_decl.id,
-        )
-        if type_vars is None:
-            return  # error already recorded
         # resolve the type annotation
-        type_ = self.resolve_type_var(
-            type_alias_decl.type_annotation,
-            type_vars,
-            type_alias_decl.line,
-            type_alias_decl.id,
+        type_ = self.convert_type_annotation_top_level(
+            type_alias_decl.type_annotation, type_alias_decl.line, type_alias_decl.id
         )
         if type_ is None:
             return  # error already recorded
         # create the type alias
-        type_alias = TypeAlias(
-            type_alias_name, type_vars, type_, type_alias_decl.assert_symbol()
-        )
+        type_alias = TypeAlias(type_alias_name, type_, type_alias_decl.assert_symbol())
         # now make sure there is not a type alias cycle and that no other type holds the name
         if self.type_env.find_type(type_alias_name) is not None:
             self.errors.append(
@@ -606,65 +285,9 @@ class TypeResolutionPass(Pass):
         # add the type alias to the type env
         self.type_env.add_type_alias(type_alias)
 
-    def visit_enum_decl(self, enum_decl: EnumDecl) -> None:
-        """
-        Processes an enum declaration, resolves its type parameters and each variant's type,
-        and registers the enum in the type environment. Protects against repeated visits.
-        Args:
-            enum_decl (EnumDecl): The enum declaration node.
-        Side effects:
-            - Adds the enum and its instantiated variants to the type environment.
-            - Accumulates errors for invalid types or duplicate variants.
-        """
-        if enum_decl.id in self.visited_enums:
-            return
-        self.visited_enums.add(enum_decl.id)
-        # Create and register the enum type.
-        enum_type = EnumType(enum_decl.name, {}, [])
-        self.type_env.add_type(enum_decl.name, enum_type)
-        # Instantiate type variables from type parameters.
-        type_vars: Dict[str, TypeVar] = self.instantiate_type_vars(
-            enum_decl.type_params, enum_decl.name, enum_decl.line, enum_decl.id
-        )
-        if type_vars is None:
-            return
-        enum_type.type_vars = type_vars
-        # Resolve and register all enum variants.
-        variants: Dict[str, EnumVariantType] = {}
-        for variant in enum_decl.variants:
-            if isinstance(variant, EnumUnitVariant):
-                variants[variant.name] = EnumUnitVariantType(variant.name)
-            elif isinstance(variant, EnumTupleVariant):
-                tuple_types: list[Type] = []
-                for elem_type in variant.types:
-                    elem_type = self.resolve_type_var(
-                        elem_type, type_vars, variant.line, variant.id
-                    )
-                    if elem_type is None:
-                        return
-                    tuple_types.append(elem_type)
-                variants[variant.name] = EnumTupleVariantType(variant.name, tuple_types)
-            elif isinstance(variant, EnumStructVariant):
-                field_types: Dict[str, Type] = self.resolve_field_annotations(
-                    variant.fields,
-                    type_vars,
-                    enum_decl.name,
-                    enum_decl.line,
-                    enum_decl.id,
-                )
-                if field_types is None:
-                    return
-                variants[variant.name] = EnumStructVariantType(
-                    variant.name, field_types
-                )
-            else:
-                raise RuntimeError(f"Unknown enum variant {variant}")
-        enum_type.variants = variants
-        self.type_env.add_type(enum_decl.name, enum_type)
-
     def visit_struct_decl(self, struct_decl: StructDecl) -> None:
         """
-        Processes a struct declaration, resolves its type parameters and all field types,
+        Processes a struct declaration, resolves its all field types,
         and registers the struct in the type environment. Supports recursive struct types.
         Args:
             struct_decl (StructDecl): The struct declaration node.
@@ -674,20 +297,12 @@ class TypeResolutionPass(Pass):
         """
         if struct_decl.id in self.visited_structs:
             return
-        struct_type = StructType(struct_decl.name, {}, {})
+        struct_type = StructType(struct_decl.name, {})
         self.type_env.add_type(struct_decl.name, struct_type)
         self.visited_structs.add(struct_decl.id)
-        # Instantiate type variables from type parameters.
-        type_vars: Dict[str, TypeVar] = self.instantiate_type_vars(
-            struct_decl.type_params, struct_decl.name, struct_decl.line, struct_decl.id
-        )
-        if type_vars is None:
-            return
-        struct_type.type_vars = type_vars
         # Resolve all struct field types.
         field_types: Dict[str, Type] = self.resolve_field_annotations(
             struct_decl.fields,
-            type_vars,
             struct_decl.name,
             struct_decl.line,
             struct_decl.id,
@@ -699,8 +314,8 @@ class TypeResolutionPass(Pass):
 
     def visit_fn_decl(self, fn_decl: FnDecl) -> None:
         """
-        Processes a standalone function declaration (not a method), resolving its type parameters,
-        parameter types, and return type, and attaches the resulting type to the function's symbol.
+        Processes a standalone function declaration (not a method), resolving its parameter types,
+        and return type, and attaches the resulting type to the function's symbol.
         Enters the function's scope to process its body statements.
         Args:
             fn_decl (FnDecl): The function declaration node.
@@ -710,11 +325,6 @@ class TypeResolutionPass(Pass):
             - Enters/exits the function's symbol table scope.
             - Accumulates errors for invalid types or missing symbols.
         """
-        type_vars: Dict[str, TypeVar] = self.instantiate_type_vars(
-            fn_decl.type_params, fn_decl.name, fn_decl.line, fn_decl.id
-        )
-        if type_vars is None:
-            return
         param_types: list[Type] = []
         for param in fn_decl.params:
             param_type = self.convert_type_annotation_top_level(
@@ -732,54 +342,13 @@ class TypeResolutionPass(Pass):
         )
         if ret_type is None:
             return
-        fn_type = FunctionType(type_vars, param_types, ret_type)
+        fn_type = FunctionType(param_types, ret_type)
         fn_decl.assert_symbol().type = fn_type
         # Enter function scope and process body statements.
         self.symbol_table.enter_scope(fn_decl.id)
         for statement in fn_decl.body:
             self.visit_statement(statement)
         self.symbol_table.exit_scope()
-
-    def visit_impl_decl(self, impl_decl: ImplDecl) -> None:
-        # TODO: get the type vars from the impl type type params
-        # TODO: resolve the impl type
-        # TODO: resolve the trait if it exists
-        # TODO: instantiate the impl type and add it to the type env
-        # TODO: add the impl to the type env
-        # TODO: visit the methods and add their symbols to the impl type
-        raise NotImplementedError("Impl handling not implemented")
-
-    def visit_method_decl(
-        self, method_decl: FnDecl, impl: Impl
-    ) -> None:
-        # instantiate the type vars from the type params
-        type_vars = self.instantiate_type_vars(
-            method_decl.type_params, method_decl.name, method_decl.line, method_decl.id
-        )
-        if type_vars is None:
-            return  # error already recorded
-        # get the function type
-        param_types: list[Type] = []
-        for param in method_decl.params:
-            param_type = self.resolve_type_var(
-                param.type_annotation, type_vars, method_decl.line, method_decl.id
-            )
-            if param_type is None:
-                return  # error already recorded
-            param_types.append(param_type)
-        ret_type = self.resolve_type_var(
-            method_decl.ret_type, type_vars, method_decl.line, method_decl.id
-        )
-        if ret_type is None:
-            return  # error already recorded
-        method_type = FunctionType(type_vars, param_types, ret_type)
-        # attach the type to the method's symbol
-        method_decl.assert_symbol().type = method_type
-        # add the method's symbol to the impl type
-        impl.methods[method_decl.name] = method_decl.assert_symbol()
-        # enter the method's scope and visit the body
-        self.visit_block_with_scope(method_decl.id, method_decl.body)
-
 
     def visit_statement(self, statement: Statement) -> None:
         """
