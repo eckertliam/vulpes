@@ -23,22 +23,12 @@ from ..ast import (
 )
 from ..types import (
     ArrayType,
-    EnumStructVariantType,
-    EnumTupleVariantType,
-    EnumType,
-    EnumUnitVariantType,
-    EnumVariantType,
     FunctionType,
-    GenericType,
-    Impl,
     StructType,
-    Trait,
-    TraitBound,
     TupleType,
     Type,
     TypeAlias,
     TypeHole,
-    TypeVar,
 )
 
 
