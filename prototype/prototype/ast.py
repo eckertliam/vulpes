@@ -59,18 +59,16 @@ class Node:
     Base class for all AST nodes
 
     Attributes:
-        kind: The kind of the node
         line: The line number of the node
         id: The id of the node
         symbol: The symbol associated with the node
     """
 
-    __slots__ = ["kind", "line", "id", "symbol"]
+    __slots__ = ["line", "id", "symbol"]
 
     _next_id = 0  # class variable to track the next available ID
 
-    def __init__(self, kind: str, line: int) -> None:
-        self.kind = kind
+    def __init__(self, line: int) -> None:
         self.line = line
         self.id = Node._next_id
         # optional symbol associated with the node
@@ -93,7 +91,7 @@ class Node:
     def assert_symbol(self) -> Symbol:
         """Safely get the symbol of a node and raise an error if it is not set"""
         if self.symbol is None:
-            raise RuntimeError(f"Node {self.kind} has no symbol")
+            raise RuntimeError(f"Node {self.__class__.__name__} has no symbol")
         return self.symbol
 
 
@@ -123,10 +121,10 @@ class NamedTypeAnnotation(TypeAnnotation):
         name: The name of the type
     """
 
-    __slots__ = ["name", "kind", "line", "id", "symbol"]
+    __slots__ = ["name", "line", "id", "symbol"]
 
     def __init__(self, name: str, line: int) -> None:
-        super().__init__("named_type", line)
+        super().__init__(line)
         self.name = name
 
 
@@ -138,10 +136,10 @@ class ArrayTypeAnnotation(TypeAnnotation):
         elem_type: The type of the elements in the array
     """
 
-    __slots__ = ["elem_type", "kind", "line", "id", "symbol"]
+    __slots__ = ["elem_type", "line", "id", "symbol"]
 
     def __init__(self, elem_type: TypeAnnotation, line: int) -> None:
-        super().__init__("array_type", line)
+        super().__init__(line)
         self.elem_type = elem_type
 
     def get_node(self, id: int) -> Optional[Node]:
@@ -159,10 +157,10 @@ class TupleTypeAnnotation(TypeAnnotation):
         elem_types: The types of the elements in the tuple
     """
 
-    __slots__ = ["elem_types", "kind", "line", "id", "symbol"]
+    __slots__ = ["elem_types", "line", "id", "symbol"]
 
     def __init__(self, elem_types: list[TypeAnnotation], line: int) -> None:
-        super().__init__("tuple_type", line)
+        super().__init__(line)
         self.elem_types = elem_types
 
     def get_node(self, id: int) -> Optional[Node]:
@@ -185,12 +183,12 @@ class FunctionTypeAnnotation(TypeAnnotation):
         ret_type: The type of the return value of the function
     """
 
-    __slots__ = ["params", "ret_type", "kind", "line", "id", "symbol"]
+    __slots__ = ["params", "ret_type", "line", "id", "symbol"]
 
     def __init__(
         self, params: list[TypeAnnotation], ret_type: TypeAnnotation, line: int
     ) -> None:
-        super().__init__("function_type", line)
+        super().__init__(line)
         self.params = params
         self.ret_type = ret_type
 
@@ -204,82 +202,11 @@ class FunctionTypeAnnotation(TypeAnnotation):
         return self.ret_type.get_node(id)
 
 
-class GenericTypeAnnotation(TypeAnnotation):
-    """
-    A type annotation for a generic type
-
-    Attributes:
-        name: The name of the generic type
-        type_args: The type arguments of the generic type
-    """
-
-    __slots__ = ["name", "type_args", "kind", "line", "id", "symbol"]
-
-    def __init__(self, name: str, type_args: list[TypeAnnotation], line: int) -> None:
-        super().__init__("generic_type", line)
-        self.name = name
-        self.type_args = type_args
-
-    def get_node(self, id: int) -> Optional[Node]:
-        if self.id == id:
-            return self
-        for type_arg in self.type_args:
-            node = type_arg.get_node(id)
-            if node is not None:
-                return node
-        return None
-
-    def get_span(self) -> tuple[int, int]:
-        min_line = self.line
-        max_line = self.line
-        for type_arg in self.type_args:
-            tmin, tmax = type_arg.get_span()
-            min_line = min(min_line, tmin)
-            max_line = max(max_line, tmax)
-        return (min_line, max_line)
-
-
-class TypeParam(Node):
-    """A type parameter"""
-
-    __slots__ = ["name", "bounds", "kind", "line", "id", "symbol"]
-
-    def __init__(
-        self,
-        name: str,
-        bounds: Optional[list[Union[NamedTypeAnnotation, GenericTypeAnnotation]]],
-        line: int,
-    ) -> None:
-        super().__init__("type_param", line)
-        self.name = name
-        self.bounds = bounds
-
-    def get_node(self, id: int) -> Optional[Node]:
-        if self.id == id:
-            return self
-        if self.bounds is not None:
-            for bound in self.bounds:
-                node = bound.get_node(id)
-                if node is not None:
-                    return node
-        return None
-
-    def get_span(self) -> tuple[int, int]:
-        min_line = self.line
-        max_line = self.line
-        if self.bounds is not None:
-            for bound in self.bounds:
-                bmin, bmax = bound.get_span()
-                min_line = min(min_line, bmin)
-                max_line = max(max_line, bmax)
-        return (min_line, max_line)
-
 
 class FnDecl(Declaration, Statement):
     """A function declaration
 
     Attributes:
-        pub: Whether the function is public
         name: The name of the function
         params: The parameters of the function
         ret_type: The type of the return value of the function
@@ -287,13 +214,10 @@ class FnDecl(Declaration, Statement):
     """
 
     __slots__ = [
-        "pub",
         "name",
-        "type_params",
         "params",
         "ret_type",
         "body",
-        "kind",
         "line",
         "id",
         "symbol",
@@ -301,18 +225,14 @@ class FnDecl(Declaration, Statement):
 
     def __init__(
         self,
-        pub: bool,
         name: str,
-        type_params: Optional[list["TypeParam"]],
         params: list["Param"],
         ret_type: TypeAnnotation,
         body: list[Statement],
         line: int,
     ) -> None:
-        super().__init__("fn_decl", line)
-        self.pub: bool = pub
+        super().__init__(line)
         self.name: str = name
-        self.type_params: Optional[list[TypeParam]] = type_params
         self.params: list["Param"] = params
         self.ret_type: TypeAnnotation = ret_type
         self.body: list[Statement] = body
@@ -320,11 +240,6 @@ class FnDecl(Declaration, Statement):
     def get_node(self, id: int) -> Optional[Node]:
         if self.id == id:
             return self
-        if self.type_params is not None:
-            for type_param in self.type_params:
-                node = type_param.get_node(id)
-                if node is not None:
-                    return node
         for param in self.params:
             node = param.get_node(id)
             if node is not None:
@@ -341,12 +256,6 @@ class FnDecl(Declaration, Statement):
     def get_span(self) -> tuple[int, int]:
         min_line = self.line
         max_line = self.line
-
-        if self.type_params is not None:
-            for type_param in self.type_params:
-                tmin, tmax = type_param.get_span()
-                min_line = min(min_line, tmin)
-                max_line = max(max_line, tmax)
 
         for param in self.params:
             pmin, pmax = param.get_span()
@@ -368,10 +277,10 @@ class FnDecl(Declaration, Statement):
 class Param(Node):
     """A parameter of a function"""
 
-    __slots__ = ["name", "type_annotation", "kind", "line", "id", "symbol"]
+    __slots__ = ["name", "type_annotation", "line", "id", "symbol"]
 
     def __init__(self, name: str, type_annotation: TypeAnnotation, line: int) -> None:
-        super().__init__("param", line)
+        super().__init__(line)
         self.name = name
         self.type_annotation = type_annotation
 
@@ -384,30 +293,21 @@ class Param(Node):
 class StructDecl(Declaration):
     """A struct declaration"""
 
-    __slots__ = ["pub", "name", "type_params", "fields", "kind", "line", "id", "symbol"]
+    __slots__ = ["name", "fields", "line", "id", "symbol"]
 
     def __init__(
         self,
-        pub: bool,
         name: str,
-        type_params: Optional[list[TypeParam]],
         fields: list["StructField"],
         line: int,
     ) -> None:
-        super().__init__("struct_decl", line)
-        self.pub = pub
+        super().__init__(line)
         self.name = name
-        self.type_params = type_params
         self.fields = fields
 
     def get_node(self, id: int) -> Optional[Node]:
         if self.id == id:
             return self
-        if self.type_params is not None:
-            for type_param in self.type_params:
-                node = type_param.get_node(id)
-                if node is not None:
-                    return node
         for field in self.fields:
             node = field.get_node(id)
             if node is not None:
@@ -418,11 +318,6 @@ class StructDecl(Declaration):
         min_line = self.line
         max_line = self.line
 
-        if self.type_params is not None:
-            for type_param in self.type_params:
-                tmin, tmax = type_param.get_span()
-                min_line = min(min_line, tmin)
-                max_line = max(max_line, tmax)
         for field in self.fields:
             fmin, fmax = field.get_span()
             min_line = min(min_line, fmin)
@@ -433,13 +328,12 @@ class StructDecl(Declaration):
 class StructField(Node):
     """A field of a struct"""
 
-    __slots__ = ["pub", "name", "type_annotation", "kind", "line", "id", "symbol"]
+    __slots__ = ["name", "type_annotation", "line", "id", "symbol"]
 
     def __init__(
-        self, pub: bool, name: str, type_annotation: TypeAnnotation, line: int
+        self, name: str, type_annotation: TypeAnnotation, line: int
     ) -> None:
-        super().__init__("struct_field", line)
-        self.pub = pub
+        super().__init__(line)
         self.name = name
         self.type_annotation = type_annotation
 
@@ -452,140 +346,6 @@ class StructField(Node):
         tmin, tmax = self.type_annotation.get_span()
         return (self.line, max(self.line, tmax))
 
-
-class EnumDecl(Declaration):
-    """An enum declaration"""
-
-    __slots__ = [
-        "pub",
-        "name",
-        "type_params",
-        "variants",
-        "kind",
-        "line",
-        "id",
-        "symbol",
-    ]
-
-    def __init__(
-        self,
-        pub: bool,
-        name: str,
-        type_params: Optional[list[TypeParam]],
-        variants: list["EnumVariant"],
-        line: int,
-    ) -> None:
-        super().__init__("enum_decl", line)
-        self.pub = pub
-        self.name = name
-        self.type_params = type_params
-        self.variants = variants
-
-    def get_node(self, id: int) -> Optional["Node"]:
-        if self.id == id:
-            return self
-        if self.type_params is not None:
-            for type_param in self.type_params:
-                node = type_param.get_node(id)
-                if node is not None:
-                    return node
-        for variant in self.variants:
-            node = variant.get_node(id)
-            if node is not None:
-                return node
-        return None
-
-    def get_span(self) -> tuple[int, int]:
-        min_line = self.line
-        max_line = self.line
-
-        if self.type_params is not None:
-            for type_param in self.type_params:
-                tmin, tmax = type_param.get_span()
-                min_line = min(min_line, tmin)
-                max_line = max(max_line, tmax)
-
-        for variant in self.variants:
-            vmin, vmax = variant.get_span()
-            min_line = min(min_line, vmin)
-            max_line = max(max_line, vmax)
-        return (min_line, max_line)
-
-
-class EnumVariant(Node):
-    """An enum variant"""
-
-    __slots__ = ["name", "kind", "line", "id", "symbol"]
-
-    def __init__(self, kind: str, name: str, line: int) -> None:
-        super().__init__(kind, line)
-        self.name = name
-
-
-class EnumUnitVariant(EnumVariant):
-    """An enum unit variant"""
-
-    def __init__(self, name: str, line: int) -> None:
-        super().__init__("enum_unit_variant", name, line)
-
-
-class EnumTupleVariant(EnumVariant):
-    """An enum tuple variant"""
-
-    __slots__ = ["types", "name", "kind", "line", "id", "symbol"]
-
-    def __init__(self, name: str, types: list[TypeAnnotation], line: int) -> None:
-        super().__init__("enum_tuple_variant", name, line)
-        self.types = types
-
-    def get_node(self, id: int) -> Optional["Node"]:
-        if self.id == id:
-            return self
-        for type_annotation in self.types:
-            node = type_annotation.get_node(id)
-            if node is not None:
-                return node
-        return None
-
-
-class EnumStructVariant(EnumVariant):
-    def __init__(self, name: str, fields: list["EnumStructField"], line: int) -> None:
-        super().__init__("enum_struct_variant", name, line)
-        self.fields = fields
-
-    def get_node(self, id: int) -> Optional[Node]:
-        if self.id == id:
-            return self
-        for field in self.fields:
-            node = field.get_node(id)
-            if node is not None:
-                return node
-        return None
-
-    def get_span(self) -> tuple[int, int]:
-        min_line = self.line
-        max_line = self.line
-        for field in self.fields:
-            fmin, fmax = field.get_span()
-            min_line = min(min_line, fmin)
-            max_line = max(max_line, fmax)
-        return (min_line, max_line)
-
-
-class EnumStructField(Node):
-    def __init__(self, name: str, type_annotation: TypeAnnotation, line: int) -> None:
-        super().__init__("enum_struct_field", line)
-        self.name = name
-        self.type_annotation = type_annotation
-
-    def get_node(self, id: int) -> Optional[Node]:
-        if self.id == id:
-            return self
-        return self.type_annotation.get_node(id)
-
-    def get_span(self) -> tuple[int, int]:
-        tmin, tmax = self.type_annotation.get_span()
-        return (self.line, max(self.line, tmax))
 
 
 class TypeAliasDecl(Declaration):
@@ -593,18 +353,14 @@ class TypeAliasDecl(Declaration):
     Represents a type alias declaration in the program.
 
     Attributes:
-        pub (bool): Indicates if the type alias is public.
         name (str): The name of the type alias.
-        type_params (Optional[list[TypeParam]]): The type parameters for the alias, if any.
         type_annotation (TypeAnnotation): The type annotation associated with the alias.
         line (int): The line number where the alias is declared.
     """
 
     def __init__(
         self,
-        pub: bool,
         name: str,
-        type_params: Optional[list[TypeParam]],
         type_annotation: TypeAnnotation,
         line: int,
     ) -> None:
@@ -612,16 +368,12 @@ class TypeAliasDecl(Declaration):
         Initializes a TypeAliasDecl instance.
 
         Args:
-            pub (bool): Whether the type alias is public.
             name (str): The name of the type alias.
-            type_params (Optional[list[TypeParam]]): The type parameters for the alias, if any.
             type_annotation (TypeAnnotation): The type annotation associated with the alias.
             line (int): The line number where the alias is declared.
         """
-        super().__init__("type_alias_decl", line)
-        self.pub = pub
+        super().__init__(line)
         self.name = name
-        self.type_params = type_params
         self.type_annotation = type_annotation
 
     def get_node(self, id: int) -> Optional[Node]:
@@ -636,11 +388,6 @@ class TypeAliasDecl(Declaration):
         """
         if self.id == id:
             return self
-        if self.type_params is not None:
-            for type_param in self.type_params:
-                node = type_param.get_node(id)
-                if node is not None:
-                    return node
         return self.type_annotation.get_node(id)
 
     def get_span(self) -> tuple[int, int]:
@@ -652,11 +399,6 @@ class TypeAliasDecl(Declaration):
         """
         min_line = self.line
         max_line = self.line
-        if self.type_params is not None:
-            for type_param in self.type_params:
-                tmin, tmax = type_param.get_span()
-                min_line = min(min_line, tmin)
-                max_line = max(max_line, tmax)
         tmin, tmax = self.type_annotation.get_span()
         min_line = min(min_line, tmin)
         max_line = max(max_line, tmax)
@@ -672,8 +414,8 @@ class VarDecl(Statement):
         expr: "Expr",
         line: int,
     ) -> None:
-        kind = "let_decl" if mutable else "const_decl"
-        super().__init__(kind, line)
+        super().__init__(line)
+        self.mutable = mutable
         self.name = name
         self.type_annotation = type_annotation
         self.expr = expr
@@ -694,8 +436,8 @@ class VarDecl(Statement):
 
 
 class Expr(Statement):
-    def __init__(self, kind: str, line: int, type: Optional[Type] = None) -> None:
-        super().__init__(kind, line)
+    def __init__(self, line: int, type: Optional[Type] = None) -> None:
+        super().__init__(line)
         self.type = type
 
 
@@ -705,7 +447,7 @@ class AssignableExpr(Expr):
 
 class Assign(Statement):
     def __init__(self, lhs: AssignableExpr, rhs: "Expr", line: int) -> None:
-        super().__init__("assign", line)
+        super().__init__(line)
         self.lhs = lhs
         self.rhs = rhs
 
@@ -720,182 +462,11 @@ class Assign(Statement):
         return (min(lhs_min, rhs_min), max(lhs_max, rhs_max))
 
 
-class ImplDecl(Declaration):
-    def __init__(
-        self,
-        type_params: Optional[list[TypeParam]],
-        trait: Optional[Union[NamedTypeAnnotation, GenericTypeAnnotation]],
-        impl_type: Union[NamedTypeAnnotation, GenericTypeAnnotation],
-        methods: list[FnDecl],
-        line: int,
-    ) -> None:
-        super().__init__("impl_decl", line)
-        self.impl_type = impl_type
-        self.methods = methods
-        self.trait = trait
-        self.type_params = type_params
-
-    def get_node(self, id: int) -> Optional[Node]:
-        if self.id == id:
-            return self
-        if self.type_params is not None:
-            for type_param in self.type_params:
-                node = type_param.get_node(id)
-                if node is not None:
-                    return node
-        node = self.impl_type.get_node(id)
-        if node is not None:
-            return node
-        for method in self.methods:
-            node = method.get_node(id)
-            if node is not None:
-                return node
-        if self.trait is not None:
-            node = self.trait.get_node(id)
-            if node is not None:
-                return node
-        if self.type_params is not None:
-            for type_param in self.type_params:
-                node = type_param.get_node(id)
-                if node is not None:
-                    return node
-        return None
-
-    def get_span(self) -> tuple[int, int]:
-        min_line = self.line
-        max_line = self.line
-        if self.type_params is not None:
-            for type_param in self.type_params:
-                tmin, tmax = type_param.get_span()
-                min_line = min(min_line, tmin)
-                max_line = max(max_line, tmax)
-        tmin, tmax = self.impl_type.get_span()
-        min_line = min(min_line, tmin)
-        max_line = max(max_line, tmax)
-        for method in self.methods:
-            mmin, mmax = method.get_span()
-            min_line = min(min_line, mmin)
-            max_line = max(max_line, mmax)
-        if self.trait is not None:
-            tmin, tmax = self.trait.get_span()
-            min_line = min(min_line, tmin)
-            max_line = max(max_line, tmax)
-        return (min_line, max_line)
-
-
-class PartialTraitMethod(Declaration):
-    """A partial trait method is a method with only a type signaure provided.
-    Must be implemented by impls of the trait. Example:
-
-    trait Animal
-        fn noise() -> string
-
-    struct Dog
-        name: string
-        age: int
-
-    impl Animal for Dog
-        fn noise() -> string
-            return "woof"
-    """
-
-    def __init__(
-        self,
-        pub: bool,
-        name: str,
-        type_params: Optional[list[TypeParam]],
-        params: list[Param],
-        ret_type: TypeAnnotation,
-        line: int,
-    ) -> None:
-        super().__init__("partial_trait_method", line)
-        self.pub = pub
-        self.name = name
-        self.type_params = type_params
-        self.params = params
-        self.ret_type = ret_type
-
-    def get_node(self, id: int) -> Optional[Node]:
-        if self.id == id:
-            return self
-        if self.type_params is not None:
-            for type_param in self.type_params:
-                node = type_param.get_node(id)
-                if node is not None:
-                    return node
-        for param in self.params:
-            node = param.get_node(id)
-            if node is not None:
-                return node
-        return self.ret_type.get_node(id)
-
-    def get_span(self) -> tuple[int, int]:
-        min_line = self.line
-        max_line = self.line
-        if self.type_params is not None:
-            for type_param in self.type_params:
-                tmin, tmax = type_param.get_span()
-                min_line = min(min_line, tmin)
-                max_line = max(max_line, tmax)
-        for param in self.params:
-            pmin, pmax = param.get_span()
-            min_line = min(min_line, pmin)
-            max_line = max(max_line, pmax)
-        ret_min, ret_max = self.ret_type.get_span()
-        min_line = min(min_line, ret_min)
-        max_line = max(max_line, ret_max)
-        return (min_line, max_line)
-
-
-class TraitDecl(Declaration):
-    def __init__(
-        self,
-        pub: bool,
-        name: str,
-        type_params: Optional[list[TypeParam]],
-        bounds: Optional[list[Union[NamedTypeAnnotation, GenericTypeAnnotation]]],
-        methods: list[Union[FnDecl, PartialTraitMethod]],
-        line: int,
-    ) -> None:
-        super().__init__("trait_decl", line)
-        self.pub = pub
-        self.name = name
-        self.type_params = type_params
-        self.bounds = bounds
-        self.methods = methods
-
-    def get_node(self, id: int) -> Optional[Node]:
-        if self.id == id:
-            return self
-        if self.type_params is not None:
-            for type_param in self.type_params:
-                node = type_param.get_node(id)
-                if node is not None:
-                    return node
-        for method in self.methods:
-            node = method.get_node(id)
-            if node is not None:
-                return node
-        return None
-
-    def get_span(self) -> tuple[int, int]:
-        min_line = self.line
-        max_line = self.line
-        if self.type_params is not None:
-            for type_param in self.type_params:
-                tmin, tmax = type_param.get_span()
-                min_line = min(min_line, tmin)
-                max_line = max(max_line, tmax)
-        for method in self.methods:
-            mmin, mmax = method.get_span()
-            min_line = min(min_line, mmin)
-            max_line = max(max_line, mmax)
-        return (min_line, max_line)
 
 
 class Return(Statement):
     def __init__(self, expr: Optional["Expr"], line: int) -> None:
-        super().__init__("return", line)
+        super().__init__(line)
         self.expr = expr
 
     def get_node(self, id: int) -> Optional[Node]:
@@ -911,7 +482,7 @@ class Return(Statement):
 
 class Else(Statement):
     def __init__(self, body: list[Statement], line: int) -> None:
-        super().__init__("else", line)
+        super().__init__(line)
         self.body = body
 
     def get_node(self, id: int) -> Optional[Node]:
@@ -941,7 +512,7 @@ class If(Statement):
         else_body: Optional[list[Statement]],
         line: int,
     ) -> None:
-        super().__init__("if", line)
+        super().__init__(line)
         self.cond = cond
         self.body = body
         if else_body is not None:
@@ -982,7 +553,7 @@ class If(Statement):
 
 class While(Statement):
     def __init__(self, cond: "Expr", body: list[Statement], line: int) -> None:
-        super().__init__("while", line)
+        super().__init__(line)
         self.cond = cond
         self.body = body
 
@@ -1010,7 +581,7 @@ class While(Statement):
 
 class Loop(Statement):
     def __init__(self, body: list[Statement], line: int) -> None:
-        super().__init__("loop", line)
+        super().__init__(line)
         self.body = body
 
     def get_node(self, id: int) -> Optional[Node]:
@@ -1034,47 +605,47 @@ class Loop(Statement):
 
 class Break(Statement):
     def __init__(self, line: int) -> None:
-        super().__init__("break", line)
+        super().__init__(line)
 
 
 class Continue(Statement):
     def __init__(self, line: int) -> None:
-        super().__init__("continue", line)
+        super().__init__(line)
 
 
 class Integer(Expr):
     def __init__(self, value: int, line: int) -> None:
-        super().__init__("integer", line, IntType())
+        super().__init__(line, IntType())
         self.value = value
 
 
 class Float(Expr):
     def __init__(self, value: float, line: int) -> None:
-        super().__init__("float", line, FloatType())
+        super().__init__(line, FloatType())
         self.value = value
 
 
 class String(Expr):
     def __init__(self, value: str, line: int) -> None:
-        super().__init__("string", line, StringType())
+        super().__init__(line, StringType())
         self.value = value
 
 
 class Char(Expr):
     def __init__(self, value: str, line: int) -> None:
-        super().__init__("char", line, CharType())
+        super().__init__(line, CharType())
         self.value = value
 
 
 class Bool(Expr):
     def __init__(self, value: bool, line: int) -> None:
-        super().__init__("bool", line, BoolType())
+        super().__init__(line, BoolType())
         self.value = value
 
 
 class ArrayExpr(Expr):
     def __init__(self, elems: list[Expr], line: int) -> None:
-        super().__init__("array", line)
+        super().__init__(line)
         self.elems = elems
 
     def get_node(self, id: int) -> Optional[Node]:
@@ -1098,7 +669,7 @@ class ArrayExpr(Expr):
 
 class TupleExpr(Expr):
     def __init__(self, elems: list[Expr], line: int) -> None:
-        super().__init__("tuple", line)
+        super().__init__(line)
         self.elems = elems
 
     def get_node(self, id: int) -> Optional[Node]:
@@ -1122,7 +693,7 @@ class TupleExpr(Expr):
 
 class FieldInit(Node):
     def __init__(self, name: str, expr: Expr, line: int) -> None:
-        super().__init__("field_init", line)
+        super().__init__(line)
         self.name = name
         self.expr = expr
 
@@ -1146,7 +717,7 @@ class StructExpr(Expr):
         fields: list[FieldInit],
         line: int,
     ) -> None:
-        super().__init__("struct_expr", line)
+        super().__init__(line)
         self.name = name
         self.type_args = type_args
         self.fields = fields
@@ -1179,128 +750,11 @@ class StructExpr(Expr):
             max_line = max(max_line, smax)
         return (min_line, max_line)
 
-
-class EnumStructExpr(Expr):
-    def __init__(
-        self,
-        name: str,
-        type_args: Optional[list[TypeAnnotation]],
-        unit: str,
-        fields: list[FieldInit],
-        line: int,
-    ) -> None:
-        super().__init__("enum_struct_expr", line)
-        self.name = name
-        self.type_args = type_args
-        self.unit = unit
-        self.fields = fields
-
-    def get_node(self, id: int) -> Optional[Node]:
-        if self.id == id:
-            return self
-        if self.type_args is not None:
-            for type_arg in self.type_args:
-                node = type_arg.get_node(id)
-                if node is not None:
-                    return node
-        for field in self.fields:
-            node = field.get_node(id)
-            if node is not None:
-                return node
-        return None
-
-    def get_span(self) -> tuple[int, int]:
-        min_line = self.line
-        max_line = self.line
-        if self.type_args is not None:
-            for type_arg in self.type_args:
-                type_arg_min, type_arg_max = type_arg.get_span()
-                min_line = min(min_line, type_arg_min)
-                max_line = max(max_line, type_arg_max)
-        for field in self.fields:
-            smin, smax = field.get_span()
-            min_line = min(min_line, smin)
-            max_line = max(max_line, smax)
-        return (min_line, max_line)
-
-
-class EnumTupleExpr(Expr):
-    def __init__(
-        self,
-        name: str,
-        type_args: Optional[list[TypeAnnotation]],
-        unit: str,
-        elems: list[Expr],
-        line: int,
-    ) -> None:
-        super().__init__("enum_tuple_expr", line)
-        self.name = name
-        self.type_args = type_args
-        self.unit = unit
-        self.elems = elems
-
-    def get_node(self, id: int) -> Optional[Node]:
-        if self.id == id:
-            return self
-        if self.type_args is not None:
-            for type_arg in self.type_args:
-                node = type_arg.get_node(id)
-                if node is not None:
-                    return node
-        for elem in self.elems:
-            node = elem.get_node(id)
-            if node is not None:
-                return node
-        return None
-
-    def get_span(self) -> tuple[int, int]:
-        min_line = self.line
-        max_line = self.line
-        if self.type_args is not None:
-            for type_arg in self.type_args:
-                type_arg_min, type_arg_max = type_arg.get_span()
-                min_line = min(min_line, type_arg_min)
-                max_line = max(max_line, type_arg_max)
-        for elem in self.elems:
-            emin, emax = elem.get_span()
-            min_line = min(min_line, emin)
-            max_line = max(max_line, emax)
-        return (min_line, max_line)
-
-
-class EnumUnitExpr(Expr):
-    def __init__(
-        self, name: str, type_args: Optional[list[TypeAnnotation]], unit: str, line: int
-    ) -> None:
-        super().__init__("enum_unit_expr", line)
-        self.name = name
-        self.type_args = type_args
-        self.unit = unit
-
-    def get_node(self, id: int) -> Optional[Node]:
-        if self.id == id:
-            return self
-        if self.type_args is not None:
-            for type_arg in self.type_args:
-                node = type_arg.get_node(id)
-                if node is not None:
-                    return node
-        return None
-
-    def get_span(self) -> tuple[int, int]:
-        min_line = self.line
-        max_line = self.line
-        if self.type_args is not None:
-            for type_arg in self.type_args:
-                type_arg_min, type_arg_max = type_arg.get_span()
-                min_line = min(min_line, type_arg_min)
-                max_line = max(max_line, type_arg_max)
-        return (min_line, max_line)
 
 
 class Ident(AssignableExpr):
     def __init__(self, name: str, line: int) -> None:
-        super().__init__("ident", line)
+        super().__init__(line)
         self.name = name
 
     @property
@@ -1323,7 +777,7 @@ class Call(Expr):
         args: list[Expr],
         line: int,
     ) -> None:
-        super().__init__("call", line)
+        super().__init__(line)
         self.callee = callee
         self.type_args = type_args
         self.args = args
@@ -1365,7 +819,7 @@ class Call(Expr):
 
 class GetIndex(AssignableExpr):
     def __init__(self, obj: Expr, index: Expr, line: int) -> None:
-        super().__init__("getindex", line)
+        super().__init__(line)
         self.obj = obj
         self.index = index
 
@@ -1394,7 +848,7 @@ class GetIndex(AssignableExpr):
 
 class AccessField(AssignableExpr):
     def __init__(self, obj: Expr, attr: str, line: int) -> None:
-        super().__init__("access_field", line)
+        super().__init__(line)
         self.obj = obj
         self.attr = attr
 
@@ -1414,60 +868,11 @@ class AccessField(AssignableExpr):
         max_line = max(max_line, obj_max)
         return (min_line, max_line)
 
-
-class CallMethod(Expr):
-    def __init__(
-        self,
-        obj: Expr,
-        type_args: Optional[list[TypeAnnotation]],
-        attr: str,
-        args: list[Expr],
-        line: int,
-    ) -> None:
-        super().__init__("call_method", line)
-        self.obj = obj
-        self.type_args = type_args
-        self.attr = attr
-        self.args = args
-
-    def get_node(self, id: int) -> Optional[Node]:
-        if self.id == id:
-            return self
-        node = self.obj.get_node(id)
-        if node is not None:
-            return node
-        if self.type_args is not None:
-            for type_arg in self.type_args:
-                node = type_arg.get_node(id)
-                if node is not None:
-                    return node
-        for arg in self.args:
-            node = arg.get_node(id)
-            if node is not None:
-                return node
-        return None
-
-    def get_span(self) -> tuple[int, int]:
-        min_line = self.line
-        max_line = self.line
-        obj_min, obj_max = self.obj.get_span()
-        min_line = min(min_line, obj_min)
-        max_line = max(max_line, obj_max)
-        if self.type_args is not None:
-            for type_arg in self.type_args:
-                type_arg_min, type_arg_max = type_arg.get_span()
-                min_line = min(min_line, type_arg_min)
-                max_line = max(max_line, type_arg_max)
-        for arg in self.args:
-            arg_min, arg_max = arg.get_span()
-            min_line = min(min_line, arg_min)
-            max_line = max(max_line, arg_max)
-        return (min_line, max_line)
 
 
 class BinaryOp(Expr):
     def __init__(self, op: str, lhs: Expr, rhs: Expr, line: int) -> None:
-        super().__init__("binary_op", line)
+        super().__init__(line)
         self.op = op
         self.lhs = lhs
         self.rhs = rhs
@@ -1494,7 +899,7 @@ class BinaryOp(Expr):
 
 class UnaryOp(Expr):
     def __init__(self, op: str, operand: Expr, line: int) -> None:
-        super().__init__("unary_op", line)
+        super().__init__(line)
         self.op = op
         self.operand = operand
 
