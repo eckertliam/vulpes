@@ -201,6 +201,149 @@ class FunctionTypeAnnotation(TypeAnnotation):
                 return node
         return self.ret_type.get_node(id)
 
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        for param in self.params:
+            pmin, pmax = param.get_span()
+            min_line = min(min_line, pmin)
+            max_line = max(max_line, pmax)
+        rmin, rmax = self.ret_type.get_span()
+        min_line = min(min_line, rmin)
+        max_line = max(max_line, rmax)
+        return (min_line, max_line)
+
+
+class StructuralTypeAnnotation(TypeAnnotation):
+    """
+    A type annotation for a structural type
+
+    Attributes:
+        fields: The fields of the structural type
+    """
+
+    __slots__ = ["fields", "line", "id", "symbol"]
+
+    def __init__(self, fields: Dict[str, TypeAnnotation], line: int) -> None:
+        super().__init__(line)
+        self.fields = fields
+
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        for field in self.fields.values():
+            node = field.get_node(id)
+            if node is not None:
+                return node
+        return None
+
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        for field in self.fields.values():
+            fmin, fmax = field.get_span()
+            min_line = min(min_line, fmin)
+            max_line = max(max_line, fmax)
+        return (min_line, max_line)
+
+
+class UnionTypeAnnotation(TypeAnnotation):
+    """
+    A type annotation for a union type
+
+    Attributes:
+        types: The types of the union
+    """
+
+    __slots__ = ["types", "line", "id", "symbol"]
+
+    def __init__(self, types: list[TypeAnnotation], line: int) -> None:
+        super().__init__(line)
+        self.types = types
+
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        for type in self.types:
+            node = type.get_node(id)
+            if node is not None:
+                return node
+        return None
+
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        for type in self.types:
+            tmin, tmax = type.get_span()
+            min_line = min(min_line, tmin)
+            max_line = max(max_line, tmax)
+        return (min_line, max_line)
+
+
+class IntersectionTypeAnnotation(TypeAnnotation):
+    """
+    A type annotation for an intersection type
+
+    Attributes:
+        types: The types of the intersection
+    """
+
+    __slots__ = ["types", "line", "id", "symbol"]
+
+    def __init__(self, types: list[TypeAnnotation], line: int) -> None:
+        super().__init__(line)
+        self.types = types
+
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        for type in self.types:
+            node = type.get_node(id)
+            if node is not None:
+                return node
+        return None
+
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        for type in self.types:
+            tmin, tmax = type.get_span()
+            min_line = min(min_line, tmin)
+            max_line = max(max_line, tmax)
+        return (min_line, max_line)
+
+
+class SubtractedTypeAnnotation(TypeAnnotation):
+    """
+    A type annotation for a subtracted type
+
+    Attributes:
+        base_type: The base type
+        subtracted_type: The type to subtract from the base type
+    """
+
+    __slots__ = ["base_type", "subtracted_type", "line", "id", "symbol"]
+
+    def __init__(
+        self, base_type: TypeAnnotation, subtracted_type: TypeAnnotation, line: int
+    ) -> None:
+        super().__init__(line)
+        self.base_type = base_type
+        self.subtracted_type = subtracted_type
+
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        node = self.base_type.get_node(id)
+        if node is not None:
+            return node
+        return self.subtracted_type.get_node(id)
+
+    def get_span(self) -> tuple[int, int]:
+        bmin, bmax = self.base_type.get_span()
+        smin, smax = self.subtracted_type.get_span()
+        return (min(bmin, smin), max(bmax, smax))
+
 
 class FnDecl(Declaration, Statement):
     """A function declaration

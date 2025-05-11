@@ -21,6 +21,7 @@ from .ast import (
     Ident,
     If,
     Integer,
+    IntersectionTypeAnnotation,
     Loop,
     NamedTypeAnnotation,
     Param,
@@ -30,10 +31,13 @@ from .ast import (
     StructDecl,
     StructExpr,
     StructField,
+    StructuralTypeAnnotation,
+    SubtractedTypeAnnotation,
     TupleExpr,
     TupleTypeAnnotation,
     TypeAliasDecl,
     UnaryOp,
+    UnionTypeAnnotation,
     VarDecl,
     While,
 )
@@ -52,11 +56,8 @@ grammar = r"""
     definition_list: (definition (_NL* definition)* [_NL*])?
     
     ?definition: fn_def
-                | enum_def
                 | struct_def
                 | type_alias
-                | impl_def
-                | trait_def
                 
     statement_list: (statement (_NL* statement)* [_NL*])?
     
@@ -96,10 +97,22 @@ grammar = r"""
     
     struct_field: IDENT ":" type_annotation
     
-    type_annotation: IDENT -> named_type
+    ?type_annotation: union_type
+
+    ?union_type: intersection_type
+        | union_type "|" intersection_type -> union_type
+
+    ?intersection_type: subtracted_type
+        | intersection_type "&" subtracted_type -> intersection_type
+
+    ?subtracted_type: base_type
+        | base_type "-" base_type -> subtracted_type
+
+    ?base_type: IDENT -> named_type
         | "[" type_annotation "]" -> array_type
         | "(" [type_annotation ("," type_annotation)*] ")" -> tuple_type
         | function_type -> function_type
+        | "{" struct_field_list "}" -> structural_type
     
     function_type: "(" [type_annotation ("," type_annotation)*] ")" "->" type_annotation
     
@@ -127,6 +140,7 @@ grammar = r"""
         | product "*" unary -> mul
         | product "/" unary -> div
         | product "%" unary -> mod
+
     ?unary: "-" unary -> neg
         | "!" unary -> not_
         | molecule
@@ -231,6 +245,24 @@ class ASTTransformer(Transformer):
     def function_type(self, items):
         *params, ret = items
         return FunctionTypeAnnotation(params, ret, ret.line)
+
+    def structural_type(self, items):
+        fields = {}
+        for field in items:
+            fields[field.name] = field.type_annotation
+        return StructuralTypeAnnotation(fields, items[0].line)
+
+    def subtracted_type(self, items):
+        base_type, subtracted_type = items
+        return SubtractedTypeAnnotation(base_type, subtracted_type, base_type.line)
+
+    def intersection_type(self, items):
+        types = items
+        return IntersectionTypeAnnotation(types, types[0].line)
+
+    def union_type(self, items):
+        types = items
+        return UnionTypeAnnotation(types, types[0].line)
 
     # ---------- parameters / fields ----------
     def param(self, items):
