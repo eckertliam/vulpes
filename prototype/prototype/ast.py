@@ -849,24 +849,15 @@ class FieldInit(Node):
 class StructExpr(Expr):
     def __init__(
         self,
-        name: str,
-        type_args: Optional[list[TypeAnnotation]],
         fields: list[FieldInit],
         line: int,
     ) -> None:
         super().__init__(line)
-        self.name = name
-        self.type_args = type_args
         self.fields = fields
 
     def get_node(self, id: int) -> Optional[Node]:
         if self.id == id:
             return self
-        if self.type_args is not None:
-            for type_arg in self.type_args:
-                node = type_arg.get_node(id)
-                if node is not None:
-                    return node
         for field in self.fields:
             node = field.get_node(id)
             if node is not None:
@@ -876,11 +867,6 @@ class StructExpr(Expr):
     def get_span(self) -> tuple[int, int]:
         min_line = self.line
         max_line = self.line
-        if self.type_args is not None:
-            for type_arg in self.type_args:
-                type_arg_min, type_arg_max = type_arg.get_span()
-                min_line = min(min_line, type_arg_min)
-                max_line = max(max_line, type_arg_max)
         for field in self.fields:
             smin, smax = field.get_span()
             min_line = min(min_line, smin)
@@ -909,13 +895,11 @@ class Call(Expr):
     def __init__(
         self,
         callee: Expr,
-        type_args: Optional[list[TypeAnnotation]],
         args: list[Expr],
         line: int,
     ) -> None:
         super().__init__(line)
         self.callee = callee
-        self.type_args = type_args
         self.args = args
 
     def get_node(self, id: int) -> Optional[Node]:
@@ -924,10 +908,7 @@ class Call(Expr):
         node = self.callee.get_node(id)
         if node is not None:
             return node
-        if self.type_args is not None:
-            for type_arg in self.type_args:
-                node = type_arg.get_node(id)
-                if node is not None:
+        for arg in self.args:
                     return node
         for arg in self.args:
             node = arg.get_node(id)
@@ -941,11 +922,6 @@ class Call(Expr):
         callee_min, callee_max = self.callee.get_span()
         min_line = min(min_line, callee_min)
         max_line = max(max_line, callee_max)
-        if self.type_args is not None:
-            for type_arg in self.type_args:
-                type_arg_min, type_arg_max = type_arg.get_span()
-                min_line = min(min_line, type_arg_min)
-                max_line = max(max_line, type_arg_max)
         for arg in self.args:
             arg_min, arg_max = arg.get_span()
             min_line = min(min_line, arg_min)

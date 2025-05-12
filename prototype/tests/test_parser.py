@@ -5,38 +5,25 @@ from prototype.ast import (
     BinaryOp,
     Break,
     Call,
-    CallMethod,
     Continue,
     Else,
-    EnumDecl,
-    EnumStructExpr,
-    EnumStructField,
-    EnumStructVariant,
-    EnumTupleExpr,
-    EnumTupleVariant,
-    EnumUnitExpr,
-    EnumUnitVariant,
     FieldInit,
-    GenericTypeAnnotation,
     GetIndex,
     AccessField,
     NamedTypeAnnotation,
     Param,
-    PartialTraitMethod,
     String,
     StructExpr,
     StructField,
-    TraitDecl,
+    StructuralTypeAnnotation,
     TupleExpr,
     TypeAliasDecl,
     Ident,
     If,
-    ImplDecl,
     Loop,
     StructDecl,
     TupleTypeAnnotation,
     TypeAnnotation,
-    TypeParam,
     VarDecl,
     While,
     Program,
@@ -67,7 +54,6 @@ def test_simple_fn_decl():
     assert len(program.declarations) == 1
     fn_decl = program.declarations[0]
     assert isinstance(fn_decl, FnDecl)
-    assert fn_decl.pub == False
     assert fn_decl.name == "main"
     assert isinstance(fn_decl.ret_type, NamedTypeAnnotation)
     assert fn_decl.ret_type.name == "int"
@@ -91,7 +77,6 @@ def test_fn_w_params():
     assert len(program.declarations) == 1
     fn_decl = program.declarations[0]
     assert isinstance(fn_decl, FnDecl)
-    assert fn_decl.pub == False
     assert fn_decl.name == "add"
     assert len(fn_decl.params) == 2
     assert (
@@ -145,27 +130,6 @@ def test_struct_decl():
         and isinstance(struct_decl.fields[1].type_annotation, NamedTypeAnnotation)
         and struct_decl.fields[1].type_annotation.name == "int"
     )
-
-
-def test_simple_enum_decl():
-    source = textwrap.dedent(
-        """
-    enum Color
-        Red
-        Green
-        Blue
-    """
-    )
-    program = parse(source)
-    assert isinstance(program, Program)
-    assert len(program.declarations) == 1
-    enum_decl = program.declarations[0]
-    assert isinstance(enum_decl, EnumDecl)
-    assert enum_decl.name == "Color"
-    assert len(enum_decl.variants) == 3
-    assert enum_decl.variants[0].name == "Red"
-    assert enum_decl.variants[1].name == "Green"
-    assert enum_decl.variants[2].name == "Blue"
 
 
 def test_if_stmt():
@@ -385,36 +349,6 @@ def test_paren_expr_binding():
     assert return_stmt.expr.name == "result"
 
 
-def test_impl():
-    source = textwrap.dedent(
-        """
-    impl Animal
-        fn make_sound() -> str
-            return "Woof"
-
-        fn move() -> void
-            print("Moving")
-    """
-    )
-    program = parse(source)
-    impl_decl = program.declarations[0]
-    assert isinstance(impl_decl, ImplDecl)
-    assert impl_decl.type_params == None
-    assert isinstance(impl_decl.impl_type, NamedTypeAnnotation)
-    assert impl_decl.impl_type.name == "Animal"
-    assert len(impl_decl.methods) == 2
-    method = impl_decl.methods[0]
-    assert isinstance(method, FnDecl)
-    assert method.name == "make_sound"
-    assert isinstance(method.ret_type, NamedTypeAnnotation)
-    assert method.ret_type.name == "str"
-    method = impl_decl.methods[1]
-    assert isinstance(method, FnDecl)
-    assert method.name == "move"
-    assert isinstance(method.ret_type, NamedTypeAnnotation)
-    assert method.ret_type.name == "void"
-
-
 def test_type_aliases():
     source = textwrap.dedent(
         """
@@ -436,7 +370,7 @@ def test_struct_exprs():
     source = textwrap.dedent(
         """
     fn main() -> int
-        const p = Point { x: 1, y: 2 }
+        const p = { x: 1, y: 2 }
         return p.x
     """
     )
@@ -450,68 +384,6 @@ def test_struct_exprs():
     assert isinstance(const_p.expr.fields[1], FieldInit)
     assert isinstance(fn_body[1], Return)
     assert isinstance(fn_body[1].expr, AccessField)
-
-
-def test_enum_exprs():
-    source = textwrap.dedent(
-        """
-    fn main() -> int
-        const c = Color::Red
-        const c2 = Animal::Dog { name: "Fido" }
-        const c3 = Coordinates::Point(1, 2)
-        return c
-    """
-    )
-    program = parse(source)
-    assert isinstance(program.declarations[0], FnDecl)
-    fn_body = program.declarations[0].body
-    assert isinstance(fn_body[0], VarDecl)
-    color_enum = fn_body[0].expr
-    assert isinstance(color_enum, EnumUnitExpr)
-    assert color_enum.name == "Color"
-    assert color_enum.unit == "Red"
-    assert isinstance(fn_body[1], VarDecl)
-    dog_enum = fn_body[1].expr
-    assert isinstance(dog_enum, EnumStructExpr)
-    assert dog_enum.name == "Animal"
-    assert dog_enum.unit == "Dog"
-    assert len(dog_enum.fields) == 1
-    assert isinstance(dog_enum.fields[0], FieldInit)
-    assert isinstance(fn_body[2], VarDecl)
-    point_enum = fn_body[2].expr
-    assert isinstance(point_enum, EnumTupleExpr)
-    assert point_enum.name == "Coordinates"
-    assert point_enum.unit == "Point"
-    assert len(point_enum.elems) == 2
-    assert isinstance(point_enum.elems[0], Integer)
-    assert point_enum.elems[0].value == 1
-    assert isinstance(point_enum.elems[1], Integer)
-    assert point_enum.elems[1].value == 2
-
-
-def test_method_calls():
-    source = textwrap.dedent(
-        """
-    fn main() -> int
-        const p = Point { x: 1, y: 2 }
-        return p.move(1, 1)
-    """
-    )
-    program = parse(source)
-    assert isinstance(program.declarations[0], FnDecl)
-    fn_body = program.declarations[0].body
-    return_stmt = fn_body[1]
-    assert isinstance(return_stmt, Return)
-    assert isinstance(return_stmt.expr, CallMethod)
-    call_attr = return_stmt.expr
-    assert isinstance(call_attr.obj, Ident)
-    assert call_attr.obj.name == "p"
-    assert call_attr.attr == "move"
-    assert len(call_attr.args) == 2
-    assert isinstance(call_attr.args[0], Integer)
-    assert call_attr.args[0].value == 1
-    assert isinstance(call_attr.args[1], Integer)
-    assert call_attr.args[1].value == 1
 
 
 def test_fn_calls():
@@ -628,248 +500,26 @@ def test_tuple_expr():
     assert tuple_expr.elems[1].value == 2
 
 
-def test_enum_tuple_variant():
+def test_structural_types():
     source = textwrap.dedent(
         """
-    enum Option
-        Some(int)
-        None
-    """
-    )
-    program = parse(source)
-    enum_decl = program.declarations[0]
-    assert isinstance(enum_decl, EnumDecl)
-    assert enum_decl.name == "Option"
-    assert len(enum_decl.variants) == 2
-    assert isinstance(enum_decl.variants[0], EnumTupleVariant)
-    assert len(enum_decl.variants[0].types) == 1
-    assert isinstance(enum_decl.variants[0].types[0], NamedTypeAnnotation)
-    assert enum_decl.variants[0].types[0].name == "int"
-
-
-def test_enum_struct_variant():
-    source = textwrap.dedent(
-        """
-    enum Message
-        Quit
-        Move { x: int, y: int }
-        Write(string)
-        ChangeColor { r: int, g: int, b: int }
-    """
-    )
-    program = parse(source)
-    enum_decl = program.declarations[0]
-    assert isinstance(enum_decl, EnumDecl)
-    assert enum_decl.name == "Message"
-    assert len(enum_decl.variants) == 4
-    quit_variant = enum_decl.variants[0]
-    assert isinstance(quit_variant, EnumUnitVariant)
-    assert quit_variant.name == "Quit"
-    move_variant = enum_decl.variants[1]
-    assert isinstance(move_variant, EnumStructVariant)
-    assert move_variant.name == "Move"
-    assert len(move_variant.fields) == 2
-    assert isinstance(move_variant.fields[0], EnumStructField)
-    assert move_variant.fields[0].name == "x"
-    assert isinstance(move_variant.fields[0].type_annotation, NamedTypeAnnotation)
-    assert move_variant.fields[0].type_annotation.name == "int"
-    assert isinstance(move_variant.fields[1], EnumStructField)
-    assert move_variant.fields[1].name == "y"
-    assert isinstance(move_variant.fields[1].type_annotation, NamedTypeAnnotation)
-    assert move_variant.fields[1].type_annotation.name == "int"
-    write_variant = enum_decl.variants[2]
-    assert isinstance(write_variant, EnumTupleVariant)
-    assert write_variant.name == "Write"
-    assert len(write_variant.types) == 1
-    assert isinstance(write_variant.types[0], NamedTypeAnnotation)
-    assert write_variant.types[0].name == "string"
-
-
-def test_trait():
-    source = textwrap.dedent(
-        """
-    trait Animal
-        fn make_sound() -> string
-        fn move() -> void
-        
-    struct Dog
-        name: string
+    type Person = {
+        name: string,
         age: int
-
-    impl Animal for Dog
-        fn make_sound() -> string
-            return "Woof"
-            
-        fn move() -> void
-            print("Moving")
-    """
-    )
-    program = parse(source)
-    trait_decl = program.declarations[0]
-    assert isinstance(trait_decl, TraitDecl)
-    assert trait_decl.name == "Animal"
-    assert trait_decl.bounds == None
-    assert len(trait_decl.methods) == 2
-    assert isinstance(trait_decl.methods[0], PartialTraitMethod)
-    assert trait_decl.methods[0].name == "make_sound"
-    assert isinstance(trait_decl.methods[0].ret_type, NamedTypeAnnotation)
-    assert trait_decl.methods[0].ret_type.name == "string"
-    assert isinstance(trait_decl.methods[1], PartialTraitMethod)
-    assert trait_decl.methods[1].name == "move"
-    assert isinstance(trait_decl.methods[1].ret_type, NamedTypeAnnotation)
-    assert trait_decl.methods[1].ret_type.name == "void"
-
-    impl_decl = program.declarations[2]
-    assert isinstance(impl_decl, ImplDecl)
-    assert impl_decl.type_params == None
-    assert isinstance(impl_decl.impl_type, NamedTypeAnnotation)
-    assert impl_decl.impl_type.name == "Dog"
-    assert isinstance(impl_decl.trait, NamedTypeAnnotation)
-    assert impl_decl.trait.name == "Animal"
-    assert len(impl_decl.methods) == 2
-    assert isinstance(impl_decl.methods[0], FnDecl)
-    assert impl_decl.methods[0].name == "make_sound"
-    assert isinstance(impl_decl.methods[0].ret_type, NamedTypeAnnotation)
-    assert impl_decl.methods[0].ret_type.name == "string"
-    assert isinstance(impl_decl.methods[1], FnDecl)
-    assert impl_decl.methods[1].name == "move"
-    assert isinstance(impl_decl.methods[1].ret_type, NamedTypeAnnotation)
-    assert impl_decl.methods[1].ret_type.name == "void"
-
-
-def test_trait_bounds():
-    source = textwrap.dedent(
-        """
-    trait Animal: Dog
-        fn make_sound() -> string
-        fn move() -> void
-    """
-    )
-    program = parse(source)
-    trait_decl = program.declarations[0]
-    assert isinstance(trait_decl, TraitDecl)
-    assert trait_decl.name == "Animal"
-    assert trait_decl.bounds == ["Dog"]
-    assert len(trait_decl.methods) == 2
-
-
-def test_type_alias_type_params():
-    source = textwrap.dedent(
-        """
-    type Vec<T> = [T]
-    """
-    )
-    program = parse(source)
-    type_alias_decl = program.declarations[0]
-    assert isinstance(type_alias_decl, TypeAliasDecl)
-    assert type_alias_decl.name == "Vec"
-    assert isinstance(type_alias_decl.type_params, list)
-    assert len(type_alias_decl.type_params) == 1
-    type_param = type_alias_decl.type_params[0]
-    assert isinstance(type_param, TypeParam)
-    assert type_param.name == "T"
-    assert type_param.bounds == None
-    assert isinstance(type_alias_decl.type_annotation, ArrayTypeAnnotation)
-    assert isinstance(type_alias_decl.type_annotation.elem_type, NamedTypeAnnotation)
-    assert type_alias_decl.type_annotation.elem_type.name == "T"
-
-
-def test_fn_type_params():
-    source = textwrap.dedent(
-        """
-    fn add<T: Add>(a: T, b: T) -> T
-        return a + b
-    """
-    )
-    program = parse(source)
-    fn_decl = program.declarations[0]
-    assert isinstance(fn_decl, FnDecl)
-    assert isinstance(fn_decl.type_params, list)
-    assert len(fn_decl.type_params) == 1
-    type_param = fn_decl.type_params[0]
-    assert isinstance(type_param, TypeParam)
-    assert type_param.name == "T"
-    assert type_param.bounds == ["Add"]
-    assert isinstance(fn_decl.ret_type, NamedTypeAnnotation)
-    assert fn_decl.ret_type.name == "T"
-    assert len(fn_decl.params) == 2
-    assert isinstance(fn_decl.params[0], Param)
-    assert isinstance(fn_decl.params[1], Param)
-
-
-def test_impl_type_params():
-    source = textwrap.dedent(
-        """
-    struct Point
-        x: int
-        y: int
+    }
     
-    impl Add<Point> for Point
-        fn add(a: Point, b: Point) -> Point
-            return Point { x: a.x + b.x, y: a.y + b.y }
+    type Point = { x: int, y: int }
     """
     )
     program = parse(source)
-    impl_decl = program.declarations[1]
-    assert isinstance(impl_decl, ImplDecl)
-    assert impl_decl.type_params == None
-    assert isinstance(impl_decl.impl_type, NamedTypeAnnotation)
-    assert impl_decl.impl_type.name == "Point"
-    assert isinstance(impl_decl.trait, GenericTypeAnnotation)
-    assert impl_decl.trait.name == "Add"
-    assert len(impl_decl.trait.type_args) == 1
-    type_arg = impl_decl.trait.type_args[0]
-    assert isinstance(type_arg, NamedTypeAnnotation)
-    assert type_arg.name == "Point"
-
-
-def test_generic_enum():
-    source = textwrap.dedent(
-        """
-    enum Option<T>
-        Some(T)
-        None
-    """
-    )
-    program = parse(source)
-    enum_decl = program.declarations[0]
-    assert isinstance(enum_decl, EnumDecl)
-    assert isinstance(enum_decl.type_params, list)
-    assert len(enum_decl.type_params) == 1
-    type_param = enum_decl.type_params[0]
-    assert isinstance(type_param, TypeParam)
-    assert type_param.name == "T"
-    assert type_param.bounds == None
-    assert len(enum_decl.variants) == 2
-    some_variant = enum_decl.variants[0]
-    assert isinstance(some_variant, EnumTupleVariant)
-    assert some_variant.name == "Some"
-    assert len(some_variant.types) == 1
-    assert isinstance(some_variant.types[0], NamedTypeAnnotation)
-    assert some_variant.types[0].name == "T"
-    none_variant = enum_decl.variants[1]
-    assert isinstance(none_variant, EnumUnitVariant)
-    assert none_variant.name == "None"
-
-
-def test_generic_struct():
-    source = textwrap.dedent(
-        """
-    struct Container<T>
-        value: T
-    """
-    )
-    program = parse(source)
-    struct_decl = program.declarations[0]
-    assert isinstance(struct_decl, StructDecl)
-    assert isinstance(struct_decl.type_params, list)
-    assert len(struct_decl.type_params) == 1
-    type_param = struct_decl.type_params[0]
-    assert isinstance(type_param, TypeParam)
-    assert type_param.name == "T"
-    assert type_param.bounds == None
-    assert len(struct_decl.fields) == 1
-    assert isinstance(struct_decl.fields[0], StructField)
-    assert struct_decl.fields[0].name == "value"
-    assert isinstance(struct_decl.fields[0].type_annotation, NamedTypeAnnotation)
-    assert struct_decl.fields[0].type_annotation.name == "T"
+    type_alias = program.declarations[0]
+    assert isinstance(type_alias, TypeAliasDecl)
+    assert type_alias.name == "Person"
+    assert isinstance(type_alias.type_annotation, StructuralTypeAnnotation)
+    assert len(type_alias.type_annotation.fields) == 2
+    assert isinstance(type_alias.type_annotation.fields["name"], NamedTypeAnnotation)
+    assert type_alias.type_annotation.fields["name"].name == "string"
+    assert isinstance(type_alias.type_annotation.fields["age"], NamedTypeAnnotation)
+    assert type_alias.type_annotation.fields["age"].name == "int"
+    
+    

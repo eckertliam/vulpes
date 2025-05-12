@@ -83,15 +83,15 @@ grammar = r"""
     let_def: "let" IDENT [":" type_annotation] "=" expr
     assign_stmt: (IDENT | getindex | get_field) "=" expr
     
-    type_alias: [PUB] "type" IDENT "=" type_annotation
+    type_alias: "type" IDENT "=" type_annotation
 
-    fn_def: [PUB] "fn" IDENT "(" param_list ")" "->" type_annotation _NL* _INDENT statement_list _DEDENT
+    fn_def: "fn" IDENT "(" param_list ")" "->" type_annotation _NL* _INDENT statement_list _DEDENT
     
     param_list: [param ("," param)*]
     
     param: IDENT ":" type_annotation
     
-    struct_def: "struct" IDENT [type_param_list] _NL struct_field_list
+    struct_def: "struct" IDENT _NL struct_field_list
     
     ?struct_field_list: [_INDENT (struct_field _NL)* _DEDENT]
     
@@ -112,7 +112,13 @@ grammar = r"""
         | "[" type_annotation "]" -> array_type
         | "(" [type_annotation ("," type_annotation)*] ")" -> tuple_type
         | function_type -> function_type
-        | "{" struct_field_list "}" -> structural_type
+        | "{" structural_type_list "}" -> structural_type
+    
+    
+    structural_type_list: structural_type_field ("," structural_type_field)* ","?
+
+    structural_type_field: IDENT ":" type_annotation
+    
     
     function_type: "(" [type_annotation ("," type_annotation)*] ")" "->" type_annotation
     
@@ -150,7 +156,7 @@ grammar = r"""
         | call
         | get_field
         
-    call: molecule [type_arg_list] "(" arglist ")"
+    call: molecule "(" arglist ")"
     getindex: molecule "[" expr "]"
     get_field: molecule "." IDENT
         
@@ -246,11 +252,18 @@ class ASTTransformer(Transformer):
         *params, ret = items
         return FunctionTypeAnnotation(params, ret, ret.line)
 
+    def structural_type_field(self, items):
+        name_tok, type_ann = items
+        return (name_tok.value, type_ann)
+
+    def structural_type_list(self, items):
+        return items
+
     def structural_type(self, items):
         fields = {}
-        for field in items:
-            fields[field.name] = field.type_annotation
-        return StructuralTypeAnnotation(fields, items[0].line)
+        for (name, type_ann) in items[0]:
+            fields[name] = type_ann
+        return StructuralTypeAnnotation(fields, items[0][0][1].line)
 
     def subtracted_type(self, items):
         base_type, subtracted_type = items
@@ -391,8 +404,8 @@ class ASTTransformer(Transformer):
         return GetIndex(obj, index, obj.line)
 
     def call(self, items):
-        callee, type_args, args = items
-        return Call(callee, type_args, args, callee.line)
+        callee, args = items
+        return Call(callee, args, callee.line)
 
     def get_field(self, items):
         obj, attr = items
@@ -495,8 +508,8 @@ class ASTTransformer(Transformer):
         return items
 
     def struct_expr(self, items):
-        name_tok, type_args, fields = items
-        return StructExpr(name_tok.value, type_args, fields, name_tok.line)
+        fields = items[0]
+        return StructExpr(fields, fields[0].line)
 
     def arglist(self, items):
         return items
