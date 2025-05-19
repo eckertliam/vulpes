@@ -8,6 +8,7 @@ from ..ast import (
     Statement,
     StructDecl,
     TypeAliasDecl,
+    UnionDecl,
     VarDecl,
     While,
 )
@@ -39,15 +40,13 @@ class NameDeclarationPass(Pass):
         for declaration in self.program.declarations:
             if isinstance(declaration, FnDecl):
                 self.fn_decl(declaration)
-            elif isinstance(declaration, StructDecl) or isinstance(
-                declaration, TypeAliasDecl
-            ):
+            elif isinstance(declaration, (StructDecl, TypeAliasDecl, UnionDecl)):
                 res = self.add_symbol(
                     declaration.name, declaration.id, declaration.line
                 )
                 if res is None:
                     return
-                # add the symbol to the struct or type alias declaration node
+                # add the symbol to the struct, type alias, or union declaration node
                 declaration.symbol = res
 
         # check for any errors that may have been added

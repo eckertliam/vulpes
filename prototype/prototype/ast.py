@@ -367,6 +367,106 @@ class StructDecl(Declaration):
         return (min_line, max_line)
 
 
+class UnionField(Node):
+    """A super type for all union fields"""
+
+    pass
+
+
+class UnionStructVariant(UnionField):
+    """A union field that is a struct variant"""
+
+    __slots__ = ["name", "fields", "line", "id", "symbol"]
+
+    def __init__(self, name: str, fields: List[StructField], line: int) -> None:
+        super().__init__(line)
+        self.name = name
+        self.fields = fields
+
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        for field in self.fields:
+            node = field.get_node(id)
+            if node is not None:
+                return node
+        return None
+
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        for field in self.fields:
+            fmin, fmax = field.get_span()
+            min_line = min(min_line, fmin)
+            max_line = max(max_line, fmax)
+        return (min_line, max_line)
+
+
+class UnionTupleVariant(UnionField):
+    """A union field that is a tuple variant"""
+
+    __slots__ = ["name", "types", "line", "id", "symbol"]
+
+    def __init__(self, name: str, types: List[TypeAnnotation], line: int) -> None:
+        super().__init__(line)
+        self.name = name
+        self.types = types
+
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        for type in self.types:
+            node = type.get_node(id)
+            if node is not None:
+                return node
+        return None
+
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        for type in self.types:
+            tmin, tmax = type.get_span()
+            min_line = min(min_line, tmin)
+            max_line = max(max_line, tmax)
+        return (min_line, max_line)
+
+class UnionTagVariant(UnionField):
+    """A union field that is a tag variant"""
+
+    __slots__ = ["name", "line", "id", "symbol"]
+
+    def __init__(self, name: str, line: int) -> None:
+        super().__init__(line)
+        self.name = name
+
+
+class UnionDecl(Declaration):
+    """A union declaration"""
+
+    __slots__ = ["name", "fields", "line", "id", "symbol"]
+
+    def __init__(self, name: str, fields: List[UnionField], line: int) -> None:
+        super().__init__(line)
+        self.name = name
+        self.fields = fields
+
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        for field in self.fields:
+            node = field.get_node(id)
+            if node is not None:
+                return node
+        return None
+    
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        for field in self.fields:
+            fmin, fmax = field.get_span()
+            min_line = min(min_line, fmin)
+            max_line = max(max_line, fmax)
+        return (min_line, max_line)
 class TypeAliasDecl(Declaration):
     """
     Represents a type alias declaration in the program.

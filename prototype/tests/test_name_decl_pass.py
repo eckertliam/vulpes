@@ -73,3 +73,43 @@ def test_var_shadowing_error():
     decl_pass.run()
     assert len(decl_pass.errors) == 1
     assert isinstance(decl_pass.errors[0], NameResolutionError)
+
+
+def test_union_decl():
+    source = textwrap.dedent(
+        """
+        union Option
+            Some(int)
+            None
+        """
+    )
+    program = parse(source)
+    decl_pass = NameDeclarationPass(program)
+    decl_pass.run()
+    assert len(decl_pass.errors) == 0
+    assert "Option" in decl_pass.symbol_table.table[-1].symbols
+    option_symbol = decl_pass.symbol_table.table[-1].symbols["Option"]
+    assert option_symbol is not None
+
+
+def test_multiple_unions():
+    source = textwrap.dedent(
+        """
+        union Result
+            Ok(int)
+            Err(string)
+
+        union Status
+            Pending
+            Done
+        """
+    )
+    program = parse(source)
+    decl_pass = NameDeclarationPass(program)
+    decl_pass.run()
+    assert len(decl_pass.errors) == 0
+    symbols = decl_pass.symbol_table.table[-1].symbols
+    assert "Result" in symbols
+    assert "Status" in symbols
+    assert symbols["Result"] is not None
+    assert symbols["Status"] is not None

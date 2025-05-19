@@ -23,6 +23,10 @@ from prototype.ast import (
     StructDecl,
     TupleTypeAnnotation,
     TypeAnnotation,
+    UnionDecl,
+    UnionStructVariant,
+    UnionTagVariant,
+    UnionTupleVariant,
     VarDecl,
     While,
     Program,
@@ -498,3 +502,75 @@ def test_tuple_expr():
     assert tuple_expr.elems[0].value == 1
     assert isinstance(tuple_expr.elems[1], Integer)
     assert tuple_expr.elems[1].value == 2
+
+
+def test_union_decl():
+    source = textwrap.dedent(
+        """
+    union Option
+        Some(int)
+        None
+    """
+    )
+    program = parse(source)
+    assert isinstance(program.declarations[0], UnionDecl)
+    union_decl = program.declarations[0]
+    assert union_decl.name == "Option"
+    assert len(union_decl.fields) == 2
+    assert isinstance(union_decl.fields[0], UnionTupleVariant)
+    assert isinstance(union_decl.fields[1], UnionTagVariant)
+    assert union_decl.fields[0].name == "Some"
+    assert union_decl.fields[1].name == "None"
+    assert isinstance(union_decl.fields[0].types[0], NamedTypeAnnotation)
+    assert union_decl.fields[0].types[0].name == "int"
+    assert union_decl.fields[1].name == "None"
+
+def test_union_all_variants():
+    source = textwrap.dedent(
+        """
+        union Value
+            IntValue(int)
+            StringValue(string)
+            StructValue {
+                name: string
+                count: int
+            }
+            Unit
+        """
+    )
+    program = parse(source)
+    assert isinstance(program, Program)
+    assert len(program.declarations) == 1
+    union_decl = program.declarations[0]
+    assert isinstance(union_decl, UnionDecl)
+    assert union_decl.name == "Value"
+    assert len(union_decl.fields) == 4
+
+    int_variant = union_decl.fields[0]
+    assert isinstance(int_variant, UnionTupleVariant)
+    assert int_variant.name == "IntValue"
+    assert len(int_variant.types) == 1
+    assert isinstance(int_variant.types[0], NamedTypeAnnotation)
+    assert int_variant.types[0].name == "int"
+
+    str_variant = union_decl.fields[1]
+    assert isinstance(str_variant, UnionTupleVariant)
+    assert str_variant.name == "StringValue"
+    assert len(str_variant.types) == 1
+    assert isinstance(str_variant.types[0], NamedTypeAnnotation)
+    assert str_variant.types[0].name == "string"
+
+    struct_variant = union_decl.fields[2]
+    assert isinstance(struct_variant, UnionStructVariant)
+    assert struct_variant.name == "StructValue"
+    assert len(struct_variant.fields) == 2
+    assert struct_variant.fields[0].name == "name"
+    assert isinstance(struct_variant.fields[0].type_annotation, NamedTypeAnnotation)
+    assert struct_variant.fields[0].type_annotation.name == "string"
+    assert struct_variant.fields[1].name == "count"
+    assert isinstance(struct_variant.fields[1].type_annotation, NamedTypeAnnotation)
+    assert struct_variant.fields[1].type_annotation.name == "int"
+
+    unit_variant = union_decl.fields[3]
+    assert isinstance(unit_variant, UnionTagVariant)
+    assert unit_variant.name == "Unit"
