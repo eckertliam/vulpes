@@ -846,34 +846,6 @@ class FieldInit(Node):
         return (min(min_line, expr_min), max(max_line, expr_max))
 
 
-class StructExpr(Expr):
-    def __init__(
-        self,
-        fields: list[FieldInit],
-        line: int,
-    ) -> None:
-        super().__init__(line)
-        self.fields = fields
-
-    def get_node(self, id: int) -> Optional[Node]:
-        if self.id == id:
-            return self
-        for field in self.fields:
-            node = field.get_node(id)
-            if node is not None:
-                return node
-        return None
-
-    def get_span(self) -> tuple[int, int]:
-        min_line = self.line
-        max_line = self.line
-        for field in self.fields:
-            smin, smax = field.get_span()
-            min_line = min(min_line, smin)
-            max_line = max(max_line, smax)
-        return (min_line, max_line)
-
-
 class Ident(AssignableExpr):
     def __init__(self, name: str, line: int) -> None:
         super().__init__(line)
@@ -909,7 +881,7 @@ class Call(Expr):
         if node is not None:
             return node
         for arg in self.args:
-                    return node
+            return node
         for arg in self.args:
             node = arg.get_node(id)
             if node is not None:

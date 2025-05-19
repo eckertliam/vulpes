@@ -21,23 +21,15 @@ from .ast import (
     Ident,
     If,
     Integer,
-    IntersectionTypeAnnotation,
     Loop,
     NamedTypeAnnotation,
     Param,
     Program,
     Return,
     String,
-    StructDecl,
-    StructExpr,
-    StructField,
-    StructuralTypeAnnotation,
-    SubtractedTypeAnnotation,
     TupleExpr,
     TupleTypeAnnotation,
-    TypeAliasDecl,
     UnaryOp,
-    UnionTypeAnnotation,
     VarDecl,
     While,
 )
@@ -83,7 +75,7 @@ grammar = r"""
     let_def: "let" IDENT [":" type_annotation] "=" expr
     assign_stmt: (IDENT | getindex | get_field) "=" expr
     
-    type_alias: "type" IDENT "=" type_annotation
+    type_def: "type" IDENT "=" type_annotation
 
     fn_def: "fn" IDENT "(" param_list ")" "->" type_annotation _NL* _INDENT statement_list _DEDENT
     
@@ -91,35 +83,18 @@ grammar = r"""
     
     param: IDENT ":" type_annotation
     
-    struct_def: "struct" IDENT _NL struct_field_list
-    
-    ?struct_field_list: [_INDENT (struct_field _NL)* _DEDENT]
-    
-    struct_field: IDENT ":" type_annotation
-    
-    ?type_annotation: union_type
-
-    ?union_type: intersection_type
-        | union_type "|" intersection_type -> union_type
-
-    ?intersection_type: subtracted_type
-        | intersection_type "&" subtracted_type -> intersection_type
-
-    ?subtracted_type: base_type
-        | base_type "-" base_type -> subtracted_type
+    ?type_annotation: base_type
 
     ?base_type: IDENT -> named_type
-        | "[" type_annotation "]" -> array_type
-        | "(" [type_annotation ("," type_annotation)*] ")" -> tuple_type
+        | "[" type_annotation ";" expr "]" -> array_type
         | function_type -> function_type
-        | "{" structural_type_list "}" -> structural_type
-    
-    
-    structural_type_list: structural_type_field ("," structural_type_field)* ","?
+        | "(" [type_annotation ("," type_annotation)*] ")" -> tuple_type
+        | record_type -> record_type
+        
 
-    structural_type_field: IDENT ":" type_annotation
-    
-    
+    record_type: "{" IDENT ":" type_annotation ("," IDENT ":" type_annotation)* "}" -> record_type
+
+
     function_type: "(" [type_annotation ("," type_annotation)*] ")" "->" type_annotation
     
     ?expr: logical_or
@@ -252,31 +227,6 @@ class ASTTransformer(Transformer):
         *params, ret = items
         return FunctionTypeAnnotation(params, ret, ret.line)
 
-    def structural_type_field(self, items):
-        name_tok, type_ann = items
-        return (name_tok.value, type_ann)
-
-    def structural_type_list(self, items):
-        return items
-
-    def structural_type(self, items):
-        fields = {}
-        for (name, type_ann) in items[0]:
-            fields[name] = type_ann
-        return StructuralTypeAnnotation(fields, items[0][0][1].line)
-
-    def subtracted_type(self, items):
-        base_type, subtracted_type = items
-        return SubtractedTypeAnnotation(base_type, subtracted_type, base_type.line)
-
-    def intersection_type(self, items):
-        types = items
-        return IntersectionTypeAnnotation(types, types[0].line)
-
-    def union_type(self, items):
-        types = items
-        return UnionTypeAnnotation(types, types[0].line)
-
     # ---------- parameters / fields ----------
     def param(self, items):
         name_tok, type_ann = items
@@ -284,13 +234,6 @@ class ASTTransformer(Transformer):
 
     def param_list(self, items):
         return items
-
-    def struct_field(self, items):
-        name_tok, type_ann = items
-        return StructField(name_tok.value, type_ann, type_ann.line)
-
-    def struct_field_list(self, items):
-        return [it for it in items if not isinstance(it, Token)]
 
     # ---------- declarations ----------
     def fn_def(self, items):
@@ -306,28 +249,6 @@ class ASTTransformer(Transformer):
         body = items[idx]
         assert isinstance(name_tok.value, str), "name_tok.value is not a str in fn_def"
         return FnDecl(name_tok.value, params, ret_type, body, name_tok.line)
-
-    def struct_def(self, items):
-        idx = 0
-        name_tok = items[idx]
-        idx += 1
-        fields = items[idx:] if len(items) > idx else []
-        # flatten the fields
-        new_fields = []
-        for field in fields:
-            if isinstance(field, list):
-                new_fields.extend(field)
-            else:
-                new_fields.append(field)
-        fields = new_fields
-        return StructDecl(name_tok.value, fields, name_tok.line)
-
-    def type_alias(self, items):
-        idx = 0
-        name_tok = items[idx]
-        idx += 1
-        type_ann = items[idx]
-        return TypeAliasDecl(name_tok.value, type_ann, name_tok.line)
 
     # ---------- statements ----------
     def statement(self, items):
@@ -506,10 +427,6 @@ class ASTTransformer(Transformer):
 
     def field_init_list(self, items):
         return items
-
-    def struct_expr(self, items):
-        fields = items[0]
-        return StructExpr(fields, fields[0].line)
 
     def arglist(self, items):
         return items
