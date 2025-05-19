@@ -34,6 +34,10 @@ from .ast import (
     TupleTypeAnnotation,
     TypeAliasDecl,
     UnaryOp,
+    UnionDecl,
+    UnionStructVariant,
+    UnionTagVariant,
+    UnionTupleVariant,
     VarDecl,
     While,
 )
@@ -53,6 +57,7 @@ grammar = r"""
     
     ?definition: fn_def
                 | struct_def
+                | union_def
                 | type_alias
                 
     statement_list: (statement (_NL* statement)* [_NL*])?
@@ -78,11 +83,23 @@ grammar = r"""
     const_def: "const" IDENT [":" type_annotation] "=" expr
     let_def: "let" IDENT [":" type_annotation] "=" expr
     assign_stmt: (IDENT | getindex | get_field) "=" expr
+    
     struct_def: "struct" IDENT _NL _INDENT field_def_list _DEDENT
     field_def_list: (_NL* field_def)+ _NL*
     field_def: IDENT ":" type_annotation
     
+    union_def: "union" IDENT _NL _INDENT union_field_list _DEDENT
+    union_field_list: (_NL* union_field)+ _NL*
     
+    union_struct_variant: IDENT "{" field_def_list "}"
+    union_tuple_variant: IDENT "(" type_annotation (_NL* "," type_annotation)* _NL* ")"
+    union_tag_variant: IDENT
+    
+    union_field: union_struct_variant
+        | union_tuple_variant
+        | union_tag_variant
+    
+
     type_alias: "type" IDENT "=" type_annotation
 
     fn_def: "fn" IDENT "(" param_list ")" "->" type_annotation _NL* _INDENT statement_list _DEDENT
@@ -247,6 +264,25 @@ class ASTTransformer(Transformer):
     def field_def_list(self, items):
         return items
 
+    def union_struct_variant(self, items):
+        name_tok, fields = items
+        return UnionStructVariant(name_tok.value, fields, name_tok.line)
+
+    def union_tuple_variant(self, items):
+        name_tok = items[0]
+        type_annots = items[1:]
+        return UnionTupleVariant(name_tok.value, type_annots, name_tok.line)
+
+    def union_tag_variant(self, items):
+        name_tok = items[0]
+        return UnionTagVariant(name_tok.value, name_tok.line)
+
+    def union_field(self, items):
+        return items[0]
+    
+    def union_field_list(self, items):
+        return items
+
     # ---------- declarations ----------
     def fn_def(self, items):
         idx = 0
@@ -265,6 +301,10 @@ class ASTTransformer(Transformer):
     def struct_def(self, items):
         name_tok, fields = items
         return StructDecl(name_tok.value, fields, name_tok.line)
+
+    def union_def(self, items):
+        name_tok, fields = items
+        return UnionDecl(name_tok.value, fields, name_tok.line)
 
     def type_alias(self, items):
         name_tok, type_ann = items
