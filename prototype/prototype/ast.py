@@ -1,5 +1,5 @@
 # Expressive AST we convert the Lark ast into
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, List
 
 from .symbol import Symbol
 from .types import BoolType, CharType, FloatType, IntType, StringType, Type
@@ -138,15 +138,26 @@ class ArrayTypeAnnotation(TypeAnnotation):
 
     __slots__ = ["elem_type", "line", "id", "symbol"]
 
-    def __init__(self, elem_type: TypeAnnotation, line: int) -> None:
+    def __init__(self, elem_type: TypeAnnotation, size: "Expr", line: int) -> None:
         super().__init__(line)
         self.elem_type = elem_type
+        self.size = size
 
     def get_node(self, id: int) -> Optional[Node]:
         if self.id == id:
             return self
-        else:
-            return self.elem_type.get_node(id)
+        node = self.elem_type.get_node(id)
+        if node is not None:
+            return node
+        return self.size.get_node(id)
+
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        e_min, e_max = self.elem_type.get_span()
+        min_line = min(min_line, e_min)
+        max_line = max(max_line, e_max)
+        return (min_line, max_line)
 
 
 class TupleTypeAnnotation(TypeAnnotation):
@@ -212,137 +223,6 @@ class FunctionTypeAnnotation(TypeAnnotation):
         min_line = min(min_line, rmin)
         max_line = max(max_line, rmax)
         return (min_line, max_line)
-
-
-class StructuralTypeAnnotation(TypeAnnotation):
-    """
-    A type annotation for a structural type
-
-    Attributes:
-        fields: The fields of the structural type
-    """
-
-    __slots__ = ["fields", "line", "id", "symbol"]
-
-    def __init__(self, fields: Dict[str, TypeAnnotation], line: int) -> None:
-        super().__init__(line)
-        self.fields = fields
-
-    def get_node(self, id: int) -> Optional[Node]:
-        if self.id == id:
-            return self
-        for field in self.fields.values():
-            node = field.get_node(id)
-            if node is not None:
-                return node
-        return None
-
-    def get_span(self) -> tuple[int, int]:
-        min_line = self.line
-        max_line = self.line
-        for field in self.fields.values():
-            fmin, fmax = field.get_span()
-            min_line = min(min_line, fmin)
-            max_line = max(max_line, fmax)
-        return (min_line, max_line)
-
-
-class UnionTypeAnnotation(TypeAnnotation):
-    """
-    A type annotation for a union type
-
-    Attributes:
-        types: The types of the union
-    """
-
-    __slots__ = ["types", "line", "id", "symbol"]
-
-    def __init__(self, types: list[TypeAnnotation], line: int) -> None:
-        super().__init__(line)
-        self.types = types
-
-    def get_node(self, id: int) -> Optional[Node]:
-        if self.id == id:
-            return self
-        for type in self.types:
-            node = type.get_node(id)
-            if node is not None:
-                return node
-        return None
-
-    def get_span(self) -> tuple[int, int]:
-        min_line = self.line
-        max_line = self.line
-        for type in self.types:
-            tmin, tmax = type.get_span()
-            min_line = min(min_line, tmin)
-            max_line = max(max_line, tmax)
-        return (min_line, max_line)
-
-
-class IntersectionTypeAnnotation(TypeAnnotation):
-    """
-    A type annotation for an intersection type
-
-    Attributes:
-        types: The types of the intersection
-    """
-
-    __slots__ = ["types", "line", "id", "symbol"]
-
-    def __init__(self, types: list[TypeAnnotation], line: int) -> None:
-        super().__init__(line)
-        self.types = types
-
-    def get_node(self, id: int) -> Optional[Node]:
-        if self.id == id:
-            return self
-        for type in self.types:
-            node = type.get_node(id)
-            if node is not None:
-                return node
-        return None
-
-    def get_span(self) -> tuple[int, int]:
-        min_line = self.line
-        max_line = self.line
-        for type in self.types:
-            tmin, tmax = type.get_span()
-            min_line = min(min_line, tmin)
-            max_line = max(max_line, tmax)
-        return (min_line, max_line)
-
-
-class SubtractedTypeAnnotation(TypeAnnotation):
-    """
-    A type annotation for a subtracted type
-
-    Attributes:
-        base_type: The base type
-        subtracted_type: The type to subtract from the base type
-    """
-
-    __slots__ = ["base_type", "subtracted_type", "line", "id", "symbol"]
-
-    def __init__(
-        self, base_type: TypeAnnotation, subtracted_type: TypeAnnotation, line: int
-    ) -> None:
-        super().__init__(line)
-        self.base_type = base_type
-        self.subtracted_type = subtracted_type
-
-    def get_node(self, id: int) -> Optional[Node]:
-        if self.id == id:
-            return self
-        node = self.base_type.get_node(id)
-        if node is not None:
-            return node
-        return self.subtracted_type.get_node(id)
-
-    def get_span(self) -> tuple[int, int]:
-        bmin, bmax = self.base_type.get_span()
-        smin, smax = self.subtracted_type.get_span()
-        return (min(bmin, smin), max(bmax, smax))
 
 
 class FnDecl(Declaration, Statement):
@@ -432,6 +312,26 @@ class Param(Node):
         return self.type_annotation.get_node(id)
 
 
+class StructField(Node):
+    """A field of a struct"""
+
+    __slots__ = ["name", "type_annotation", "line", "id", "symbol"]
+
+    def __init__(self, name: str, type_annotation: TypeAnnotation, line: int) -> None:
+        super().__init__(line)
+        self.name = name
+        self.type_annotation = type_annotation
+
+    def get_node(self, id: int) -> Optional["Node"]:
+        if self.id == id:
+            return self
+        return self.type_annotation.get_node(id)
+
+    def get_span(self) -> tuple[int, int]:
+        tmin, tmax = self.type_annotation.get_span()
+        return (self.line, max(self.line, tmax))
+
+
 class StructDecl(Declaration):
     """A struct declaration"""
 
@@ -440,7 +340,7 @@ class StructDecl(Declaration):
     def __init__(
         self,
         name: str,
-        fields: list["StructField"],
+        fields: List[StructField],
         line: int,
     ) -> None:
         super().__init__(line)
@@ -465,26 +365,6 @@ class StructDecl(Declaration):
             min_line = min(min_line, fmin)
             max_line = max(max_line, fmax)
         return (min_line, max_line)
-
-
-class StructField(Node):
-    """A field of a struct"""
-
-    __slots__ = ["name", "type_annotation", "line", "id", "symbol"]
-
-    def __init__(self, name: str, type_annotation: TypeAnnotation, line: int) -> None:
-        super().__init__(line)
-        self.name = name
-        self.type_annotation = type_annotation
-
-    def get_node(self, id: int) -> Optional["Node"]:
-        if self.id == id:
-            return self
-        return self.type_annotation.get_node(id)
-
-    def get_span(self) -> tuple[int, int]:
-        tmin, tmax = self.type_annotation.get_span()
-        return (self.line, max(self.line, tmax))
 
 
 class TypeAliasDecl(Declaration):
@@ -828,24 +708,6 @@ class TupleExpr(Expr):
         return (min_line, max_line)
 
 
-class FieldInit(Node):
-    def __init__(self, name: str, expr: Expr, line: int) -> None:
-        super().__init__(line)
-        self.name = name
-        self.expr = expr
-
-    def get_node(self, id: int) -> Optional[Node]:
-        if self.id == id:
-            return self
-        return self.expr.get_node(id)
-
-    def get_span(self) -> tuple[int, int]:
-        min_line = self.line
-        max_line = self.line
-        expr_min, expr_max = self.expr.get_span()
-        return (min(min_line, expr_min), max(max_line, expr_max))
-
-
 class Ident(AssignableExpr):
     def __init__(self, name: str, line: int) -> None:
         super().__init__(line)
@@ -997,4 +859,40 @@ class UnaryOp(Expr):
         operand_min, operand_max = self.operand.get_span()
         min_line = min(min_line, operand_min)
         max_line = max(max_line, operand_max)
+        return (min_line, max_line)
+
+
+class FieldInit(Node):
+    def __init__(self, name: str, expr: Expr, line: int) -> None:
+        super().__init__(line)
+        self.name = name
+        self.expr = expr
+
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        return self.expr.get_node(id)
+
+
+class StructExpr(Expr):
+    def __init__(self, fields: List[FieldInit], line: int) -> None:
+        super().__init__(line)
+        self.fields = fields
+
+    def get_node(self, id: int) -> Optional[Node]:
+        if self.id == id:
+            return self
+        for field in self.fields:
+            node = field.get_node(id)
+            if node is not None:
+                return node
+        return None
+
+    def get_span(self) -> tuple[int, int]:
+        min_line = self.line
+        max_line = self.line
+        for field in self.fields:
+            fmin, fmax = field.get_span()
+            min_line = min(min_line, fmin)
+            max_line = max(max_line, fmax)
         return (min_line, max_line)

@@ -154,27 +154,34 @@ class ArrayType(Type):
 
     Attributes:
         elem_type (Type): The type of elements contained in the array.
+        size (int): The size of the array.
     """
 
-    __slots__ = ["elem_type"]
+    __slots__ = ["elem_type", "size"]
 
-    def __init__(self, elem_type: Type) -> None:
+    def __init__(self, elem_type: Type, size: int) -> None:
         """
         Initializes an ArrayType instance.
 
         Args:
             elem_type (Type): The type of elements contained in the array.
+            size (int): The size of the array.
         """
         self.elem_type = elem_type
+        self.size = size
 
     def __str__(self) -> str:
-        return f"[{self.elem_type}]"
+        return f"[{self.elem_type}; {self.size}]"
 
     def __eq__(self, other: "Type") -> bool:
-        return isinstance(other, ArrayType) and self.elem_type == other.elem_type
+        return (
+            isinstance(other, ArrayType)
+            and self.elem_type == other.elem_type
+            and self.size == other.size
+        )
 
     def __hash__(self) -> int:
-        return hash(("array", hash(self.elem_type)))
+        return hash(("array", hash(self.elem_type), self.size))
 
 
 class TupleType(Type):
