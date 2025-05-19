@@ -10,6 +10,7 @@ from ..ast import (
     FnDecl,
     FunctionTypeAnnotation,
     If,
+    Integer,
     Loop,
     NamedTypeAnnotation,
     Statement,
@@ -32,9 +33,6 @@ from ..types import (
 )
 
 
-# TODO: add docstrings to all methods
-
-
 class TypeResolutionPass(Pass):
     """
     This pass adds type definitions to the type env
@@ -44,19 +42,17 @@ class TypeResolutionPass(Pass):
 
     def __init__(self, previous_pass: NameReferencePass):
         super().__init__(previous_pass=previous_pass)
-        # we need to keep track of the type aliases, enums, and structs
-        # we sometimes need to jump around the ast to add types to the type env
-        # so we need to keep track of what we have already visited
+        # we need to keep track of the type aliases and structs
+        # so we can avoid cycles and multiple definitions
         self.visited_type_aliases: Set[int] = set()
-        self.visited_enums: Set[int] = set()
         self.visited_structs: Set[int] = set()
-        self.visited_traits: Set[int] = set()
+
 
     def convert_type_annotation_top_level(
         self, type_annotation: TypeAnnotation, decl_line: int, decl_id: int
     ) -> Optional[Type]:
         # used to convert type annotations that are at the top level
-        # this means converting type annotations for structs, enums, and type aliases
+        # this means converting type annotations for structs and type aliases
         if isinstance(type_annotation, NamedTypeAnnotation):
             existing_type = self.type_env.get_type(type_annotation.name)
             if existing_type is None:
@@ -77,14 +73,14 @@ class TypeResolutionPass(Pass):
                 type_decl_node = self.program.get_node(type_decl.ast_id)
                 if type_decl_node is None:
                     raise RuntimeError("Cannot find node for type declaration")
-                # check if the type declaration is a type alias, enum, or struct
+                # check if the type declaration is a type alias or struct
                 if not (
                     isinstance(type_decl_node, TypeAliasDecl)
                     or isinstance(type_decl_node, StructDecl)
                 ):
                     self.errors.append(
                         TypeInferenceError(
-                            f"Type {type_annotation.name} is not a type alias, enum, or struct",
+                            f"Type {type_annotation.name} is not a type alias or struct",
                             decl_line,
                             decl_id,
                         )
@@ -115,8 +111,13 @@ class TypeResolutionPass(Pass):
                 # if somehting went wrong we return None
                 # the attempt to convert the element type will have added an error
                 return None
+            # TODO: we need to find a way to handle the size at compile time
+            if isinstance(type_annotation.size, Integer):
+                size = type_annotation.size.value
+            else:
+                raise NotImplementedError("Array size is not an integer")
             # we return the array type
-            return ArrayType(elem_type)
+            return ArrayType(elem_type, size)
         elif isinstance(type_annotation, TupleTypeAnnotation):
             # we need to convert the element types
             elem_types = [
@@ -180,7 +181,7 @@ class TypeResolutionPass(Pass):
     def visit_type_decl(self, type_decl: Declaration) -> None:
         """
         Dispatches a top-level type declaration to the appropriate handler.
-        Supported declarations: TypeAliasDecl, EnumDecl, StructDecl, TraitDecl.
+        Supported declarations: TypeAliasDecl, StructDecl.
         Ignores other declaration types.
         Args:
             type_decl (Declaration): The top-level declaration node to process.
@@ -201,8 +202,8 @@ class TypeResolutionPass(Pass):
         decl_name: str,
         decl_line: int,
         decl_id: int,
-    ) -> Optional[Dict[str, TypeAnnotation]]:
-        """This function resolves the type annotations of the fields of a struct or enum
+    ) -> Optional[Dict[str, Type]]:
+        """This function resolves the type annotations of the fields of a struct
 
         Args:
             fields (List[StructField]): The fields to resolve the type annotations of
@@ -211,9 +212,9 @@ class TypeResolutionPass(Pass):
             decl_id (int): The id of the declaration
 
         Returns:
-            Optional[Dict[str, TypeAnnotation]]: A dict of field names and their resolved type annotations or None if an error occurs
+            Optional[Dict[str, Type]]: A dict of field names and their resolved types or None if an error occurs
         """
-        field_types: Dict[str, TypeAnnotation] = {}
+        field_types: Dict[str, Type] = {}
         for field in fields:
             field_type = self.convert_type_annotation_top_level(
                 field.type_annotation, decl_line, decl_id
@@ -228,6 +229,8 @@ class TypeResolutionPass(Pass):
                         decl_id,
                     )
                 )
+                return None
+            field_types[field.name] = field_type
         return field_types
 
     def visit_type_alias_decl(self, type_alias_decl: TypeAliasDecl) -> None:

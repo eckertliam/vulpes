@@ -15,7 +15,6 @@ from prototype.ast import (
     String,
     StructExpr,
     StructField,
-    StructuralTypeAnnotation,
     TupleExpr,
     TypeAliasDecl,
     Ident,
@@ -111,6 +110,7 @@ def test_struct_decl():
     struct Point
         x: int
         y: int
+    
     """
     )
     program = parse(source)
@@ -498,28 +498,3 @@ def test_tuple_expr():
     assert tuple_expr.elems[0].value == 1
     assert isinstance(tuple_expr.elems[1], Integer)
     assert tuple_expr.elems[1].value == 2
-
-
-def test_structural_types():
-    source = textwrap.dedent(
-        """
-    type Person = {
-        name: string,
-        age: int
-    }
-    
-    type Point = { x: int, y: int }
-    """
-    )
-    program = parse(source)
-    type_alias = program.declarations[0]
-    assert isinstance(type_alias, TypeAliasDecl)
-    assert type_alias.name == "Person"
-    assert isinstance(type_alias.type_annotation, StructuralTypeAnnotation)
-    assert len(type_alias.type_annotation.fields) == 2
-    assert isinstance(type_alias.type_annotation.fields["name"], NamedTypeAnnotation)
-    assert type_alias.type_annotation.fields["name"].name == "string"
-    assert isinstance(type_alias.type_annotation.fields["age"], NamedTypeAnnotation)
-    assert type_alias.type_annotation.fields["age"].name == "int"
-    
-    

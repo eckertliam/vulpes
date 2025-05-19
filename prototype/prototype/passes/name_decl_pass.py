@@ -1,11 +1,9 @@
-from typing import Optional, Union
+from typing import Optional
 from ..ast import (
     Else,
     FnDecl,
     If,
     Loop,
-    NamedTypeAnnotation,
-    Param,
     Program,
     Statement,
     StructDecl,
@@ -36,30 +34,21 @@ class NameDeclarationPass(Pass):
             return res
 
     def run(self) -> None:
-        # first we add all defined data structs to the symbol table
-        # we do this so that we can then add their impls to their scopes
-        for declaration in self.program.declarations:
-            if isinstance(declaration, StructDecl):
-                res = self.add_symbol(
-                    declaration.name, declaration.id, declaration.line
-                )
-                if res is None:
-                    return
-                # add the symbol to the struct declaration node
-                declaration.symbol = res
-            elif isinstance(declaration, TypeAliasDecl):
-                res = self.add_symbol(
-                    declaration.name, declaration.id, declaration.line
-                )
-                if res is None:
-                    return
-                # add the symbol to the type alias declaration node
-                declaration.symbol = res
-
-        # now we add all impls and fns to the symbol table
+        # loop through all declarations and add them to the symbol table
+        # go through function bodies to handle their local variables
         for declaration in self.program.declarations:
             if isinstance(declaration, FnDecl):
                 self.fn_decl(declaration)
+            elif isinstance(declaration, StructDecl) or isinstance(
+                declaration, TypeAliasDecl
+            ):
+                res = self.add_symbol(
+                    declaration.name, declaration.id, declaration.line
+                )
+                if res is None:
+                    return
+                # add the symbol to the struct or type alias declaration node
+                declaration.symbol = res
 
         # check for any errors that may have been added
         if len(self.errors) > 0:

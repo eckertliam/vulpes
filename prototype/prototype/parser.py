@@ -27,8 +27,12 @@ from .ast import (
     Program,
     Return,
     String,
+    StructDecl,
+    StructExpr,
+    StructField,
     TupleExpr,
     TupleTypeAnnotation,
+    TypeAliasDecl,
     UnaryOp,
     VarDecl,
     While,
@@ -74,8 +78,12 @@ grammar = r"""
     const_def: "const" IDENT [":" type_annotation] "=" expr
     let_def: "let" IDENT [":" type_annotation] "=" expr
     assign_stmt: (IDENT | getindex | get_field) "=" expr
+    struct_def: "struct" IDENT _NL _INDENT field_def_list _DEDENT
+    field_def_list: (_NL* field_def)+ _NL*
+    field_def: IDENT ":" type_annotation
     
-    type_def: "type" IDENT "=" type_annotation
+    
+    type_alias: "type" IDENT "=" type_annotation
 
     fn_def: "fn" IDENT "(" param_list ")" "->" type_annotation _NL* _INDENT statement_list _DEDENT
     
@@ -89,10 +97,6 @@ grammar = r"""
         | "[" type_annotation ";" expr "]" -> array_type
         | function_type -> function_type
         | "(" [type_annotation ("," type_annotation)*] ")" -> tuple_type
-        | record_type -> record_type
-        
-
-    record_type: "{" IDENT ":" type_annotation ("," IDENT ":" type_annotation)* "}" -> record_type
 
 
     function_type: "(" [type_annotation ("," type_annotation)*] ")" "->" type_annotation
@@ -130,10 +134,10 @@ grammar = r"""
         | getindex
         | call
         | get_field
-        
     call: molecule "(" arglist ")"
     getindex: molecule "[" expr "]"
     get_field: molecule "." IDENT
+    
         
     ?atom: IDENT -> ident
         | FLOAT -> float
@@ -144,11 +148,12 @@ grammar = r"""
         | TRUE -> true
         | FALSE -> false
         | "[" [expr ("," expr)*] "]" -> array_expr
-        | "{" field_init_list "}" -> struct_expr
+        | struct_expr
         
-    field_init_list: [ field_init ("," field_init)* ]
+    struct_expr: LBRACE field_init_list RBRACE
     field_init: IDENT ":" expr
-        
+    field_init_list: [ field_init ("," _NL* field_init)* [_NL*] ]
+
 
     arglist: [expr ("," expr)*]
     
@@ -217,8 +222,8 @@ class ASTTransformer(Transformer):
         return NamedTypeAnnotation(items[0].value, items[0].line)
 
     def array_type(self, items):
-        (elem_type,) = items
-        return ArrayTypeAnnotation(elem_type, elem_type.line)
+        (elem_type, size) = items
+        return ArrayTypeAnnotation(elem_type, size, elem_type.line)
 
     def tuple_type(self, items):
         return TupleTypeAnnotation(items, items[0].line)
@@ -235,6 +240,13 @@ class ASTTransformer(Transformer):
     def param_list(self, items):
         return items
 
+    def field_def(self, items):
+        name_tok, type_ann = items
+        return StructField(name_tok.value, type_ann, name_tok.line)
+
+    def field_def_list(self, items):
+        return items
+
     # ---------- declarations ----------
     def fn_def(self, items):
         idx = 0
@@ -249,6 +261,14 @@ class ASTTransformer(Transformer):
         body = items[idx]
         assert isinstance(name_tok.value, str), "name_tok.value is not a str in fn_def"
         return FnDecl(name_tok.value, params, ret_type, body, name_tok.line)
+
+    def struct_def(self, items):
+        name_tok, fields = items
+        return StructDecl(name_tok.value, fields, name_tok.line)
+
+    def type_alias(self, items):
+        name_tok, type_ann = items
+        return TypeAliasDecl(name_tok.value, type_ann, name_tok.line)
 
     # ---------- statements ----------
     def statement(self, items):
@@ -426,7 +446,11 @@ class ASTTransformer(Transformer):
         return FieldInit(name_tok.value, expr, name_tok.line)
 
     def field_init_list(self, items):
-        return items
+        return items if items else []
+
+    def struct_expr(self, items):
+        lbrace, fields, rbrace = items
+        return StructExpr(fields, lbrace.line)
 
     def arglist(self, items):
         return items
