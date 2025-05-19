@@ -211,40 +211,29 @@ class FunctionType(Type):
     Represents a function type, which includes parameter types and a return type.
 
     Attributes:
-        type_vars (Dict[str, TypeVar]): Type variables used in the function.
         params (list[Type]): The types of parameters the function accepts.
         ret_type (Type): The return type of the function.
     """
 
-    __slots__ = ["type_vars", "params", "ret_type"]
+    __slots__ = ["params", "ret_type"]
 
-    def __init__(
-        self, type_vars: Dict[str, "TypeVar"], params: list[Type], ret_type: Type
-    ) -> None:
+    def __init__(self, params: list[Type], ret_type: Type) -> None:
         """
         Initializes a FunctionType instance.
 
         Args:
-            type_vars (Dict[str, TypeVar]): Type variables used in the function.
             params (list[Type]): The types of parameters the function accepts.
             ret_type (Type): The return type of the function.
         """
-        self.type_vars = type_vars
         self.params = params
         self.ret_type = ret_type
 
     def __str__(self) -> str:
-        tvs = (
-            f"<{', '.join(str(t) for t in self.type_vars.values())}>"
-            if self.type_vars
-            else ""
-        )
-        return f"{tvs}({', '.join(str(t) for t in self.params)}) -> {self.ret_type}"
+        return f"({', '.join(str(t) for t in self.params)}) -> {self.ret_type}"
 
     def __eq__(self, other: "Type") -> bool:
         return (
             isinstance(other, FunctionType)
-            and self.type_vars == other.type_vars
             and self.params == other.params
             and self.ret_type == other.ret_type
         )
@@ -255,24 +244,8 @@ class FunctionType(Type):
                 "fn",
                 tuple(hash(t) for t in self.params),
                 hash(self.ret_type),
-                tuple(hash(t) for t in self.type_vars.values()),
             )
         )
-
-
-class SelfType(Type):
-    """
-    Represents the 'Self' type used in trait declarations to refer to the implementing type.
-    """
-
-    def __str__(self) -> str:
-        return "Self"
-
-    def __eq__(self, other: "Type") -> bool:
-        return isinstance(other, SelfType)
-
-    def __hash__(self) -> int:
-        return hash("Self")
 
 
 # Struct Type
@@ -282,25 +255,20 @@ class StructType(Type):
 
     Attributes:
         name (str): The name of the struct.
-        type_vars (Dict[str, TypeVar]): Type variables used in the struct.
         fields (Dict[str, Type]): The fields of the struct and their types.
     """
 
-    __slots__ = ["name", "type_vars", "fields"]
+    __slots__ = ["name", "fields"]
 
-    def __init__(
-        self, name: str, type_vars: Dict[str, "TypeVar"], fields: Dict[str, Type]
-    ) -> None:
+    def __init__(self, name: str, fields: Dict[str, Type]) -> None:
         """
         Initializes a StructType instance.
 
         Args:
             name (str): The name of the struct.
-            type_vars (Dict[str, TypeVar]): Type variables used in the struct.
             fields (Dict[str, Type]): The fields of the struct and their types.
         """
         self.name = name
-        self.type_vars = type_vars
         self.fields = fields
 
     def __str__(self) -> str:
@@ -321,233 +289,6 @@ class StructType(Type):
                 tuple(sorted((k, hash(v)) for k, v in self.fields.items())),
             )
         )
-
-
-# Handling enum variant types
-class EnumVariantType(ABC):
-    """
-    Abstract base class for all enum variant types.
-
-    Attributes:
-        name (str): The name of the enum variant.
-    """
-
-    __slots__ = ["name"]
-
-    def __init__(self, name: str) -> None:
-        """
-        Initializes an EnumVariantType instance.
-
-        Args:
-            name (str): The name of the enum variant.
-        """
-        self.name = name
-
-    @abstractmethod
-    def __str__(self) -> str:
-        pass
-
-    @abstractmethod
-    def __eq__(self, other: "EnumVariantType") -> bool:
-        pass
-
-    def __ne__(self, other: "EnumVariantType") -> bool:
-        return not self.__eq__(other)
-
-    @abstractmethod
-    def __hash__(self) -> int:
-        pass
-
-
-class EnumUnitVariantType(EnumVariantType):
-    """
-    Represents a unit variant type, which is an enum variant with no associated data.
-    """
-
-    __slots__ = ["name"]
-
-    def __init__(self, name: str) -> None:
-        """
-        Initializes an EnumUnitVariantType instance.
-
-        Args:
-            name (str): The name of the unit variant.
-        """
-        super().__init__(name)
-
-    def __eq__(self, other: "EnumVariantType") -> bool:
-        return isinstance(other, EnumUnitVariantType) and self.name == other.name
-
-    def __hash__(self) -> int:
-        return hash(("enum_unit", self.name))
-
-    def __str__(self) -> str:
-        return self.name
-
-
-class EnumTupleVariantType(EnumVariantType):
-    """
-    Represents a tuple variant type, which is an enum variant with a tuple of associated data types.
-
-    Attributes:
-        types (list[Type]): The types of elements in the tuple variant.
-    """
-
-    __slots__ = ["name", "types"]
-
-    def __init__(self, name: str, types: list[Type]) -> None:
-        """
-        Initializes an EnumTupleVariantType instance.
-
-        Args:
-            name (str): The name of the tuple variant.
-            types (list[Type]): The types of elements in the tuple variant.
-        """
-        super().__init__(name)
-        self.types = types
-
-    def __eq__(self, other: "EnumVariantType") -> bool:
-        return (
-            isinstance(other, EnumTupleVariantType)
-            and self.name == other.name
-            and self.types == other.types
-        )
-
-    def __hash__(self) -> int:
-        return hash(("enum_tuple", self.name, tuple(hash(t) for t in self.types)))
-
-    def __str__(self) -> str:
-        return f"{self.name} ({', '.join(str(t) for t in self.types)})"
-
-
-class EnumStructVariantType(EnumVariantType):
-    """
-    Represents a struct variant type, which is an enum variant with named fields.
-
-    Attributes:
-        fields (Dict[str, Type]): The fields of the struct variant and their types.
-    """
-
-    __slots__ = ["name", "fields"]
-
-    def __init__(self, name: str, fields: Dict[str, Type]) -> None:
-        """
-        Initializes an EnumStructVariantType instance.
-
-        Args:
-            name (str): The name of the struct variant.
-            fields (Dict[str, Type]): The fields of the struct variant and their types.
-        """
-        super().__init__(name)
-        self.fields = fields
-
-    def __str__(self) -> str:
-        return f"{self.name} {{ {', '.join(f'{k}: {v}' for k, v in self.fields.items())} }}"
-
-    def __eq__(self, other: "EnumVariantType") -> bool:
-        return (
-            isinstance(other, EnumStructVariantType)
-            and self.name == other.name
-            and self.fields == other.fields
-        )
-
-    def __hash__(self) -> int:
-        return hash(
-            (
-                "enum_struct",
-                self.name,
-                tuple(sorted((k, hash(v)) for k, v in self.fields.items())),
-            )
-        )
-
-
-# Enum Type
-class EnumType(Type):
-    """
-    Represents an enum type, which is a type with multiple named variants.
-
-    Attributes:
-        name (str): The name of the enum.
-        type_vars (Dict[str, TypeVar]): Type variables used in the enum.
-        variants (list[EnumVariantType]): The variants of the enum.
-    """
-
-    __slots__ = ["name", "type_vars", "variants"]
-
-    def __init__(
-        self,
-        name: str,
-        type_vars: Dict[str, "TypeVar"],
-        variants: list[EnumVariantType],
-    ) -> None:
-        """
-        Initializes an EnumType instance.
-
-        Args:
-            name (str): The name of the enum.
-            type_vars (Dict[str, TypeVar]): Type variables used in the enum.
-            variants (list[EnumVariantType]): The variants of the enum.
-        """
-        self.name = name
-        self.type_vars = type_vars
-        self.variants: Dict[str, EnumVariantType] = {v.name: v for v in variants}
-
-    def __str__(self) -> str:
-        return f"{self.name} {{ {', '.join(str(v) for v in self.variants.values())} }}"
-
-    def __eq__(self, other: "Type") -> bool:
-        return (
-            isinstance(other, EnumType)
-            and self.name == other.name
-            and self.variants == other.variants
-        )
-
-    def __hash__(self) -> int:
-        return hash(
-            (
-                "enum",
-                self.name,
-                tuple(sorted((k, hash(v)) for k, v in self.variants.items())),
-            )
-        )
-
-
-class GenericType(Type):
-    """
-    Represents an instantiation of a generic type, which will be monomorphized during type checking.
-
-    Attributes:
-        base_type (Union[StructType, EnumType]): The base type being instantiated.
-        type_args (List[Type]): The type arguments for the generic type.
-    """
-
-    __slots__ = ["base_type", "type_args"]
-
-    def __init__(
-        self, base_type: Union[StructType, EnumType], type_args: List[Type]
-    ) -> None:
-        """
-        Initializes a GenericType instance.
-
-        Args:
-            base_type (Union[StructType, EnumType]): The base type being instantiated.
-            type_args (List[Type]): The type arguments for the generic type.
-        """
-        self.base_type = base_type
-        self.type_args = type_args
-
-    def __str__(self) -> str:
-        return f"{self.base_type.name}<{', '.join(str(t) for t in self.type_args)}>"
-
-    def __eq__(self, other: "Type") -> bool:
-        return (
-            isinstance(other, GenericType)
-            and self.base_type == other.base_type
-            and self.type_args == other.type_args
-        )
-
-    def __hash__(self) -> int:
-        return hash(("generic", self.base_type, tuple(hash(t) for t in self.type_args)))
 
 
 class TypeHole(Type):
@@ -584,216 +325,28 @@ class TypeHole(Type):
         return hash(self.name)
 
 
-class TraitBound(Type):
-    """
-    Represents a trait bound, which is a type that is a trait.
-
-    Attributes:
-        name (str): The name of the trait bound.
-        type_args (Optional[List[Type]]): The type arguments for the trait bound.
-    """
-
-    __slots__ = ["name", "type_args"]
-
-    def __init__(self, name: str, type_args: Optional[List[Type]] = None) -> None:
-        """
-        Initializes a TraitBound instance.
-
-        Args:
-            name (str): The name of the trait bound.
-            type_args (Optional[List[Type]]): The type arguments for the trait bound.
-        """
-        self.name = name
-        self.type_args = type_args
-
-    def __str__(self) -> str:
-        tas = f"<{', '.join(str(t) for t in self.type_args)}>" if self.type_args else ""
-        return f"{self.name}{tas}"
-
-    def __eq__(self, other: "Type") -> bool:
-        return (
-            isinstance(other, TraitBound)
-            and self.name == other.name
-            and self.type_args == other.type_args
-        )
-
-    def __hash__(self) -> int:
-        if self.type_args:
-            return hash(
-                ("trait_bound", self.name, tuple(hash(t) for t in self.type_args))
-            )
-        else:
-            return hash(("trait_bound", self.name))
-
-
-class TypeVar(Type):
-    """
-    Represents a type variable, which is derived from type parameters and contains trait bounds and a name.
-
-    Attributes:
-        name (str): The name of the type variable.
-        bounds (Dict[str, TraitBound]): The trait bounds associated with the type variable.
-    """
-
-    __slots__ = ["name", "bounds"]
-
-    def __init__(self, name: str, bounds: Dict[str, TraitBound]) -> None:
-        """
-        Initializes a TypeVar instance.
-
-        Args:
-            name (str): The name of the type variable.
-            bounds (Dict[str, TraitBound]): The trait bounds associated with the type variable.
-        """
-        self.name = name
-        self.bounds = bounds
-
-    def __str__(self) -> str:
-        return f"{self.name} : {', '.join(str(b) for b in self.bounds)}"
-
-    def __eq__(self, other: "Type") -> bool:
-        return (
-            isinstance(other, TypeVar)
-            and self.name == other.name
-            and self.bounds == other.bounds
-        )
-
-    def __hash__(self) -> int:
-        return hash(
-            ("type_var", self.name, tuple(hash(b) for b in self.bounds.values()))
-        )
-
-
-class Trait:
-    """
-    Represents a trait, which is a collection of methods that can be implemented by a type.
-
-    Attributes:
-        name (str): The name of the trait.
-        symbol (Symbol): The symbol representing the trait declaration.
-        type_vars (Dict[str, TypeVar]): Type variables used in the trait.
-        bounds (Dict[str, TraitBound]): Trait bounds associated with the trait.
-        methods (Dict[str, FunctionType]): Methods defined in the trait.
-        partial_methods (Dict[str, FunctionType]): Partial methods defined in the trait.
-
-    Methods:
-        add_method: Adds a method to the trait.
-        get_method: Retrieves a method from the trait by name.
-        add_partial_method: Adds a partial method to the trait.
-        get_partial_method: Retrieves a partial method from the trait by name.
-    """
-
-    __slots__ = ["name", "symbol", "type_vars", "bounds", "methods", "partial_methods"]
-
-    def __init__(self, name: str, symbol: Symbol) -> None:
-        """
-        Initializes a Trait instance.
-
-        Args:
-            name (str): The name of the trait.
-        """
-        self.name = name
-        self.symbol = symbol
-        self.type_vars: Dict[str, TypeVar] = {}
-        self.bounds: Dict[str, TraitBound] = {}
-        self.methods: Dict[str, Symbol] = {}
-        self.partial_methods: Dict[str, Symbol] = {}
-
-    def add_method(self, name: str, fn_type: Symbol) -> None:
-        self.methods[name] = fn_type
-
-    def get_method(self, name: str) -> Optional[Symbol]:
-        return self.methods.get(name)
-
-    def add_partial_method(self, name: str, fn_type: Symbol) -> None:
-        self.partial_methods[name] = fn_type
-
-    def get_partial_method(self, name: str) -> Optional[Symbol]:
-        return self.partial_methods.get(name)
-
-
-class Impl:
-    """
-    Represents a collection of methods implemented by a type.
-
-    Attributes:
-        target (Type): The type for which the methods are implemented.
-        trait (Trait): The trait that the methods implement.
-        methods (Dict[str, Symbol]): A dictionary mapping method names to their corresponding Symbol objects.
-        symbol (Symbol): The symbol representing the implementation.
-        type_vars (Dict[str, TypeVar]): A dictionary of type variables used in the implementation.
-    """
-
-    __slots__ = ["target", "trait", "methods", "symbol", "type_vars"]
-
-    def __init__(
-        self, target: Type, trait: Trait, symbol: Symbol, type_vars: Dict[str, TypeVar]
-    ) -> None:
-        """
-        Initializes an Impl instance.
-
-        Args:
-            target (Type): The type for which the methods are implemented.
-            trait (Trait): The trait that the methods implement.
-            symbol (Symbol): The symbol representing the implementation.
-            type_vars (Dict[str, TypeVar]): A dictionary of type variables used in the implementation.
-        """
-        self.target = target
-        self.trait = trait
-        self.symbol = symbol
-        self.type_vars = type_vars
-        self.methods: Dict[str, Symbol] = {}
-
-    def add_method(self, name: str, method: Symbol) -> None:
-        """
-        Adds a method to the implementation.
-
-        Args:
-            name (str): The name of the method to add.
-            method (Symbol): The Symbol object representing the method.
-        """
-        self.methods[name] = method
-
-    def get_method(self, name: str) -> Optional[Symbol]:
-        """
-        Retrieves a method from the implementation by name.
-
-        Args:
-            name (str): The name of the method to retrieve.
-
-        Returns:
-            Optional[Symbol]: The Symbol object representing the method, or None if the method is not found.
-        """
-        return self.methods.get(name)
-
-
 class TypeAlias:
     """
     Represents a type alias, which is a name for a type.
 
     Attributes:
         name (str): The name of the type alias.
-        type_vars (Dict[str, TypeVar]): Type variables used in the type alias.
         type (Type): The type that the alias represents.
         symbol (Symbol): The symbol representing the type alias declaration.
     """
 
-    __slots__ = ["name", "type_vars", "type", "symbol"]
+    __slots__ = ["name", "type", "symbol"]
 
-    def __init__(
-        self, name: str, type_vars: Dict[str, TypeVar], type: Type, symbol: Symbol
-    ) -> None:
+    def __init__(self, name: str, type: Type, symbol: Symbol) -> None:
         """
         Initializes a TypeAlias instance.
 
         Args:
             name (str): The name of the type alias.
-            type_vars (Dict[str, TypeVar]): Type variables used in the type alias.
             type (Type): The type that the alias represents.
             symbol (Symbol): The symbol representing the type alias declaration.
         """
         self.name = name
-        self.type_vars = type_vars
         self.type = type
         self.symbol = symbol
 
@@ -801,14 +354,11 @@ class TypeAlias:
         return (
             isinstance(other, TypeAlias)
             and self.name == other.name
-            and self.type_vars == other.type_vars
             and self.type == other.type
         )
 
     def __hash__(self) -> int:
-        return hash(
-            ("type_alias", self.name, tuple(hash(t) for t in self.type_vars), self.type)
-        )
+        return hash(("type_alias", self.name, self.type))
 
 
 class TypeEnv:
@@ -817,24 +367,17 @@ class TypeEnv:
 
     Attributes:
         types (Dict[str, Type]): A dictionary mapping type names to Type objects.
-        traits (Dict[str, Trait]): A dictionary mapping trait names to Trait objects.
-        impls (Dict[Type, List[Impl]]): A dictionary mapping types to their implementations.
         type_aliases (Dict[str, TypeAlias]): A dictionary mapping type alias names to TypeAlias objects.
     Methods:
         add_type: Adds a type to the environment.
         get_type: Retrieves a type from the environment by name.
-        add_trait: Adds a trait to the environment.
-        get_trait: Retrieves a trait from the environment by name.
-        add_impl: Adds an implementation to the environment.
-        type_impls_trait: Checks if a type implements a specific trait and returns the trait if it does.
-        type_impls_method: Checks if a type implements a specific method and returns the method symbol if it does.
         detect_cycle: Detects if adding a type alias would create a cycle.
         add_type_alias: Adds a type alias to the environment
         get_type_alias: Retrieves a type alias from the environment by name.
         find_type: Searches for a type by name in both the types and type_aliases fields.
     """
 
-    __slots__ = ["types", "traits", "impls", "type_aliases"]
+    __slots__ = ["types", "type_aliases"]
 
     def __init__(self) -> None:
         """
@@ -848,8 +391,6 @@ class TypeEnv:
             "char": CharType(),
             "void": VoidType(),
         }
-        self.traits: Dict[str, Trait] = {}
-        self.impls: Dict[Type, List[Impl]] = {}
         self.type_aliases: Dict[str, TypeAlias] = {}
 
     def add_type(self, name: str, type: Type) -> None:
@@ -873,72 +414,6 @@ class TypeEnv:
             Optional[Type]: The type object if found, None otherwise.
         """
         return self.types.get(name)
-
-    def add_trait(self, name: str, trait: Trait) -> None:
-        """
-        Adds a trait to the environment.
-
-        Args:
-            name (str): The name of the trait.
-            trait (Trait): The trait object to add.
-        """
-        self.traits[name] = trait
-
-    def get_trait(self, name: str) -> Optional[Trait]:
-        """
-        Retrieves a trait from the environment by name.
-
-        Args:
-            name (str): The name of the trait to retrieve.
-
-        Returns:
-            Optional[Trait]: The trait object if found, None otherwise.
-        """
-        return self.traits.get(name)
-
-    def add_impl(self, type_: Type, impl: Impl) -> None:
-        """
-        Adds an implementation to the environment.
-
-        Args:
-            type_ (Type): The type for which the implementation is added.
-            impl (Impl): The implementation to add.
-        """
-        if type_ not in self.impls:
-            self.impls[type_] = []
-        self.impls[type_].append(impl)
-
-    def type_impls_trait(self, type_: Type, trait_name: str) -> Optional[Trait]:
-        """
-        Checks if a type implements a specific trait and returns the trait if it does.
-
-        Args:
-            type_ (Type): The type to check.
-            trait_name (str): The name of the trait.
-
-        Returns:
-            Optional[Trait]: The trait if the type implements it, None otherwise.
-        """
-        for impl in self.impls.get(type_, []):
-            if impl.trait.name == trait_name:
-                return impl.trait
-        return None
-
-    def type_impls_method(self, type_: Type, method_name: str) -> Optional[Symbol]:
-        """
-        Checks if a type implements a specific method and returns the method symbol if it does.
-
-        Args:
-            type_ (Type): The type to check.
-            method_name (str): The name of the method.
-
-        Returns:
-            Optional[Symbol]: The method symbol if the type implements it, None otherwise.
-        """
-        for impl in self.impls.get(type_, []):
-            if method_name in impl.methods:
-                return impl.methods[method_name]
-        return None
 
     def detect_cycle(self, alias_name: str, type_: Type) -> bool:
         """

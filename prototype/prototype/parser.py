@@ -10,43 +10,25 @@ from .ast import (
     Bool,
     Break,
     Call,
-    CallMethod,
     Char,
     Continue,
-    EnumDecl,
-    EnumStructExpr,
-    EnumStructField,
-    EnumStructVariant,
-    EnumTupleExpr,
-    EnumTupleVariant,
-    EnumUnitExpr,
-    EnumUnitVariant,
     FieldInit,
     Float,
     FnDecl,
     FunctionTypeAnnotation,
     AccessField,
-    GenericTypeAnnotation,
     GetIndex,
     Ident,
     If,
-    ImplDecl,
     Integer,
     Loop,
     NamedTypeAnnotation,
     Param,
-    PartialTraitMethod,
     Program,
     Return,
     String,
-    StructDecl,
-    StructExpr,
-    StructField,
-    TraitDecl,
     TupleExpr,
     TupleTypeAnnotation,
-    TypeAliasDecl,
-    TypeParam,
     UnaryOp,
     VarDecl,
     While,
@@ -66,11 +48,8 @@ grammar = r"""
     definition_list: (definition (_NL* definition)* [_NL*])?
     
     ?definition: fn_def
-                | enum_def
                 | struct_def
                 | type_alias
-                | impl_def
-                | trait_def
                 
     statement_list: (statement (_NL* statement)* [_NL*])?
     
@@ -96,62 +75,27 @@ grammar = r"""
     let_def: "let" IDENT [":" type_annotation] "=" expr
     assign_stmt: (IDENT | getindex | get_field) "=" expr
     
-    type_alias: [PUB] "type" IDENT [type_param_list] "=" type_annotation
+    type_def: "type" IDENT "=" type_annotation
 
-    fn_def: [PUB] "fn" IDENT [type_param_list] "(" param_list ")" "->" type_annotation _NL* _INDENT statement_list _DEDENT
+    fn_def: "fn" IDENT "(" param_list ")" "->" type_annotation _NL* _INDENT statement_list _DEDENT
     
     param_list: [param ("," param)*]
     
     param: IDENT ":" type_annotation
     
-    enum_def: [PUB] "enum" IDENT [type_param_list] _NL enum_variant_list
-    
-    ?enum_variant_list: [_INDENT (enum_variant _NL)* _DEDENT]
-    
-    enum_tuple_variant: IDENT "(" [type_annotation ("," type_annotation)*] ")"
+    ?type_annotation: base_type
 
-    enum_unit_variant: IDENT
-    
-    enum_struct_variant: IDENT "{" enum_struct_field ("," enum_struct_field)* "}"
-
-    enum_struct_field: IDENT ":" type_annotation
-
-    enum_variant: enum_tuple_variant -> tuple_enum_variant
-        | enum_unit_variant -> unit_enum_variant
-        | enum_struct_variant -> struct_enum_variant
-
-    struct_def: [PUB] "struct" IDENT [type_param_list] _NL struct_field_list
-    
-    ?struct_field_list: [_INDENT (struct_field _NL)* _DEDENT]
-    
-    struct_field: [PUB] IDENT ":" type_annotation
-    
-    impl_def: "impl" [type_param_list] type_annotation ["for" type_annotation] _NL _INDENT _NL* fn_def (_NL* fn_def)* [_NL*] _DEDENT
-    
-    trait_def: [PUB] "trait" IDENT [type_param_list] [":" trait_bounds] _NL _INDENT _NL* trait_method (_NL* trait_method)* [_NL*] _DEDENT
-    
-    trait_bounds: IDENT ("+" IDENT)*
-    
-    trait_method: [PUB] "fn" IDENT [type_param_list] "(" param_list ")" "->" type_annotation trait_method_body
-
-    trait_method_body: _NL _INDENT statement_list _DEDENT
-                    | _NL
-
-    type_param: IDENT [":" trait_bounds]
-    
-    type_param_list: "<" type_param ("," type_param)* ">"
-
-    type_annotation: IDENT -> named_type
-        | "[" type_annotation "]" -> array_type
-        | "(" [type_annotation ("," type_annotation)*] ")" -> tuple_type
+    ?base_type: IDENT -> named_type
+        | "[" type_annotation ";" expr "]" -> array_type
         | function_type -> function_type
-        | generic_type -> generic_type
-    
+        | "(" [type_annotation ("," type_annotation)*] ")" -> tuple_type
+        | record_type -> record_type
+        
+
+    record_type: "{" IDENT ":" type_annotation ("," IDENT ":" type_annotation)* "}" -> record_type
+
+
     function_type: "(" [type_annotation ("," type_annotation)*] ")" "->" type_annotation
-    
-    generic_type: IDENT type_arg_list
-    
-    type_arg_list: "<" type_annotation ("," type_annotation)* ">"
     
     ?expr: logical_or
 
@@ -177,6 +121,7 @@ grammar = r"""
         | product "*" unary -> mul
         | product "/" unary -> div
         | product "%" unary -> mod
+
     ?unary: "-" unary -> neg
         | "!" unary -> not_
         | molecule
@@ -185,10 +130,8 @@ grammar = r"""
         | getindex
         | call
         | get_field
-        | call_method
         
-    call: molecule [type_arg_list] "(" arglist ")"
-    call_method: molecule "." IDENT [type_arg_list] "(" arglist ")"
+    call: molecule "(" arglist ")"
     getindex: molecule "[" expr "]"
     get_field: molecule "." IDENT
         
@@ -201,10 +144,7 @@ grammar = r"""
         | TRUE -> true
         | FALSE -> false
         | "[" [expr ("," expr)*] "]" -> array_expr
-        | IDENT [type_arg_list] "{" field_init_list "}" -> struct_expr
-        | IDENT [type_arg_list] "::" IDENT "{" field_init_list "}" -> enum_struct_expr
-        | IDENT [type_arg_list] "::" IDENT "(" [expr ("," expr)*] ")" -> enum_tuple_expr
-        | IDENT [type_arg_list] "::" IDENT -> enum_unit_expr
+        | "{" field_init_list "}" -> struct_expr
         
     field_init_list: [ field_init ("," field_init)* ]
     field_init: IDENT ":" expr
@@ -216,7 +156,6 @@ grammar = r"""
     FALSE: "false"
     BREAK: "break"
     CONTINUE: "continue"
-    PUB: "pub"
     LPAR: "("
     RPAR: ")"
     LSQB: "["
@@ -288,21 +227,7 @@ class ASTTransformer(Transformer):
         *params, ret = items
         return FunctionTypeAnnotation(params, ret, ret.line)
 
-    def generic_type(self, items):
-        if isinstance(items[0], GenericTypeAnnotation):
-            return items[0]
-        else:
-            name_tok, *type_params = items
-            return GenericTypeAnnotation(name_tok.value, type_params, name_tok.line)
-
     # ---------- parameters / fields ----------
-    def type_param(self, items):
-        name_tok, bounds = items
-        return TypeParam(name_tok.value, bounds, name_tok.line)
-
-    def type_param_list(self, items):
-        return items
-
     def param(self, items):
         name_tok, type_ann = items
         return Param(name_tok.value, type_ann, type_ann.line)
@@ -310,50 +235,10 @@ class ASTTransformer(Transformer):
     def param_list(self, items):
         return items
 
-    def struct_field(self, items):
-        idx = 0
-        pub = items[idx] != None and items[idx].type == "PUB"
-        idx += 1
-        name_tok = items[idx]
-        idx += 1
-        type_ann = items[idx]
-        return StructField(pub, name_tok.value, type_ann, type_ann.line)
-
-    # ---------- enum helpers ----------
-    def enum_struct_field(self, items):
-        name_tok, type_ann = items
-        return EnumStructField(name_tok.value, type_ann, type_ann.line)
-
-    def enum_variant_list(self, items):
-        return [it for it in items if not isinstance(it, Token)]
-
-    def struct_field_list(self, items):
-        return [it for it in items if not isinstance(it, Token)]
-
-    def unit_enum_variant(self, items):
-        # the only item should be a tree with a single IDENT child
-        assert len(items) == 1
-        assert isinstance(items[0], Tree)
-        assert len(items[0].children) == 1
-        assert isinstance(items[0].children[0], Token)
-        return EnumUnitVariant(items[0].children[0].value, items[0].children[0].line)
-
-    def tuple_enum_variant(self, items):
-        name_tok, *type_list = items[0].children
-        return EnumTupleVariant(name_tok.value, type_list, name_tok.line)
-
-    def struct_enum_variant(self, items):
-        name_tok, *fields = items[0].children
-        return EnumStructVariant(name_tok.value, fields, name_tok.line)
-
     # ---------- declarations ----------
     def fn_def(self, items):
         idx = 0
-        pub = items[idx] != None and items[idx].type == "PUB"
-        idx += 1
         name_tok = items[idx]
-        idx += 1
-        type_params = items[idx]
         idx += 1
         params = items[idx]
         # filter None from params
@@ -363,117 +248,7 @@ class ASTTransformer(Transformer):
         idx += 1
         body = items[idx]
         assert isinstance(name_tok.value, str), "name_tok.value is not a str in fn_def"
-        return FnDecl(
-            pub, name_tok.value, type_params, params, ret_type, body, name_tok.line
-        )
-
-    def struct_def(self, items):
-        idx = 0
-        pub = items[idx] != None and items[idx].type == "PUB"
-        idx += 1
-        name_tok = items[idx]
-        idx += 1
-        type_params = items[idx]
-        idx += 1
-        fields = items[idx:] if len(items) > idx else []
-        # flatten the fields
-        new_fields = []
-        for field in fields:
-            if isinstance(field, list):
-                new_fields.extend(field)
-            else:
-                new_fields.append(field)
-        fields = new_fields
-        return StructDecl(pub, name_tok.value, type_params, fields, name_tok.line)
-
-    def enum_def(self, items):
-        idx = 0
-        pub = items[idx] != None and items[idx].type == "PUB"
-        idx += 1
-        name_tok = items[idx]
-        idx += 1
-        type_params = items[idx]
-        idx += 1
-        variants = items[idx] if len(items) > idx else []
-        return EnumDecl(pub, name_tok.value, type_params, variants, name_tok.line)
-
-    def type_alias(self, items):
-        idx = 0
-        pub = items[idx] != None and items[idx].type == "PUB"
-        idx += 1
-        name_tok = items[idx]
-        idx += 1
-        type_params = items[idx]
-        idx += 1
-        type_ann = items[idx]
-        return TypeAliasDecl(pub, name_tok.value, type_params, type_ann, name_tok.line)
-
-    def impl_def(self, items):
-        idx = 0
-        type_params = items[idx]
-        idx += 1
-        # get the first type annotation
-        first_type_ann = items[idx]
-        idx += 1
-        impl_type = None
-        trait_type = None
-        # if the next token not None then it is the impl type
-        if items[idx] is not None:
-            impl_type = items[idx]
-            trait_type = first_type_ann
-        else:
-            impl_type = first_type_ann
-        idx += 1  # skip over the type annotation
-        methods = items[idx:]  # methods are the rest of the items
-        return ImplDecl(type_params, trait_type, impl_type, methods, impl_type.line)
-
-    def trait_method_body(self, items):
-        if len(items) == 0:
-            return None
-        elif len(items) == 1:
-            return items[0]
-
-    def trait_def(self, items):
-        idx = 0
-        pub = items[idx] != None and items[idx].type == "PUB"
-        idx += 1
-        name_tok = items[idx]
-        idx += 1
-        type_params = items[idx]
-        idx += 1
-        bounds = items[idx]
-        idx += 1
-        methods = items[idx:]
-        return TraitDecl(
-            pub, name_tok.value, type_params, bounds, methods, name_tok.line
-        )
-
-    def trait_bounds(self, items):
-        return items
-
-    def trait_method(self, items):
-        idx = 0
-        pub = items[idx] != None and items[idx].type == "PUB"
-        idx += 1
-        name_tok = items[idx]
-        idx += 1
-        type_params = items[idx]
-        idx += 1
-        params = items[idx]
-        # filter None from params
-        params = [param for param in params if param is not None]
-        idx += 1
-        ret_type = items[idx]
-        idx += 1
-        body = items[idx]
-        if body is None:
-            return PartialTraitMethod(
-                pub, name_tok.value, type_params, params, ret_type, name_tok.line
-            )
-        else:
-            return FnDecl(
-                pub, name_tok.value, type_params, params, ret_type, body, name_tok.line
-            )
+        return FnDecl(name_tok.value, params, ret_type, body, name_tok.line)
 
     # ---------- statements ----------
     def statement(self, items):
@@ -550,12 +325,8 @@ class ASTTransformer(Transformer):
         return GetIndex(obj, index, obj.line)
 
     def call(self, items):
-        callee, type_args, args = items
-        return Call(callee, type_args, args, callee.line)
-
-    def call_method(self, items):
-        obj, type_args, attr, args = items
-        return CallMethod(obj, type_args, attr.value, args, obj.line)
+        callee, args = items
+        return Call(callee, args, callee.line)
 
     def get_field(self, items):
         obj, attr = items
@@ -656,26 +427,6 @@ class ASTTransformer(Transformer):
 
     def field_init_list(self, items):
         return items
-
-    def struct_expr(self, items):
-        name_tok, type_args, fields = items
-        return StructExpr(name_tok.value, type_args, fields, name_tok.line)
-
-    def enum_struct_expr(self, items):
-        name_tok, type_args, unit_tok, fields = items
-        return EnumStructExpr(
-            name_tok.value, type_args, unit_tok.value, fields, name_tok.line
-        )
-
-    def enum_tuple_expr(self, items):
-        name_tok, type_args, unit_tok, *elems = items
-        return EnumTupleExpr(
-            name_tok.value, type_args, unit_tok.value, elems, name_tok.line
-        )
-
-    def enum_unit_expr(self, items):
-        name_tok, type_args, unit_tok = items
-        return EnumUnitExpr(name_tok.value, type_args, unit_tok.value, name_tok.line)
 
     def arglist(self, items):
         return items
