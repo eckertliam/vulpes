@@ -2,7 +2,7 @@
 from typing import Dict, Optional, Union, List, Set
 
 from .symbol import Symbol
-from .types import BoolType, CharType, FloatType, IntType, StringType, Type
+from .types import BoolType, CharType, FloatType, IntType, StringType, Type, TypeEnv
 
 
 class ModuleManager:
@@ -53,6 +53,7 @@ class Module:
         imports: A dictionary of imports by name mapping to their symbol once its set
         exports: A dictionary of exports by name
         nodes: A dictionary of nodes by id to improve performance when grabbing nodes by id a lot
+        type_env: The type environment for the module. Populated during type collection and type normalization.
     """
 
     __slots__ = [
@@ -62,6 +63,7 @@ class Module:
         "imports",
         "exports",
         "nodes",
+        "type_env",
     ]
 
     def __init__(
@@ -74,6 +76,7 @@ class Module:
         self.exports: Dict[str, Symbol] = {}
         # memoize nodes by id to improve perf when grabbing nodes by id a lot
         self.nodes: Dict[int, Node] = {}
+        self.type_env: TypeEnv = TypeEnv()
 
     def push(self, top_level_node: TopLevelNode):
         """Add a top level node to the program"""
