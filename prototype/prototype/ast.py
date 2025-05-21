@@ -4,16 +4,17 @@ from typing import Dict, Optional, Union, List, Set
 from .symbol import Symbol
 from .types import BoolType, CharType, FloatType, IntType, StringType, Type
 
-class Modules:
+
+class ModuleManager:
     """A collection of modules"""
-    
+
     def __init__(self) -> None:
         self.modules: Dict[str, Module] = {}
         self.nodes: Dict[int, Node] = {}
-        
+
     def get_module(self, name: str) -> Optional["Module"]:
         return self.modules.get(name)
-    
+
     def add_module(self, module: "Module") -> None:
         if module.file_path is None:
             raise ValueError("Module has no file path")
@@ -22,7 +23,7 @@ class Modules:
     def get_node(self, id: int) -> Optional["Node"]:
         if id in self.nodes:
             return self.nodes[id]
-        
+
         for module in self.modules.values():
             node = module.get_node(id)
             if node is not None:
@@ -40,6 +41,7 @@ class Modules:
 
 TopLevelNode = Union["Import", "ExportSpec", "Declaration"]
 
+
 class Module:
     """
     Represents a module. A module is a collection of declarations
@@ -53,7 +55,14 @@ class Module:
         nodes: A dictionary of nodes by id to improve performance when grabbing nodes by id a lot
     """
 
-    __slots__ = ["file_path", "top_level_nodes", "source", "imports", "exports", "nodes"]
+    __slots__ = [
+        "file_path",
+        "top_level_nodes",
+        "source",
+        "imports",
+        "exports",
+        "nodes",
+    ]
 
     def __init__(
         self, source: Optional[str] = None, file_path: Optional[str] = None
@@ -148,20 +157,18 @@ class TypeAnnotation(Node):
 
 class Import(Node):
     """Imports a module
-    
+
     Attributes:
         module: The name of the module to import
         targets: The targets to import from the module
     """
 
     __slots__ = ["module", "targets", "line", "id", "symbol"]
-    
 
     def __init__(self, module: str, targets: List[str], line: int) -> None:
         super().__init__(line)
         self.module = module
         self.targets: List[str] = targets
-        
 
 
 class ExportSpec(Node):
