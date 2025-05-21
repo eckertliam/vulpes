@@ -8,6 +8,7 @@ from prototype.ast import (
     Continue,
     Else,
     FieldInit,
+    GenericTypeAnnotation,
     GetIndex,
     AccessField,
     NamedTypeAnnotation,
@@ -525,6 +526,7 @@ def test_union_decl():
     assert union_decl.fields[0].types[0].name == "int"
     assert union_decl.fields[1].name == "None"
 
+
 def test_union_all_variants():
     source = textwrap.dedent(
         """
@@ -574,3 +576,158 @@ def test_union_all_variants():
     unit_variant = union_decl.fields[3]
     assert isinstance(unit_variant, UnionTagVariant)
     assert unit_variant.name == "Unit"
+
+
+def test_generic_type_alias():
+    source = textwrap.dedent(
+        """
+    type SquareMatrix<T> = [[T; 3]; 3]
+    """
+    )
+    program = parse(source)
+    assert isinstance(program, Program)
+    assert len(program.declarations) == 1
+    type_alias = program.declarations[0]
+    assert isinstance(type_alias, TypeAliasDecl)
+    assert type_alias.name == "SquareMatrix"
+    assert len(type_alias.type_params) == 1
+    assert type_alias.type_params[0].name == "T"
+    assert isinstance(type_alias.type_annotation, ArrayTypeAnnotation)
+    assert isinstance(type_alias.type_annotation.elem_type, ArrayTypeAnnotation)
+    assert isinstance(
+        type_alias.type_annotation.elem_type.elem_type, NamedTypeAnnotation
+    )
+    assert type_alias.type_annotation.elem_type.elem_type.name == "T"
+    assert isinstance(type_alias.type_annotation.elem_type.size, Integer)
+    assert type_alias.type_annotation.elem_type.size.value == 3
+
+
+def test_generic_union():
+    source = textwrap.dedent(
+        """
+    union Option<T>
+        Some(T)
+        None
+    """
+    )
+    program = parse(source)
+    assert isinstance(program, Program)
+    assert len(program.declarations) == 1
+    union_decl = program.declarations[0]
+    assert isinstance(union_decl, UnionDecl)
+    assert union_decl.name == "Option"
+    assert len(union_decl.type_params) == 1
+    assert union_decl.type_params[0].name == "T"
+    assert isinstance(union_decl.fields[0], UnionTupleVariant)
+    assert isinstance(union_decl.fields[1], UnionTagVariant)
+    assert union_decl.fields[0].name == "Some"
+    assert union_decl.fields[1].name == "None"
+
+
+def test_generic_struct():
+    source = textwrap.dedent(
+        """
+    struct Point<T>
+        x: T
+        y: T
+    """
+    )
+    program = parse(source)
+    assert isinstance(program, Program)
+    assert len(program.declarations) == 1
+    struct_decl = program.declarations[0]
+    assert isinstance(struct_decl, StructDecl)
+    assert struct_decl.name == "Point"
+    assert len(struct_decl.type_params) == 1
+    assert struct_decl.type_params[0].name == "T"
+    assert isinstance(struct_decl.fields[0], StructField)
+    assert struct_decl.fields[0].name == "x"
+    assert isinstance(struct_decl.fields[0].type_annotation, NamedTypeAnnotation)
+    assert struct_decl.fields[0].type_annotation.name == "T"
+    assert isinstance(struct_decl.fields[1], StructField)
+    assert struct_decl.fields[1].name == "y"
+    assert isinstance(struct_decl.fields[1].type_annotation, NamedTypeAnnotation)
+    assert struct_decl.fields[1].type_annotation.name == "T"
+
+
+def test_generic_fn():
+    source = textwrap.dedent(
+        """
+    fn add<T>(a: T, b: T) -> T
+        return a + b
+    """
+    )
+    program = parse(source)
+    assert isinstance(program, Program)
+    assert len(program.declarations) == 1
+    fn_decl = program.declarations[0]
+    assert isinstance(fn_decl, FnDecl)
+    assert fn_decl.name == "add"
+    assert len(fn_decl.type_params) == 1
+    assert fn_decl.type_params[0].name == "T"
+    assert isinstance(fn_decl.ret_type, NamedTypeAnnotation)
+    assert fn_decl.ret_type.name == "T"
+    assert isinstance(fn_decl.params[0], Param)
+    assert fn_decl.params[0].name == "a"
+    assert isinstance(fn_decl.params[0].type_annotation, NamedTypeAnnotation)
+    assert fn_decl.params[0].type_annotation.name == "T"
+    assert isinstance(fn_decl.params[1], Param)
+    assert fn_decl.params[1].name == "b"
+    assert isinstance(fn_decl.params[1].type_annotation, NamedTypeAnnotation)
+    assert fn_decl.params[1].type_annotation.name == "T"
+
+
+def test_call_with_generic_param():
+    source = textwrap.dedent(
+        """
+    fn main() -> int
+        return add<int>(1, 2)
+    """
+    )
+    program = parse(source)
+    assert isinstance(program, Program)
+    assert len(program.declarations) == 1
+    fn_decl = program.declarations[0]
+    assert isinstance(fn_decl, FnDecl)
+    assert fn_decl.name == "main"
+    assert isinstance(fn_decl.ret_type, NamedTypeAnnotation)
+    assert fn_decl.ret_type.name == "int"
+    assert isinstance(fn_decl.body[0], Return)
+    assert isinstance(fn_decl.body[0].expr, Call)
+    call = fn_decl.body[0].expr
+    assert isinstance(call.callee, Ident)
+    assert call.callee.name == "add"
+    assert len(call.type_args) == 1
+    assert isinstance(call.type_args[0], NamedTypeAnnotation)
+    assert call.type_args[0].name == "int"
+    assert len(call.args) == 2
+    assert isinstance(call.args[0], Integer)
+    assert call.args[0].value == 1
+    assert isinstance(call.args[1], Integer)
+    assert call.args[1].value == 2
+
+
+def test_generic_type_annotation():
+    source = textwrap.dedent(
+        """
+    fn main() -> int
+        const x: Option<int> = Some(1)
+        const y: int = x.unwrap()
+        return y
+    """
+    )
+    program = parse(source)
+    assert isinstance(program, Program)
+    assert len(program.declarations) == 1
+    fn_decl = program.declarations[0]
+    assert isinstance(fn_decl, FnDecl)
+    assert fn_decl.name == "main"
+    assert isinstance(fn_decl.ret_type, NamedTypeAnnotation)
+    assert fn_decl.ret_type.name == "int"
+    assert isinstance(fn_decl.body[0], VarDecl)
+    const_x = fn_decl.body[0]
+    assert isinstance(const_x.type_annotation, GenericTypeAnnotation)
+    assert const_x.type_annotation.name == "Option"
+    assert len(const_x.type_annotation.type_args) == 1
+    assert isinstance(const_x.type_annotation.type_args[0], NamedTypeAnnotation)
+    assert const_x.type_annotation.type_args[0].name == "int"
