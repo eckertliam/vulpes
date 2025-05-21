@@ -4,7 +4,7 @@ from ..ast import (
     FnDecl,
     If,
     Loop,
-    Program,
+    Module,
     Statement,
     StructDecl,
     TypeAliasDecl,
@@ -23,7 +23,7 @@ class NameDeclarationPass(Pass):
     This pass enters all variable declarations into their respective scopes in a symbol table
     """
 
-    def __init__(self, program: Program) -> None:
+    def __init__(self, program: Module) -> None:
         super().__init__(program=program)
 
     def add_symbol(self, name: str, ast_id: int, line: int) -> Optional[Symbol]:

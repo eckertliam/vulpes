@@ -7,7 +7,7 @@ from ..types import TypeEnv
 
 from ..errors import VulpesError
 
-from ..ast import Program
+from ..ast import Module
 from .symbol_table import SymbolTable
 
 
@@ -20,7 +20,7 @@ class Pass(ABC):
     __slots__ = ["program", "symbol_table", "errors", "type_env"]
 
     def __init__(
-        self, program: Optional[Program] = None, previous_pass: Optional["Pass"] = None
+        self, program: Optional[Module] = None, previous_pass: Optional["Pass"] = None
     ):
         if program:
             self.program = program

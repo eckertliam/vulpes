@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from typing import Dict, Optional, Union
 
-from ..ast import Program
+from ..ast import Modules
 from ..errors import VulpesError, NameResolutionError
 from ..symbol import Symbol
 
@@ -62,21 +62,26 @@ class SymbolTable:
         name: str,
         ast_id: int,
         line: int,
-        program: Program,
+        modules: Modules,
     ) -> Union[Symbol, VulpesError]:
         # check for shadowing
         if name in self.table[self.current_scope_id].symbols:
             # get the existing symbol
             existing_symbol = self.table[self.current_scope_id].symbols[name]
             # get the node of the existing symbol
-            existing_node = program.get_node(existing_symbol.ast_id)
+            existing_node = modules.get_node(existing_symbol.ast_id)
             if existing_node is None:
                 raise RuntimeError("Cannot find node for existing symbol")
             # get the line of the existing symbol
             existing_line = existing_node.line
+            # get the module that contains the existing symbol
+            existing_module = modules.get_module_with_node(existing_symbol.ast_id)
+            if existing_module is None:
+                raise RuntimeError("Cannot find module for existing symbol")
+            module_path = existing_module.file_path if existing_module.file_path is not None else ""
             # add an error
             return NameResolutionError(
-                f"Cannot redeclare {name} in the same scope, {name} is already defined at line {existing_line}",
+                f"Cannot redeclare {name} in the same scope, {name} is already defined at line {existing_line} of {module_path}",
                 line,
                 ast_id,
             )

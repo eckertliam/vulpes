@@ -1,5 +1,5 @@
 # Error handling
-from .parser import Program
+from .parser import Module
 
 
 class VulpesError(Exception):
@@ -12,7 +12,7 @@ class VulpesError(Exception):
     def __str__(self) -> str:
         return f"[Line {self.line}] {self.message}"
 
-    def report(self, program: Program) -> None:
+    def report(self, program: Module) -> None:
         # get the declaration of the node
         decl = program.get_decl(self.ast_id)
         if decl is None:

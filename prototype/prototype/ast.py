@@ -1,31 +1,74 @@
 # Expressive AST we convert the Lark ast into
-from typing import Dict, Optional, Union, List
+from typing import Dict, Optional, Union, List, Set
 
 from .symbol import Symbol
 from .types import BoolType, CharType, FloatType, IntType, StringType, Type
 
+class Modules:
+    """A collection of modules"""
+    
+    def __init__(self) -> None:
+        self.modules: Dict[str, Module] = {}
+        self.nodes: Dict[int, Node] = {}
+        
+    def get_module(self, name: str) -> Optional["Module"]:
+        return self.modules.get(name)
+    
+    def add_module(self, module: "Module") -> None:
+        if module.file_path is None:
+            raise ValueError("Module has no file path")
+        self.modules[module.file_path] = module
 
-class Program:
+    def get_node(self, id: int) -> Optional["Node"]:
+        if id in self.nodes:
+            return self.nodes[id]
+        
+        for module in self.modules.values():
+            node = module.get_node(id)
+            if node is not None:
+                self.nodes[id] = node
+                return node
+        return None
+
+    # get the module that contains the node id
+    def get_module_with_node(self, id: int) -> Optional["Module"]:
+        for module in self.modules.values():
+            if module.get_node(id) is not None:
+                return module
+        return None
+
+
+TopLevelNode = Union["Import", "ExportSpec", "Declaration"]
+
+class Module:
     """
-    Represents a program. A program is a collection of declarations
+    Represents a module. A module is a collection of declarations
 
     Attributes:
-        declarations: A list of declarations in the program
+        file_path: The path to the file that the program is in
+        top_level_nodes: A list of top level nodes in the program
         source: The source code of the program
+        imports: A dictionary of imports by name mapping to their symbol once its set
+        exports: A dictionary of exports by name
         nodes: A dictionary of nodes by id to improve performance when grabbing nodes by id a lot
     """
 
-    __slots__ = ["declarations", "source", "nodes"]
+    __slots__ = ["file_path", "top_level_nodes", "source", "imports", "exports", "nodes"]
 
-    def __init__(self, source: Optional[str] = None) -> None:
-        self.declarations: list[Declaration] = []
+    def __init__(
+        self, source: Optional[str] = None, file_path: Optional[str] = None
+    ) -> None:
+        self.file_path: Optional[str] = file_path
+        self.top_level_nodes: List[TopLevelNode] = []
         self.source: Optional[str] = source
+        self.imports: Dict[str, Symbol] = {}
+        self.exports: Dict[str, Symbol] = {}
         # memoize nodes by id to improve perf when grabbing nodes by id a lot
         self.nodes: Dict[int, Node] = {}
 
-    def push(self, declaration: "Declaration"):
-        """Add a declaration to the program"""
-        self.declarations.append(declaration)
+    def push(self, top_level_node: TopLevelNode):
+        """Add a top level node to the program"""
+        self.top_level_nodes.append(top_level_node)
 
     # get a node by id
     def get_node(self, id: int) -> Optional["Node"]:
@@ -35,22 +78,12 @@ class Program:
         if id in self.nodes:
             return self.nodes[id]
 
-        # check all declarations
-        for declaration in self.declarations:
-            node = declaration.get_node(id)
+        # check all top level nodes
+        for top_level_node in self.top_level_nodes:
+            node = top_level_node.get_node(id)
             if node is not None:
                 self.nodes[id] = node
                 return node
-        return None
-
-    # get the top level declaration that contains the node id
-    def get_decl(self, id: int) -> Optional["Declaration"]:
-        """Get the top level declaration that contains the node id.
-        Returns None if the node is not found in any top level declaration"""
-        for declaration in self.declarations:
-            # while we're here checking out the nodes we add them to the memoized nodes
-            if declaration.get_node(id) is not None:
-                return declaration
         return None
 
 
@@ -111,6 +144,34 @@ class TypeAnnotation(Node):
     """Unifies all type annotations in the program"""
 
     pass
+
+
+class Import(Node):
+    """Imports a module
+    
+    Attributes:
+        module: The name of the module to import
+        targets: The targets to import from the module
+    """
+
+    __slots__ = ["module", "targets", "line", "id", "symbol"]
+    
+
+    def __init__(self, module: str, targets: List[str], line: int) -> None:
+        super().__init__(line)
+        self.module = module
+        self.targets: List[str] = targets
+        
+
+
+class ExportSpec(Node):
+    """A specification of what to export from a module"""
+
+    __slots__ = ["exports", "line", "id", "symbol"]
+
+    def __init__(self, exports: Set[str], line: int) -> None:
+        super().__init__(line)
+        self.exports = exports
 
 
 class NamedTypeAnnotation(TypeAnnotation):

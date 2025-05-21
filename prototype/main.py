@@ -5,7 +5,7 @@
 
 
 import sys
-from prototype.parser import parse, Program
+from prototype.parser import parse, Module
 
 
 def main():
