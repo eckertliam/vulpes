@@ -30,7 +30,7 @@ from prototype.ast import (
     UnionTupleVariant,
     VarDecl,
     While,
-    Program,
+    Module,
     FnDecl,
     Return,
     Integer,
@@ -42,7 +42,7 @@ import textwrap
 
 def test_empty_program():
     program = parse("")
-    assert isinstance(program, Program)
+    assert isinstance(program, Module)
     assert len(program.declarations) == 0
 
 
@@ -54,7 +54,7 @@ def test_simple_fn_decl():
     """
     )
     program = parse(source)
-    assert isinstance(program, Program)
+    assert isinstance(program, Module)
     assert len(program.declarations) == 1
     fn_decl = program.declarations[0]
     assert isinstance(fn_decl, FnDecl)
@@ -77,7 +77,7 @@ def test_fn_w_params():
     """
     )
     program = parse(source)
-    assert isinstance(program, Program)
+    assert isinstance(program, Module)
     assert len(program.declarations) == 1
     fn_decl = program.declarations[0]
     assert isinstance(fn_decl, FnDecl)
@@ -119,7 +119,7 @@ def test_struct_decl():
     """
     )
     program = parse(source)
-    assert isinstance(program, Program)
+    assert isinstance(program, Module)
     assert len(program.declarations) == 1
     struct_decl = program.declarations[0]
     assert isinstance(struct_decl, StructDecl)
@@ -541,7 +541,7 @@ def test_union_all_variants():
         """
     )
     program = parse(source)
-    assert isinstance(program, Program)
+    assert isinstance(program, Module)
     assert len(program.declarations) == 1
     union_decl = program.declarations[0]
     assert isinstance(union_decl, UnionDecl)
@@ -585,7 +585,7 @@ def test_generic_type_alias():
     """
     )
     program = parse(source)
-    assert isinstance(program, Program)
+    assert isinstance(program, Module)
     assert len(program.declarations) == 1
     type_alias = program.declarations[0]
     assert isinstance(type_alias, TypeAliasDecl)
@@ -611,7 +611,7 @@ def test_generic_union():
     """
     )
     program = parse(source)
-    assert isinstance(program, Program)
+    assert isinstance(program, Module)
     assert len(program.declarations) == 1
     union_decl = program.declarations[0]
     assert isinstance(union_decl, UnionDecl)
@@ -633,7 +633,7 @@ def test_generic_struct():
     """
     )
     program = parse(source)
-    assert isinstance(program, Program)
+    assert isinstance(program, Module)
     assert len(program.declarations) == 1
     struct_decl = program.declarations[0]
     assert isinstance(struct_decl, StructDecl)
@@ -658,7 +658,7 @@ def test_generic_fn():
     """
     )
     program = parse(source)
-    assert isinstance(program, Program)
+    assert isinstance(program, Module)
     assert len(program.declarations) == 1
     fn_decl = program.declarations[0]
     assert isinstance(fn_decl, FnDecl)
@@ -685,7 +685,7 @@ def test_call_with_generic_param():
     """
     )
     program = parse(source)
-    assert isinstance(program, Program)
+    assert isinstance(program, Module)
     assert len(program.declarations) == 1
     fn_decl = program.declarations[0]
     assert isinstance(fn_decl, FnDecl)
@@ -717,7 +717,7 @@ def test_generic_type_annotation():
     """
     )
     program = parse(source)
-    assert isinstance(program, Program)
+    assert isinstance(program, Module)
     assert len(program.declarations) == 1
     fn_decl = program.declarations[0]
     assert isinstance(fn_decl, FnDecl)

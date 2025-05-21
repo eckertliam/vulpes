@@ -12,11 +12,13 @@ from .ast import (
     Call,
     Char,
     Continue,
+    Else,
     FieldInit,
     Float,
     FnDecl,
     FunctionTypeAnnotation,
     AccessField,
+    GenericTypeAnnotation,
     GetIndex,
     Ident,
     If,
@@ -24,7 +26,7 @@ from .ast import (
     Loop,
     NamedTypeAnnotation,
     Param,
-    Program,
+    Module,
     Return,
     String,
     StructDecl,
@@ -33,6 +35,7 @@ from .ast import (
     TupleExpr,
     TupleTypeAnnotation,
     TypeAliasDecl,
+    TypeParam,
     UnaryOp,
     UnionDecl,
     UnionStructVariant,
@@ -74,21 +77,24 @@ grammar = r"""
              | break_stmt
              | continue_stmt
 
-    if_stmt: "if" expr _NL _INDENT statement_list _DEDENT ["else" (if_stmt | _NL _INDENT statement_list _DEDENT)] -> if_stmt
+    if_stmt: "if" expr _NL _INDENT statement_list _DEDENT ["else" _NL* (if_stmt | _NL _INDENT statement_list _DEDENT)] -> if_stmt
     while_stmt: "while" expr _NL _INDENT statement_list _DEDENT -> while_stmt
     loop_stmt: "loop" _NL _INDENT statement_list _DEDENT -> loop_stmt
     break_stmt: BREAK -> break_stmt
     continue_stmt: CONTINUE -> continue_stmt
     
+    type_param: IDENT
+    type_param_list: type_param ("," type_param)*
+    
     const_def: "const" IDENT [":" type_annotation] "=" expr
     let_def: "let" IDENT [":" type_annotation] "=" expr
     assign_stmt: (IDENT | getindex | get_field) "=" expr
     
-    struct_def: "struct" IDENT _NL _INDENT field_def_list _DEDENT
+    struct_def: "struct" IDENT ["<" type_param_list ">"] _NL _INDENT field_def_list _DEDENT
     field_def_list: (_NL* field_def)+ _NL*
     field_def: IDENT ":" type_annotation
     
-    union_def: "union" IDENT _NL _INDENT union_field_list _DEDENT
+    union_def: "union" IDENT ["<" type_param_list ">"] _NL _INDENT union_field_list _DEDENT -> union_def
     union_field_list: (_NL* union_field)+ _NL*
     
     union_struct_variant: IDENT "{" field_def_list "}"
@@ -100,9 +106,9 @@ grammar = r"""
         | union_tag_variant
     
 
-    type_alias: "type" IDENT "=" type_annotation
+    type_alias: "type" IDENT ["<" type_param_list ">"] "=" type_annotation
 
-    fn_def: "fn" IDENT "(" param_list ")" "->" type_annotation _NL* _INDENT statement_list _DEDENT
+    fn_def: "fn" IDENT ["<" type_param_list ">"] "(" param_list ")" "->" type_annotation _NL* _INDENT statement_list _DEDENT
     
     param_list: [param ("," param)*]
     
@@ -114,7 +120,9 @@ grammar = r"""
         | "[" type_annotation ";" expr "]" -> array_type
         | function_type -> function_type
         | "(" [type_annotation ("," type_annotation)*] ")" -> tuple_type
-
+        | IDENT "<" type_arg_list ">" -> generic_type
+        
+    type_arg_list: type_annotation ("," type_annotation)*
 
     function_type: "(" [type_annotation ("," type_annotation)*] ")" "->" type_annotation
     
@@ -151,7 +159,7 @@ grammar = r"""
         | getindex
         | call
         | get_field
-    call: molecule "(" arglist ")"
+    call: molecule ["<" type_arg_list ">"] "(" arglist ")"
     getindex: molecule "[" expr "]"
     get_field: molecule "." IDENT
     
@@ -161,13 +169,13 @@ grammar = r"""
         | INT -> int
         | STRING -> string
         | CHAR -> char
-        | "(" [expr ("," expr)*] ")" -> paren_expr
+        | _LPAR [expr ("," expr)*] _RPAR -> paren_expr
         | TRUE -> true
         | FALSE -> false
-        | "[" [expr ("," expr)*] "]" -> array_expr
+        | _LSQB [expr ("," expr)*] _RSQB -> array_expr
         | struct_expr
         
-    struct_expr: LBRACE field_init_list RBRACE
+    struct_expr: _LBRACE field_init_list _RBRACE
     field_init: IDENT ":" expr
     field_init_list: [ field_init ("," _NL* field_init)* [_NL*] ]
 
@@ -178,12 +186,12 @@ grammar = r"""
     FALSE: "false"
     BREAK: "break"
     CONTINUE: "continue"
-    LPAR: "("
-    RPAR: ")"
-    LSQB: "["
-    RSQB: "]"
-    LBRACE: "{"
-    RBRACE: "}"
+    _LPAR: "("
+    _RPAR: ")"
+    _LSQB: "["
+    _RSQB: "]"
+    _LBRACE: "{"
+    _RBRACE: "}"
     IDENT: /[a-zA-Z_][a-zA-Z0-9_]*/
     CHAR: /'(\\.|[^\\'])'/
     _NL: /(\r?\n[ \t]*)+/
@@ -226,10 +234,10 @@ class ASTTransformer(Transformer):
 
     # ---------- entry points ----------
     def start(self, items):
-        return items[0] if items else Program()
+        return items[0] if items else Module()
 
     def definition_list(self, defs):
-        program = Program()
+        program = Module()
         for d in defs:
             program.push(d)
         return program
@@ -249,7 +257,18 @@ class ASTTransformer(Transformer):
         *params, ret = items
         return FunctionTypeAnnotation(params, ret, ret.line)
 
+    def generic_type(self, items):
+        name_tok, type_args = items
+        return GenericTypeAnnotation(name_tok.value, type_args, name_tok.line)
+
     # ---------- parameters / fields ----------
+    def type_param_list(self, items):
+        return items if items else []
+
+    def type_param(self, items):
+        name_tok = items[0]
+        return TypeParam(name_tok.value, name_tok.line)
+
     def param(self, items):
         name_tok, type_ann = items
         return Param(name_tok.value, type_ann, type_ann.line)
@@ -279,14 +298,18 @@ class ASTTransformer(Transformer):
 
     def union_field(self, items):
         return items[0]
-    
+
     def union_field_list(self, items):
         return items
 
     # ---------- declarations ----------
     def fn_def(self, items):
+        for item in items:
+            print(item)
         idx = 0
         name_tok = items[idx]
+        idx += 1
+        type_params = items[idx]
         idx += 1
         params = items[idx]
         # filter None from params
@@ -296,19 +319,21 @@ class ASTTransformer(Transformer):
         idx += 1
         body = items[idx]
         assert isinstance(name_tok.value, str), "name_tok.value is not a str in fn_def"
-        return FnDecl(name_tok.value, params, ret_type, body, name_tok.line)
+        return FnDecl(
+            name_tok.value, type_params, params, ret_type, body, name_tok.line
+        )
 
     def struct_def(self, items):
-        name_tok, fields = items
-        return StructDecl(name_tok.value, fields, name_tok.line)
+        name_tok, type_params, fields = items
+        return StructDecl(name_tok.value, type_params, fields, name_tok.line)
 
     def union_def(self, items):
-        name_tok, fields = items
-        return UnionDecl(name_tok.value, fields, name_tok.line)
+        name_tok, type_params, fields = items
+        return UnionDecl(name_tok.value, type_params, fields, name_tok.line)
 
     def type_alias(self, items):
-        name_tok, type_ann = items
-        return TypeAliasDecl(name_tok.value, type_ann, name_tok.line)
+        name_tok, type_params, type_ann = items
+        return TypeAliasDecl(name_tok.value, type_params, type_ann, name_tok.line)
 
     # ---------- statements ----------
     def statement(self, items):
@@ -348,17 +373,14 @@ class ASTTransformer(Transformer):
     def if_stmt(self, items):
         cond = items[0]
         body = items[1]
-        else_body = items[2:] if len(items) > 2 else None
-        # flatten the else body
-        if else_body is not None:
-            new_else_body = []
-            for item in else_body:
-                if isinstance(item, list):
-                    new_else_body.extend(item)
-                else:
-                    new_else_body.append(item)
-            else_body = new_else_body
-        return If(cond, body, else_body, items[0].line)
+        else_body = items[2] if len(items) > 2 else None
+        return If(cond, body, else_body, cond.line)
+
+    def else_if(self, items):
+        return items[0]
+
+    def else_block(self, items):
+        return Else(items[0], items[0][0].line)
 
     def while_stmt(self, items):
         cond = items[0]
@@ -379,14 +401,17 @@ class ASTTransformer(Transformer):
         return items[0]
 
     # ---------- expressions ----------
+    def type_arg_list(self, items):
+        return items if items else []
+
     def getindex(self, items):
         obj = items[0]
         index = items[1]
         return GetIndex(obj, index, obj.line)
 
     def call(self, items):
-        callee, args = items
-        return Call(callee, args, callee.line)
+        callee, type_args, args = items
+        return Call(callee, type_args, args, callee.line)
 
     def get_field(self, items):
         obj, attr = items
@@ -489,8 +514,8 @@ class ASTTransformer(Transformer):
         return items if items else []
 
     def struct_expr(self, items):
-        lbrace, fields, rbrace = items
-        return StructExpr(fields, lbrace.line)
+        fields = items[0]
+        return StructExpr(fields, fields[0].line)
 
     def arglist(self, items):
         return items
@@ -504,8 +529,8 @@ PARSER = Lark(
 )
 
 
-def parse(source: str) -> Program:
-    program: Union[Optional[Program], Tree] = PARSER.parse(source)
-    assert isinstance(program, Program)
+def parse(source: str) -> Module:
+    program: Union[Optional[Module], Tree] = PARSER.parse(source)
+    assert isinstance(program, Module)
     program.source = source
     return program
