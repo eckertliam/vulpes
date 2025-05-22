@@ -18,8 +18,6 @@ class ModuleManager:
         return self.modules.get(name)
 
     def add_module(self, module: "Module") -> None:
-        if module.file_path is None:
-            raise ValueError("Module has no file path")
         self.modules[module.name] = module
 
     def get_node(self, id: int) -> Optional["Node"]:
