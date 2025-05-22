@@ -3,7 +3,7 @@
 from prototype.ast import Module, ExportSpec, Import, ModuleManager
 from prototype.ast.passes import module_res_pass
 from prototype.ast.passes.module_res import (
-    ModuleNotFoundError,
+    ModuleDoesNotExist,
     ImportFromSelfError,
     ImportTargetNotFoundError,
 )
@@ -38,7 +38,7 @@ def test_import_from_nonexistent_module():
     _, errors = module_res_pass(manager)
 
     assert any(
-        isinstance(err, ModuleNotFoundError) and err.module_name == "A"
+        isinstance(err, ModuleDoesNotExist) and err.module_name == "A"
         for err in errors
     )
 

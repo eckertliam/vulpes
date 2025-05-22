@@ -23,7 +23,6 @@ It performs the following steps:
 
 - Walks top-level declarations and binds their names to symbols.
 - Adds all locally declared symbols to the module’s symbol table.
-- Resolves all references to those names within the module body.
 - Does not link imported names to external symbols—that happens in a later import linking step.
 
 ## Export Collection Pass
@@ -51,6 +50,17 @@ It performs the following steps:
 - Report an error if any requested name is not found in the target module’s `exports`.
 
 This pass allows imported identifiers to participate in later semantic analysis just like local names.
+
+## Name Reference Pass
+
+The Name Reference Pass walks the AST and verifies that all names are valid references to symbols.
+
+It performs the following steps:
+
+- Walks the AST and verifies that all names are valid references to symbols.
+- Reports an error if any name is not found in the symbol table.
+
+Must occur after the Import Linking Pass so that all imported names are available.
 
 ## Type Collection Pass
 

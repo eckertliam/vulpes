@@ -5,7 +5,7 @@ from prototype.errors import VulpesError
 from prototype.ast import ModuleManager, Import, Module, ExportSpec, TopLevelNode
 
 
-class ModuleNotFoundError(VulpesError):
+class ModuleDoesNotExist(VulpesError):
     """Error raised when a module cannot be found
 
     Attributes:
@@ -85,7 +85,7 @@ def resolve_top_level_node(
             return [ImportFromSelfError(module.name)]
         # check if the module exists
         elif node.module not in module_manager.modules:
-            return [ModuleNotFoundError(node.module)]
+            return [ModuleDoesNotExist(node.module)]
         elif len(node.targets) > 0:
             return resolve_import_targets(
                 node.targets, module_manager.modules[node.module], module

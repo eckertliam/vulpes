@@ -76,9 +76,8 @@ class Module:
         Module._next_id += 1
         self.top_level_nodes: List[TopLevelNode] = []
         self.source: Optional[str] = source
-        # maps exports to the ast ids of each exported or imported node
-        self.imports: Dict[str, int] = {}
-        self.exports: Dict[str, int] = {}
+        self.imports: Dict[str, Symbol] = {}
+        self.exports: Dict[str, Symbol] = {}
         # memoize nodes by id to improve perf when grabbing nodes by id a lot
         self.nodes: Dict[int, Node] = {}
         self.type_env: TypeEnv = TypeEnv()

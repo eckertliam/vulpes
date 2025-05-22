@@ -82,9 +82,9 @@ class SymbolTable:
         self,
         name: str,
         ast_id: int,
-    ) -> Optional[Symbol]:
+    ) -> Symbol:
         """Add a symbol to the current scope.
-        If the symbol already exists, return None.
+        If the symbol already exists in the current scope or the top level scope, return None.
         Otherwise, add the symbol to the current scope and return the symbol.
 
         Args:
@@ -92,10 +92,10 @@ class SymbolTable:
             ast_id (int): The ast id of the symbol
 
         Returns:
-            Optional[Symbol]: The symbol if it was added, otherwise None
+            Symbol: The symbol if it was added, otherwise raises a RuntimeError
         """
-        if name in self.table[self.current_scope_id].symbols:
-            return None
+        if name in self.table[self.current_scope_id].symbols or name in self.table[-1].symbols:
+            raise RuntimeError("Name already in use")
         else:
             symbol = Symbol(name, ast_id, self.current_scope_id)
             self.table[self.current_scope_id].symbols[name] = symbol
