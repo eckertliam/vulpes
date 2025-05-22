@@ -2,6 +2,8 @@
 import os
 from typing import Dict, Optional, Union, List, Set
 
+from .symbol import Symbol, SymbolTable
+
 from ..types import BoolType, CharType, FloatType, IntType, StringType, Type, TypeEnv
 
 
@@ -49,6 +51,7 @@ class Module:
     Attributes:
         file_path: The path to the file that the program is in
         name: The name of the module
+        symbol_table: The symbol table for the module. Populated during name resolution.
         top_level_nodes: A list of top level nodes in the program
         source: The source code of the program
         imports: A dictionary of imports by name mapping to their symbol once its set
@@ -68,6 +71,7 @@ class Module:
             if file_path
             else "anonymous"
         )
+        self.symbol_table: SymbolTable = SymbolTable()
         self._id: int = Module._next_id
         Module._next_id += 1
         self.top_level_nodes: List[TopLevelNode] = []
@@ -110,16 +114,16 @@ class Node:
     Attributes:
         line (int): The line number of the node
         id (int): The id of the node
-        type (Optional[Type]): The type of the node
+        symbol (Optional[Symbol]): The symbol of the node
     """
 
     _next_id = 0  # class variable to track the next available ID
 
-    def __init__(self, line: int, type: Optional[Type] = None) -> None:
+    def __init__(self, line: int, symbol: Optional[Symbol] = None) -> None:
         self.line = line
         self.id = Node._next_id
         Node._next_id += 1
-        self.type = type
+        self.symbol = symbol
 
     def get_node(self, id: int) -> Optional["Node"]:
         """Get a node by id.
