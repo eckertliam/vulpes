@@ -5,7 +5,24 @@ incremental and chainable construction of complex AST structures, which is usefu
 for programmatically generating code or during parsing.
 """
 
-from prototype.ast import *
+from typing import Optional, Set
+from prototype.ast import (
+    Module,
+    TypeAnnotation,
+    FnDecl,
+    StructDecl,
+    UnionDecl,
+    TypeAliasDecl,
+    Import,
+    ExportSpec,
+    Statement,
+    StructField,
+    UnionStructVariant,
+    UnionTupleVariant,
+    UnionTagVariant,
+    TypeParam,
+    Param,
+)
 
 
 class ModuleBuilder:
@@ -73,14 +90,14 @@ class ModuleBuilder:
         type_alias_decl = TypeAliasDecl(name, [], TypeAnnotation(0), 0)
         self.module.top_level_nodes.append(type_alias_decl)
         return TypeAliasDeclBuilder(type_alias_decl, self)
-    
-    def add_import(self, module: str, targets: List[str] = []) -> "ModuleBuilder":
+
+    def add_import(self, module: str, targets: Set[str] = set()) -> "ModuleBuilder":
         """
         Add an import statement to the module.
 
         Args:
             module (str): The name of the module to import.
-            targets (List[str], optional): Specific targets to import from the module. Defaults to an empty list, which means import the entire module.
+            targets (Set[str], optional): Specific targets to import from the module. Defaults to an empty set, which means import the entire module.
 
         Returns:
             ModuleBuilder: The builder itself, allowing for method chaining.

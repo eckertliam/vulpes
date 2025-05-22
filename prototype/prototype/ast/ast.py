@@ -1,8 +1,10 @@
 # Expressive AST we convert the Lark ast into
+import os
 from typing import Dict, Optional, Union, List, Set
+from uuid import UUID, uuid4
 
-from .symbol import Symbol
-from .types import BoolType, CharType, FloatType, IntType, StringType, Type, TypeEnv
+from ..symbol import Symbol
+from ..types import BoolType, CharType, FloatType, IntType, StringType, Type, TypeEnv
 
 
 class ModuleManager:
@@ -18,7 +20,7 @@ class ModuleManager:
     def add_module(self, module: "Module") -> None:
         if module.file_path is None:
             raise ValueError("Module has no file path")
-        self.modules[module.file_path] = module
+        self.modules[module.name] = module
 
     def get_node(self, id: int) -> Optional["Node"]:
         if id in self.nodes:
@@ -48,6 +50,7 @@ class Module:
 
     Attributes:
         file_path: The path to the file that the program is in
+        name: The name of the module
         top_level_nodes: A list of top level nodes in the program
         source: The source code of the program
         imports: A dictionary of imports by name mapping to their symbol once its set
@@ -58,6 +61,8 @@ class Module:
 
     __slots__ = [
         "file_path",
+        "name",
+        "_id",
         "top_level_nodes",
         "source",
         "imports",
@@ -70,6 +75,12 @@ class Module:
         self, source: Optional[str] = None, file_path: Optional[str] = None
     ) -> None:
         self.file_path: Optional[str] = file_path
+        self.name: str = (
+            os.path.splitext(os.path.basename(file_path))[0]
+            if file_path
+            else "anonymous"
+        )
+        self._id: UUID = uuid4()
         self.top_level_nodes: List[TopLevelNode] = []
         self.source: Optional[str] = source
         self.imports: Dict[str, Symbol] = {}
@@ -97,6 +108,9 @@ class Module:
                 self.nodes[id] = node
                 return node
         return None
+
+    def __hash__(self) -> int:
+        return hash(self._id)
 
 
 class Node:
@@ -168,10 +182,10 @@ class Import(Node):
 
     __slots__ = ["module", "targets", "line", "id", "symbol"]
 
-    def __init__(self, module: str, targets: List[str], line: int) -> None:
+    def __init__(self, module: str, targets: Set[str], line: int) -> None:
         super().__init__(line)
         self.module = module
-        self.targets: List[str] = targets
+        self.targets: Set[str] = targets
 
 
 class ExportSpec(Node):
