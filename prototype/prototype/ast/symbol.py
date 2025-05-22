@@ -1,6 +1,7 @@
+from contextlib import contextmanager
 from dataclasses import dataclass
 
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING, Dict, Generator, Optional
 
 if TYPE_CHECKING:
     from prototype.types import Type
@@ -48,6 +49,14 @@ class SymbolTable:
         self.table[-1] = Scope(-1, None, {})
         # we point current scope to the global scope
         self.current_scope_id = -1
+
+    @contextmanager
+    def scoped(self, scope_id: int) -> Generator[None, None, None]:
+        self.enter_scope(scope_id)
+        try:
+            yield
+        finally:
+            self.exit_scope()
 
     def enter_scope(self, scope_id: int) -> None:
         """Enter a new scope.

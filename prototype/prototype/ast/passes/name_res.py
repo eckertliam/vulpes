@@ -140,16 +140,13 @@ def visit_fn_decl(fn_decl: FnDecl, module: Module) -> List[VulpesError]:
     # if its not add it
     fn_symbol = module.symbol_table.add_symbol(fn_decl.name, fn_decl.id)
     # enter the function scope
-    module.symbol_table.enter_scope(fn_symbol.ast_id)
-    # add the parameters to the symbol table
-    # filter out None values leaving only errors
-    param_res: List[VulpesError] = list(
-        chain.from_iterable(add_local_symbol(param, module) for param in fn_decl.params)
-    )
-    # visit the body of the function
-    body_res: List[VulpesError] = visit_block(fn_decl.body, module)
-    # exit the function scope
-    module.symbol_table.exit_scope()
+    with module.symbol_table.scoped(fn_symbol.ast_id):
+        # add the parameters to the symbol table
+        param_res: List[VulpesError] = list(
+            chain.from_iterable(add_local_symbol(param, module) for param in fn_decl.params)
+        )
+        # visit the body of the function
+        body_res: List[VulpesError] = visit_block(fn_decl.body, module)
     return param_res + body_res
 
 
@@ -179,13 +176,8 @@ def visit_body(body: List[Statement], ast_id: int, module: Module) -> List[Vulpe
     Returns:
         List[VulpesError]: A list of errors that occurred during the visit
     """
-    # enter the scope of the body
-    module.symbol_table.enter_scope(ast_id)
-    # visit the body
-    body_res: List[VulpesError] = visit_block(body, module)
-    # exit the scope of the body
-    module.symbol_table.exit_scope()
-    return body_res
+    with module.symbol_table.scoped(ast_id):
+        return visit_block(body, module)
 
 
 def visit_stmt(stmt: Statement, module: Module) -> List[VulpesError]:
@@ -200,14 +192,13 @@ def visit_stmt(stmt: Statement, module: Module) -> List[VulpesError]:
     """
     if isinstance(stmt, VarDecl):
         return visit_var_decl(stmt, module)
-    elif isinstance(stmt, If):
+    if isinstance(stmt, If):
         return visit_if(stmt, module)
-    elif isinstance(stmt, While):
+    if isinstance(stmt, While):
         return visit_while(stmt, module)
-    elif isinstance(stmt, Loop):
+    if isinstance(stmt, Loop):
         return visit_loop(stmt, module)
-    else:  # we dont care about statements without decls
-        return []
+    return []
 
 
 def visit_loop(loop: Loop, module: Module) -> List[VulpesError]:
@@ -216,6 +207,9 @@ def visit_loop(loop: Loop, module: Module) -> List[VulpesError]:
     Args:
         loop (Loop): The loop statement to visit
         module (Module): The module to add the symbols to
+
+    Returns:
+        List[VulpesError]: A list of errors that occurred during the visit
     """
     return visit_body(loop.body, loop.id, module)
 
