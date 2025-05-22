@@ -1,9 +1,7 @@
 # Expressive AST we convert the Lark ast into
 import os
 from typing import Dict, Optional, Union, List, Set
-from uuid import UUID, uuid4
 
-from ..symbol import Symbol
 from ..types import BoolType, CharType, FloatType, IntType, StringType, Type, TypeEnv
 
 
@@ -59,17 +57,7 @@ class Module:
         type_env: The type environment for the module. Populated during type collection and type normalization.
     """
 
-    __slots__ = [
-        "file_path",
-        "name",
-        "_id",
-        "top_level_nodes",
-        "source",
-        "imports",
-        "exports",
-        "nodes",
-        "type_env",
-    ]
+    _next_id = 0  # class variable to track the next available ID
 
     def __init__(
         self, source: Optional[str] = None, file_path: Optional[str] = None
@@ -80,11 +68,13 @@ class Module:
             if file_path
             else "anonymous"
         )
-        self._id: UUID = uuid4()
+        self._id: int = Module._next_id
+        Module._next_id += 1
         self.top_level_nodes: List[TopLevelNode] = []
         self.source: Optional[str] = source
-        self.imports: Dict[str, Symbol] = {}
-        self.exports: Dict[str, Symbol] = {}
+        # maps exports to the ast ids of each exported or imported node
+        self.imports: Dict[str, int] = {}
+        self.exports: Dict[str, int] = {}
         # memoize nodes by id to improve perf when grabbing nodes by id a lot
         self.nodes: Dict[int, Node] = {}
         self.type_env: TypeEnv = TypeEnv()
@@ -118,22 +108,18 @@ class Node:
     Base class for all AST nodes
 
     Attributes:
-        line: The line number of the node
-        id: The id of the node
-        symbol: The symbol associated with the node
+        line (int): The line number of the node
+        id (int): The id of the node
+        type (Optional[Type]): The type of the node
     """
-
-    __slots__ = ["line", "id", "symbol"]
 
     _next_id = 0  # class variable to track the next available ID
 
-    def __init__(self, line: int) -> None:
+    def __init__(self, line: int, type: Optional[Type] = None) -> None:
         self.line = line
         self.id = Node._next_id
-        # optional symbol associated with the node
-        # makes passes a lot easier and more efficient
-        self.symbol: Optional[Symbol] = None
         Node._next_id += 1
+        self.type = type
 
     def get_node(self, id: int) -> Optional["Node"]:
         """Get a node by id.
@@ -146,12 +132,6 @@ class Node:
     def get_span(self) -> tuple[int, int]:
         """Get the span of the node. The span is the line number of the first and last line of the node"""
         return (self.line, self.line)
-
-    def assert_symbol(self) -> Symbol:
-        """Safely get the symbol of a node and raise an error if it is not set"""
-        if self.symbol is None:
-            raise RuntimeError(f"Node {self.__class__.__name__} has no symbol")
-        return self.symbol
 
 
 class Declaration(Node):
@@ -180,8 +160,6 @@ class Import(Node):
         targets: The targets to import from the module
     """
 
-    __slots__ = ["module", "targets", "line", "id", "symbol"]
-
     def __init__(self, module: str, targets: Set[str], line: int) -> None:
         super().__init__(line)
         self.module = module
@@ -190,8 +168,6 @@ class Import(Node):
 
 class ExportSpec(Node):
     """A specification of what to export from a module"""
-
-    __slots__ = ["exports", "line", "id", "symbol"]
 
     def __init__(self, exports: Set[str], line: int) -> None:
         super().__init__(line)
@@ -206,8 +182,6 @@ class NamedTypeAnnotation(TypeAnnotation):
         name: The name of the type
     """
 
-    __slots__ = ["name", "line", "id", "symbol"]
-
     def __init__(self, name: str, line: int) -> None:
         super().__init__(line)
         self.name = name
@@ -221,8 +195,6 @@ class GenericTypeAnnotation(TypeAnnotation):
         name: The name of the type
         type_args: The type arguments of the type
     """
-
-    __slots__ = ["name", "type_args", "line", "id", "symbol"]
 
     def __init__(self, name: str, type_args: List[TypeAnnotation], line: int) -> None:
         super().__init__(line)
@@ -254,9 +226,8 @@ class ArrayTypeAnnotation(TypeAnnotation):
 
     Attributes:
         elem_type: The type of the elements in the array
+        size: The size of the array
     """
-
-    __slots__ = ["elem_type", "line", "id", "symbol"]
 
     def __init__(self, elem_type: TypeAnnotation, size: "Expr", line: int) -> None:
         super().__init__(line)
@@ -288,9 +259,7 @@ class TupleTypeAnnotation(TypeAnnotation):
         elem_types: The types of the elements in the tuple
     """
 
-    __slots__ = ["elem_types", "line", "id", "symbol"]
-
-    def __init__(self, elem_types: list[TypeAnnotation], line: int) -> None:
+    def __init__(self, elem_types: List[TypeAnnotation], line: int) -> None:
         super().__init__(line)
         self.elem_types = elem_types
 
@@ -314,10 +283,8 @@ class FunctionTypeAnnotation(TypeAnnotation):
         ret_type: The type of the return value of the function
     """
 
-    __slots__ = ["params", "ret_type", "line", "id", "symbol"]
-
     def __init__(
-        self, params: list[TypeAnnotation], ret_type: TypeAnnotation, line: int
+        self, params: List[TypeAnnotation], ret_type: TypeAnnotation, line: int
     ) -> None:
         super().__init__(line)
         self.params = params
@@ -348,8 +315,6 @@ class FunctionTypeAnnotation(TypeAnnotation):
 class TypeParam(Node):
     """A type parameter"""
 
-    __slots__ = ["name", "line", "id", "symbol"]
-
     def __init__(self, name: str, line: int) -> None:
         super().__init__(line)
         self.name = name
@@ -365,17 +330,6 @@ class FnDecl(Declaration, Statement):
         ret_type: The type of the return value of the function
         body: The body of the function
     """
-
-    __slots__ = [
-        "name",
-        "type_params",
-        "params",
-        "ret_type",
-        "body",
-        "line",
-        "id",
-        "symbol",
-    ]
 
     def __init__(
         self,
@@ -437,8 +391,6 @@ class FnDecl(Declaration, Statement):
 class Param(Node):
     """A parameter of a function"""
 
-    __slots__ = ["name", "type_annotation", "line", "id", "symbol"]
-
     def __init__(self, name: str, type_annotation: TypeAnnotation, line: int) -> None:
         super().__init__(line)
         self.name = name
@@ -452,8 +404,6 @@ class Param(Node):
 
 class StructField(Node):
     """A field of a struct"""
-
-    __slots__ = ["name", "type_annotation", "line", "id", "symbol"]
 
     def __init__(self, name: str, type_annotation: TypeAnnotation, line: int) -> None:
         super().__init__(line)
@@ -472,8 +422,6 @@ class StructField(Node):
 
 class StructDecl(Declaration):
     """A struct declaration"""
-
-    __slots__ = ["name", "type_params", "fields", "line", "id", "symbol"]
 
     def __init__(
         self,
@@ -525,8 +473,6 @@ class UnionField(Node):
 class UnionStructVariant(UnionField):
     """A union field that is a struct variant"""
 
-    __slots__ = ["name", "fields", "line", "id", "symbol"]
-
     def __init__(self, name: str, fields: List[StructField], line: int) -> None:
         super().__init__(line)
         self.name = name
@@ -553,8 +499,6 @@ class UnionStructVariant(UnionField):
 
 class UnionTupleVariant(UnionField):
     """A union field that is a tuple variant"""
-
-    __slots__ = ["name", "types", "line", "id", "symbol"]
 
     def __init__(self, name: str, types: List[TypeAnnotation], line: int) -> None:
         super().__init__(line)
@@ -583,8 +527,6 @@ class UnionTupleVariant(UnionField):
 class UnionTagVariant(UnionField):
     """A union field that is a tag variant"""
 
-    __slots__ = ["name", "line", "id", "symbol"]
-
     def __init__(self, name: str, line: int) -> None:
         super().__init__(line)
         self.name = name
@@ -592,8 +534,6 @@ class UnionTagVariant(UnionField):
 
 class UnionDecl(Declaration):
     """A union declaration"""
-
-    __slots__ = ["name", "type_params", "fields", "line", "id", "symbol"]
 
     def __init__(
         self,
@@ -992,17 +932,6 @@ class Ident(AssignableExpr):
     def __init__(self, name: str, line: int) -> None:
         super().__init__(line)
         self.name = name
-
-    @property
-    def type(
-        self,
-    ) -> Optional[Type]:
-        return self.symbol.type if self.symbol else None
-
-    @type.setter
-    def type(self, type: Type) -> None:
-        if self.symbol:
-            self.symbol.type = type
 
 
 class Call(Expr):
