@@ -9,7 +9,6 @@ The Module Resolution Pass ensures that all imported modules exist, have been su
 It performs the following steps:
 
 - Reads the import statements from each module’s AST.
-- Resolves the logical module names to file paths or handles.
 - Confirms that each referenced module is present in the `ModuleManager`.
 - Verifies that each imported name exists in the export set of the referenced module.
 - Reports an error if any import cannot be resolved.
