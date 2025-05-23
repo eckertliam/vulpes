@@ -61,14 +61,10 @@ class Module:
     _next_id = 0  # class variable to track the next available ID
 
     def __init__(
-        self, source: Optional[str] = None, file_path: Optional[str] = None
+        self, name: str, source: Optional[str] = None, file_path: Optional[str] = None
     ) -> None:
         self.file_path: Optional[str] = file_path
-        self.name: str = (
-            os.path.splitext(os.path.basename(file_path))[0]
-            if file_path
-            else "anonymous"
-        )
+        self.name: str = name
         self.symbol_table: SymbolTable = SymbolTable()
         self._id: int = Module._next_id
         Module._next_id += 1
@@ -168,7 +164,11 @@ class Import(Node):
 
 
 class ExportSpec(Node):
-    """A specification of what to export from a module"""
+    """A specification of what to export from a module
+
+    Attributes:
+        exports: The names of the exports to export
+    """
 
     def __init__(self, exports: Set[str], line: int) -> None:
         super().__init__(line)

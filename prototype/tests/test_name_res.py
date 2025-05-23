@@ -1,9 +1,8 @@
-
 import pytest
 
 from prototype.ast import Module, ModuleManager
-from prototype.ast.ast import FnDecl, TypeAnnotation, Param, TypeParam, Integer
-from prototype.ast.passes.name_res import name_res_pass, DuplicateDefinitionError
+from prototype.ast.ast import FnDecl, TypeAnnotation, Integer
+from prototype.ast.passes.name_res import name_res_pass
 
 
 def make_fn(name: str, line: int = 1) -> FnDecl:
@@ -18,7 +17,7 @@ def make_fn(name: str, line: int = 1) -> FnDecl:
 
 
 def test_duplicate_function_declaration():
-    module = Module()
+    module = Module("test")
     module.push(make_fn("foo"))
     module.push(make_fn("foo"))  # Duplicate
 
@@ -31,7 +30,7 @@ def test_duplicate_function_declaration():
 
 
 def test_unique_function_declarations():
-    module = Module()
+    module = Module("test")
     module.push(make_fn("foo"))
     module.push(make_fn("bar"))
 
@@ -56,7 +55,7 @@ def test_duplicate_struct_and_function_names():
 
     fn = make_fn("Thing", line=2)
 
-    module = Module()
+    module = Module("test")
     module.push(struct)
     module.push(fn)  # Same name as struct
 
@@ -68,8 +67,8 @@ def test_duplicate_struct_and_function_names():
     assert "Thing" in str(errors[0])
 
 
-
 from prototype.ast.ast import VarDecl, Ident, Integer, If, Bool
+
 
 def make_var(name: str, line: int = 1) -> VarDecl:
     return VarDecl(
@@ -80,14 +79,17 @@ def make_var(name: str, line: int = 1) -> VarDecl:
         line=line,
     )
 
+
 def test_duplicate_variable_in_same_scope():
     fn = make_fn("foo")
-    fn.body.extend([
-        make_var("x", 1),
-        make_var("x", 2),  # Duplicate in same scope
-    ])
+    fn.body.extend(
+        [
+            make_var("x", 1),
+            make_var("x", 2),  # Duplicate in same scope
+        ]
+    )
 
-    module = Module()
+    module = Module("test")
     module.push(fn)
 
     manager = ModuleManager()
@@ -107,12 +109,9 @@ def test_variable_shadowing_in_nested_scope():
     )
 
     fn = make_fn("foo")
-    fn.body.extend([
-        make_var("x", 1),  # Outer scope
-        inner_if
-    ])
+    fn.body.extend([make_var("x", 1), inner_if])  # Outer scope
 
-    module = Module()
+    module = Module("test")
     module.push(fn)
 
     manager = ModuleManager()

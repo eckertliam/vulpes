@@ -1,5 +1,6 @@
 from prototype.ast import Module, ModuleManager, ExportSpec, Symbol, Declaration
 from prototype.ast.passes.export_collection import (
+    MultipleExportSpecsError,
     export_collection_pass,
     DuplicateExportError,
     UndefinedExportError,
@@ -12,7 +13,6 @@ class DummyDecl(Declaration):
 
 
 def add_declared_symbol(module: Module, name: str, decl: Declaration):
-    module.nodes[decl.id] = decl
     module.symbol_table.table[-1].symbols[name] = Symbol(
         name=name, ast_id=decl.id, parent_scope_id=-1
     )
@@ -50,7 +50,7 @@ def test_undefined_export_error():
     assert "baz" not in mod.exports
 
 
-def test_duplicate_export_error():
+def test_multiple_export_specs_error():
     mm = ModuleManager()
     mod = Module("mod3.vlp")
     decl = DummyDecl()
@@ -60,17 +60,14 @@ def test_duplicate_export_error():
     mm.add_module(mod)
 
     _, errors = export_collection_pass(mm)
-    assert any(
-        isinstance(e, DuplicateExportError) and e.export_name == "x" for e in errors
-    )
-    assert list(mod.exports.keys()).count("x") == 1
+    assert any(isinstance(e, MultipleExportSpecsError) for e in errors)
 
 
 def test_exports_across_multiple_modules_are_independent():
     mm = ModuleManager()
 
-    mod_a = Module("a.vlp")
-    mod_b = Module("b.vlp")
+    mod_a = Module("a")
+    mod_b = Module("b")
 
     decl_a = DummyDecl()
     decl_b = DummyDecl()
@@ -100,3 +97,16 @@ def test_no_exports_specified():
     _, errors = export_collection_pass(mm)
     assert not errors
     assert mod.exports == {}
+
+
+def test_duplicate_export_error():
+    mm = ModuleManager()
+    mod = Module("duplicate.vlp")
+    decl = DummyDecl()
+    add_declared_symbol(mod, "foo", decl)
+    mod.exports["foo"] = Symbol(name="foo", ast_id=decl.id, parent_scope_id=-1)
+    mod.top_level_nodes.append(ExportSpec({"foo"}, 0))
+    mm.add_module(mod)
+
+    _, errors = export_collection_pass(mm)
+    assert any(isinstance(e, DuplicateExportError) for e in errors)
