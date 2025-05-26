@@ -5,7 +5,7 @@ incremental and chainable construction of complex AST structures, which is usefu
 for programmatically generating code or during parsing.
 """
 
-from typing import Optional, Set
+from typing import Set
 from prototype.ast import (
     Module,
     TypeAnnotation,
@@ -30,14 +30,22 @@ class ModuleBuilder:
     Builder for constructing a Module AST node and its top-level declarations.
     """
 
-    def __init__(self, file_path: Optional[str] = None):
+    def __init__(self, file_name: str):
         """
         Initialize the ModuleBuilder.
 
         Args:
-            file_path (Optional[str]): The file path for the module.
+            file_name (str): The file name for the module.
         """
-        self.module: Module = Module(file_path=file_path)
+        self.module: Module = Module(file_name)
+
+    def build(self) -> Module:
+        """
+        Finalize the module and return it.
+        Returns:
+            Module: The constructed module.
+        """
+        return self.module
 
     def build_fn_decl(self, name: str) -> "FnDeclBuilder":
         """
@@ -136,7 +144,7 @@ class FnDeclBuilder:
         self.module_builder = module_builder
         self.ret_type_set = False
 
-    def build_fn_decl(self) -> ModuleBuilder:
+    def build(self) -> ModuleBuilder:
         """
         Finalize the function declaration and return to the module builder.
         Returns:
@@ -211,7 +219,7 @@ class StructDeclBuilder:
         self.struct_decl = struct_decl
         self.module_builder = module_builder
 
-    def build_struct_decl(self) -> ModuleBuilder:
+    def build(self) -> ModuleBuilder:
         """
         Finalize the struct declaration and return to the module builder.
         Returns:
@@ -259,7 +267,7 @@ class UnionDeclBuilder:
         self.union_decl = union_decl
         self.module_builder = module_builder
 
-    def build_union_decl(self) -> ModuleBuilder:
+    def build(self) -> ModuleBuilder:
         """
         Finalize the union declaration and return to the module builder.
         Returns:
@@ -334,7 +342,7 @@ class UnionStructVariantBuilder:
         self.union_struct_variant = union_struct_variant
         self.union_decl_builder = union_decl_builder
 
-    def build_union_struct_variant(self) -> UnionDeclBuilder:
+    def build(self) -> UnionDeclBuilder:
         """
         Finalize the struct variant and return to the union declaration builder.
         Returns:
@@ -375,7 +383,7 @@ class UnionTupleVariantBuilder:
         self.union_tuple_variant = union_tuple_variant
         self.union_decl_builder = union_decl_builder
 
-    def build_union_tuple_variant(self) -> UnionDeclBuilder:
+    def build(self) -> UnionDeclBuilder:
         """
         Finalize the tuple variant and return to the union declaration builder.
         Returns:
@@ -412,7 +420,7 @@ class TypeAliasDeclBuilder:
         self.type_set = False
         self.module_builder = module_builder
 
-    def build_type_alias_decl(self) -> ModuleBuilder:
+    def build(self) -> ModuleBuilder:
         """
         Finalize the type alias declaration and return to the module builder.
         Returns:

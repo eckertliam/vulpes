@@ -58,7 +58,9 @@ The Name Reference Pass walks the AST and verifies that all names are valid refe
 It performs the following steps:
 
 - Walks the AST and verifies that all names are valid references to symbols.
-- Reports an error if any name is not found in the symbol table.
+- Attaches the symbol of the referenced name to the name node.
+- If the name cannot be resolved, searches the module's `imports` table for the symbol.
+- If the symbol is not found, reports an error.
 
 Must occur after the Import Linking Pass so that all imported names are available.
 
