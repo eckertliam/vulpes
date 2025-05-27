@@ -646,6 +646,15 @@ class TypeAliasDecl(Declaration):
 
 
 class VarDecl(Statement):
+    """A variable declaration
+    
+    Attributes:
+        mutable (bool): Whether the variable is mutable
+        name (str): The name of the variable
+        type_annotation (Optional[TypeAnnotation]): The type annotation of the variable
+        expr (Expr): The expression that initializes the variable
+        line: The line number of the declaration
+    """
     def __init__(
         self,
         mutable: bool,
@@ -686,6 +695,13 @@ class AssignableExpr(Expr):
 
 
 class Assign(Statement):
+    """An assign statement
+
+    Attributes:
+        lhs (AssignableExpr): The left hand side of the assign statement
+        rhs (Expr): The right hand side of the assign statement
+        line (int): The line number of the assign statement
+    """
     def __init__(self, lhs: AssignableExpr, rhs: "Expr", line: int) -> None:
         super().__init__(line)
         self.lhs = lhs
@@ -743,6 +759,14 @@ class Else(Statement):
 
 
 class If(Statement):
+    """An if statement
+
+    Attributes:
+        cond (Expr): The condition of the if statement
+        body (list[Statement]): The body of the if statement
+        else_body (Optional[list[Statement]]): The else body of the if statement
+        line (int): The line number of the if statement
+    """
     def __init__(
         self,
         cond: "Expr",
