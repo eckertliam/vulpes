@@ -1,8 +1,9 @@
 from functools import lru_cache
 from itertools import chain
-from typing import List, Set, Tuple
+from typing import List, Set
 from prototype.errors import VulpesError
 from prototype.ast import ModuleManager, Import, Module, ExportSpec, TopLevelNode
+from .pass_types import PassResult
 
 
 class ModuleDoesNotExist(VulpesError):
@@ -49,13 +50,15 @@ class ImportTargetNotFoundError(VulpesError):
 
 def module_res_pass(
     module_manager: ModuleManager,
-) -> Tuple[ModuleManager, List[VulpesError]]:
+    prev_result: List[VulpesError] = [],
+) -> PassResult:
     """Module Resolution Pass
 
     This pass ensures that all imports are valid and present.
 
     Args:
         module_manager (ModuleManager): The module manager to pass through
+        prev_result (List[VulpesError]): A list of errors from previous passes
 
     Returns:
         ModuleManager: The module manager with all imports resolved
@@ -65,7 +68,7 @@ def module_res_pass(
         resolve_module(mod, module_manager) for mod in module_manager.modules.values()
     ]
     errors: List[VulpesError] = list(chain.from_iterable(resolved_modules))
-    return module_manager, errors
+    return module_manager, prev_result + errors
 
 
 def resolve_module(module: Module, module_manager: ModuleManager) -> List[VulpesError]:

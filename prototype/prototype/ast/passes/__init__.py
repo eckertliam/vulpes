@@ -1,5 +1,5 @@
 
-from typing import Callable, List, Tuple
+from typing import Callable, List, Optional, Tuple
 
 from prototype.ast import ModuleManager
 from prototype.errors import VulpesError
@@ -13,4 +13,4 @@ from .pipeline import Pipeline
 
 
 PassResult = Tuple[ModuleManager, List[VulpesError]]
-Pass = Callable[[ModuleManager], PassResult]
+Pass = Callable[[ModuleManager, Optional[PassResult]], PassResult]

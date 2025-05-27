@@ -1,8 +1,8 @@
 from itertools import chain
-from typing import List, Tuple
+from typing import List
 from prototype.errors import VulpesError
 from prototype.ast import ModuleManager, Module, Import
-from prototype.ast.symbol import Symbol
+from .pass_types import PassResult
 
 
 class ModuleDoesNotExportError(VulpesError):
@@ -20,17 +20,19 @@ class ModuleDoesNotExportError(VulpesError):
 
 def import_linker_pass(
     module_manager: ModuleManager,
-) -> Tuple[ModuleManager, List[VulpesError]]:
+    prev_result: List[VulpesError] = [],
+) -> PassResult:
     """This pass populates the imports table for each module with the corresponding
     symbols from the exporting module.
 
     Args:
         module_manager (ModuleManager): The module manager to populate the imports table for
+        prev_result (List[VulpesError]): A list of errors from previous passes
 
     Returns:
         Tuple[ModuleManager, List[VulpesError]]: The module manager with the imports table populated, and a list of errors
     """
-    return module_manager, list(
+    return module_manager, prev_result + list(
         chain.from_iterable(
             visit_module(module, module_manager)
             for module in module_manager.modules.values()

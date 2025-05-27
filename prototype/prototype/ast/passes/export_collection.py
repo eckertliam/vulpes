@@ -1,7 +1,8 @@
 from itertools import chain
-from typing import List, Tuple
+from typing import List
 from prototype.ast import ModuleManager, Declaration, ExportSpec, Module
 from prototype.errors import VulpesError
+from .pass_types import PassResult
 
 
 class UndefinedExportError(VulpesError):
@@ -51,7 +52,8 @@ class InvalidExportTargetError(VulpesError):
 
 def export_collection_pass(
     module_manager: ModuleManager,
-) -> Tuple[ModuleManager, List[VulpesError]]:
+    prev_result: List[VulpesError] = [],
+) -> PassResult:
     """This pass populates each module's exports table based on its ExportSpec
     It performs the following steps:
     - Reads each module's ExportSpec
@@ -60,11 +62,12 @@ def export_collection_pass(
 
     Args:
         module_manager (ModuleManager): The module manager to walk
+        prev_result (List[VulpesError]): A list of errors from previous passes
 
     Returns:
         Tuple[ModuleManager, List[VulpesError]]: The module manager with the exports table populated
     """
-    return module_manager, list(
+    return module_manager, prev_result + list(
         chain.from_iterable(
             visit_module(module) for module in module_manager.modules.values()
         )

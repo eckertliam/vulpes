@@ -1,5 +1,5 @@
 from itertools import chain
-from typing import List, Tuple, Union
+from typing import List, Optional, Tuple, Union
 from prototype.errors import VulpesError
 from prototype.ast import (
     Else,
@@ -17,6 +17,7 @@ from prototype.ast import (
     TopLevelNode,
     StructDecl,
 )
+from .pass_types import PassResult
 
 
 class DuplicateDefinitionError(VulpesError):
@@ -33,18 +34,20 @@ class DuplicateDefinitionError(VulpesError):
 
 def name_res_pass(
     module_manager: ModuleManager,
-) -> Tuple[ModuleManager, List[VulpesError]]:
+    prev_result: List[VulpesError] = [],
+) -> PassResult:
     """Name Resolution Pass
 
     This pass walks the AST and builds the symbol table for each module.
 
     Args:
         module_manager (ModuleManager): The module manager to walk
+        prev_result (List[VulpesError]): A list of errors from previous passes
 
     Returns:
         ModuleManager: The module manager with the symbol table populated
     """
-    return module_manager, list(
+    return module_manager, prev_result + list(
         chain.from_iterable(
             visit_module(module) for module in module_manager.modules.values()
         )
@@ -143,7 +146,9 @@ def visit_fn_decl(fn_decl: FnDecl, module: Module) -> List[VulpesError]:
     with module.symbol_table.scoped(fn_symbol.ast_id):
         # add the parameters to the symbol table
         param_res: List[VulpesError] = list(
-            chain.from_iterable(add_local_symbol(param, module) for param in fn_decl.params)
+            chain.from_iterable(
+                add_local_symbol(param, module) for param in fn_decl.params
+            )
         )
         # visit the body of the function
         body_res: List[VulpesError] = visit_block(fn_decl.body, module)
