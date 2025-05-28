@@ -728,6 +728,26 @@ class MonoTypeAlias(TypeAlias):
         return hash(("monomorphized_type_alias", self.name, tuple(self.type_args), self.type, self.poly_type))
     
 
+
+
+PRIMITIVE_TYPES: Dict[str, Type] = {
+    "void": VoidType(),
+    "i8": IntType(8),
+    "i16": IntType(16),
+    "i32": IntType(32),
+    "i64": IntType(64),
+    "u8": IntType(8, False),
+    "u16": IntType(16, False),
+    "u32": IntType(32, False),
+    "u64": IntType(64, False),
+    "f32": FloatType(32),
+    "f64": FloatType(64),
+    "bool": BoolType(),
+    "char": CharType(),
+    "string": StringType(),
+}
+
+
 class TypeEnv:
     """
     Represents a type environment
@@ -743,7 +763,7 @@ class TypeEnv:
     __slots__ = ["types", "type_aliases", "structs", "unions", "functions"]
 
     def __init__(self) -> None:
-        self.types: Dict[str, Type] = {}
+        self.types: Dict[str, Type] = PRIMITIVE_TYPES.copy()
         self.type_aliases: Dict[str, TypeAlias] = {}
         self.structs: Dict[str, StructType] = {}
         self.unions: Dict[str, UnionType] = {}

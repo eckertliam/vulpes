@@ -30,14 +30,14 @@ class ModuleBuilder:
     Builder for constructing a Module AST node and its top-level declarations.
     """
 
-    def __init__(self, file_name: str):
+    def __init__(self, module_name: str):
         """
         Initialize the ModuleBuilder.
 
         Args:
-            file_name (str): The file name for the module.
+            module_name (str): The name of the module.
         """
-        self.module: Module = Module(file_name)
+        self.module: Module = Module(module_name)
 
     def build(self) -> Module:
         """

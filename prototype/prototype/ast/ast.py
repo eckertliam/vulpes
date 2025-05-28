@@ -1,5 +1,4 @@
 # Expressive AST we convert the Lark ast into
-import os
 from typing import Dict, Optional, Union, List, Set
 
 from .symbol import Symbol, SymbolTable
