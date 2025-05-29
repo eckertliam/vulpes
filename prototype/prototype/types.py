@@ -261,6 +261,28 @@ class TypeVar(Type):
         return hash(("type_var", self.name, self._id))
 
 
+class TypeHole(Type):
+    """Represents a type hole, which is a placeholder for a type that is not yet known.
+
+    Attributes:
+        _id (uuid4): A unique identifier for the type hole.
+    """
+
+    __slots__ = ["_id"]
+
+    def __init__(self) -> None:
+        self._id = uuid4()
+
+    def __str__(self) -> str:
+        return f"TypeHole({self._id})"
+
+    def __eq__(self, other: "Type") -> bool:
+        return isinstance(other, TypeHole) and self._id == other._id
+
+    def __hash__(self) -> int:
+        return hash(("type_hole", self._id))
+
+
 def monomorphize_type(type: Type, ty_param_arg_map: Dict[TypeVar, Type]) -> Type:
     """
     Monomorphizes a type by substituting type variables with their corresponding type arguments.
