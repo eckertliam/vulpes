@@ -245,9 +245,7 @@ class TypeVar(Type):
 
     def __init__(self, name: str) -> None:
         self.name = name
-        self._id = (
-            uuid4()
-        )  # guarantee uniqueness across different type fields which might use the same type var name
+        self._id = uuid4()
 
     def __str__(self) -> str:
         return self.name
@@ -299,6 +297,7 @@ def monomorphize_type(type: Type, ty_param_arg_map: Dict[TypeVar, Type]) -> Type
     else:
         return type
 
+
 def mangle_type_name(name: str, type_args: List[Type]) -> str:
     """
     Mangles a type name to include type arguments
@@ -312,10 +311,12 @@ def mangle_type_name(name: str, type_args: List[Type]) -> str:
     """
     return f"{name}$mono${'$'.join(str(t) for t in type_args)}"
 
+
 class FunctionType(Type):
     """Represents a function type"""
-    
+
     pass
+
 
 class PolyFunctionType(FunctionType):
     """
@@ -382,20 +383,46 @@ class PolyFunctionType(FunctionType):
         mono_ret_type = monomorphize_type(self.ret_type, type_args_map)
 
         # return the monomorphized function type
-        return MonoFunctionType(
-            self.name, type_args, mono_params, mono_ret_type, self
+        return MonoFunctionType(self.name, type_args, mono_params, mono_ret_type, self)
+
+
+class AnonymousFunctionType(FunctionType):
+    """Represents an anonymous function type
+
+    Attributes:
+        params (List[Type]): The types of parameters the function accepts.
+        ret_type (Type): The return type of the function.
+    """
+
+    __slots__ = ["params", "ret_type"]
+
+    def __init__(self, params: List[Type], ret_type: Type) -> None:
+        self.params = params
+        self.ret_type = ret_type
+
+    def __str__(self) -> str:
+        return f"fn({', '.join(str(t) for t in self.params)}) -> {self.ret_type}"
+
+    def __eq__(self, other: "Type") -> bool:
+        return (
+            isinstance(other, AnonymousFunctionType)
+            and self.params == other.params
+            and self.ret_type == other.ret_type
         )
+
+    def __hash__(self) -> int:
+        return hash(("anonymous_fn", tuple(self.params), self.ret_type))
 
 
 class MonoFunctionType(FunctionType):
     """Represents a monomorphized function type
-    
+
     Attributes:
         name (str): The name of the function.
         type_args (List[Type]): The type arguments of the function.
         params (List[Type]): The types of parameters the function accepts.
         ret_type (Type): The return type of the function.
-        poly_type (PolyFunctionType): The polymorphic function type.
+        poly_type (Optional[PolyFunctionType]): The polymorphic function type.
     """
 
     __slots__ = ["name", "type_args", "params", "ret_type", "poly_type"]
@@ -406,7 +433,7 @@ class MonoFunctionType(FunctionType):
         type_args: List[Type],
         params: List[Type],
         ret_type: Type,
-        poly_type: PolyFunctionType,
+        poly_type: Optional[PolyFunctionType] = None,
     ) -> None:
         self.name = mangle_type_name(name, type_args)
         self.type_args = type_args
@@ -415,7 +442,10 @@ class MonoFunctionType(FunctionType):
         self.poly_type = poly_type
 
     def __str__(self) -> str:
-        return f"{self.name}<{', '.join(str(t) for t in self.type_args)}>({', '.join(str(t) for t in self.params)}) -> {self.ret_type}"
+        type_args_str = (
+            f"<{', '.join(str(t) for t in self.type_args)}>" if self.type_args else ""
+        )
+        return f"{self.name}{type_args_str}({', '.join(str(t) for t in self.params)}) -> {self.ret_type}"
 
     def __eq__(self, other: "Type") -> bool:
         return (
@@ -439,12 +469,14 @@ class MonoFunctionType(FunctionType):
             )
         )
 
+
 class StructType(Type):
     """
     Represents a struct type, which is a collection of fields of potentially different types.
     """
 
     pass
+
 
 class PolyStructType(StructType):
     """
@@ -503,12 +535,12 @@ class PolyStructType(StructType):
 
 class MonoStructType(StructType):
     """Represents a monomorphized struct type
-    
+
     Attributes:
         name (str): The name of the struct.
         type_args (List[Type]): The type arguments of the struct.
         fields (Dict[str, Type]): A dictionary of the fields of the struct.
-        poly_type (StructType): The polymorphic struct type.
+        poly_type (Optional[PolyStructType]): The polymorphic struct type.
     """
 
     __slots__ = ["name", "type_args", "fields", "poly_type"]
@@ -518,7 +550,7 @@ class MonoStructType(StructType):
         name: str,
         type_args: List[Type],
         fields: Dict[str, Type],
-        poly_type: PolyStructType,
+        poly_type: Optional[PolyStructType] = None,
     ) -> None:
         self.name = mangle_type_name(name, type_args)
         self.type_args = type_args
@@ -556,9 +588,32 @@ class UnionType(Type):
 
     pass
 
+
+class Tag(Type):
+    """Represents a tag type within a union
+
+    Attributes:
+        name (str): The name of the tag.
+    """
+
+    __slots__ = ["name"]
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def __str__(self) -> str:
+        return f"tag {self.name}"
+
+    def __eq__(self, other: "Type") -> bool:
+        return isinstance(other, Tag) and self.name == other.name
+
+    def __hash__(self) -> int:
+        return hash(("tag", self.name))
+
+
 class PolyUnionType(UnionType):
     """Represents a polymorphic union type
-    
+
     Attributes:
         name (str): The name of the union.
         type_params (Set[TypeVar]): The type parameters of the union.
@@ -612,12 +667,12 @@ class PolyUnionType(UnionType):
 
 class MonoUnionType(UnionType):
     """Represents a monomorphized union type
-    
+
     Attributes:
         name (str): The name of the union.
         type_args (List[Type]): The type arguments of the union.
         variants (Dict[str, Type]): A dictionary of the variants of the union.
-        poly_type (UnionType): The polymorphic union type.
+        poly_type (Optional[PolyUnionType]): The polymorphic union type.
     """
 
     __slots__ = ["name", "type_args", "variants", "poly_type"]
@@ -627,7 +682,7 @@ class MonoUnionType(UnionType):
         name: str,
         type_args: List[Type],
         variants: Dict[str, Type],
-        poly_type: PolyUnionType,
+        poly_type: Optional[PolyUnionType] = None,
     ) -> None:
         self.name = mangle_type_name(name, type_args)
         self.type_args = type_args
@@ -657,12 +712,14 @@ class MonoUnionType(UnionType):
             )
         )
 
+
 class TypeAlias(Type):
     """
     Represents a type alias, which is a name for a type.
     """
 
     pass
+
 
 class PolyTypeAlias(TypeAlias):
     """Represents a polymorphic type alias
@@ -684,50 +741,78 @@ class PolyTypeAlias(TypeAlias):
         return f"type {self.name}"
 
     def __eq__(self, other: "Type") -> bool:
-        return isinstance(other, PolyTypeAlias) and self.name == other.name and self.type_params == other.type_params and self.type == other.type
-    
+        return (
+            isinstance(other, PolyTypeAlias)
+            and self.name == other.name
+            and self.type_params == other.type_params
+            and self.type == other.type
+        )
+
     def __hash__(self) -> int:
         return hash(("type_alias", self.name, tuple(self.type_params), self.type))
-    
+
     def monomorphize(self, type_args: List[Type]) -> "MonoTypeAlias":
         # ensure the same len
         if len(type_args) != len(self.type_params):
-            raise ValueError(f"Expected {len(self.type_params)} type arguments, got {len(type_args)}")
-        
-        type_args_map: Dict[TypeVar, Type] = {param: arg for param, arg in zip(self.type_params, type_args)}
-        
+            raise ValueError(
+                f"Expected {len(self.type_params)} type arguments, got {len(type_args)}"
+            )
+
+        type_args_map: Dict[TypeVar, Type] = {
+            param: arg for param, arg in zip(self.type_params, type_args)
+        }
+
         mono_type = monomorphize_type(self.type, type_args_map)
-        
+
         return MonoTypeAlias(self.name, type_args, mono_type, self)
-    
+
+
 class MonoTypeAlias(TypeAlias):
     """Represents a monomorphized type alias
-    
+
     Attributes:
         name (str): The name of the type alias.
         type_args (List[Type]): The type arguments of the type alias.
         type (Type): The type of the type alias.
-        poly_type (TypeAlias): The polymorphic type alias.
+        poly_type (Optional[PolyTypeAlias]): The polymorphic type alias.
     """
-    
+
     __slots__ = ["name", "type_args", "type", "poly_type"]
-    
-    def __init__(self, name: str, type_args: List[Type], type: Type, poly_type: PolyTypeAlias) -> None:
+
+    def __init__(
+        self,
+        name: str,
+        type_args: List[Type],
+        type: Type,
+        poly_type: Optional[PolyTypeAlias] = None,
+    ) -> None:
         self.name = mangle_type_name(name, type_args)
         self.type_args = type_args
         self.type = type
         self.poly_type = poly_type
-    
+
     def __str__(self) -> str:
         return f"type {self.name}<{', '.join(str(t) for t in self.type_args)}>"
-    
-    def __eq__(self, other: "Type") -> bool:
-        return isinstance(other, MonoTypeAlias) and self.name == other.name and self.type_args == other.type_args and self.type == other.type and self.poly_type == other.poly_type
-    
-    def __hash__(self) -> int:
-        return hash(("monomorphized_type_alias", self.name, tuple(self.type_args), self.type, self.poly_type))
-    
 
+    def __eq__(self, other: "Type") -> bool:
+        return (
+            isinstance(other, MonoTypeAlias)
+            and self.name == other.name
+            and self.type_args == other.type_args
+            and self.type == other.type
+            and self.poly_type == other.poly_type
+        )
+
+    def __hash__(self) -> int:
+        return hash(
+            (
+                "monomorphized_type_alias",
+                self.name,
+                tuple(self.type_args),
+                self.type,
+                self.poly_type,
+            )
+        )
 
 
 PRIMITIVE_TYPES: Dict[str, Type] = {
@@ -768,18 +853,11 @@ class TypeEnv:
         self.structs: Dict[str, StructType] = {}
         self.unions: Dict[str, UnionType] = {}
         self.functions: Dict[str, FunctionType] = {}
-        
-    def add_type(self, name: str, type: Type) -> None:
-        # first check against collisions
-        if name in self.types:
-            raise ValueError(f"Type {name} already exists")
-        
-        # add the type to the environment
+
+    def set_type(self, name: str, type: Type) -> None:
         self.types[name] = type
-        
-        # dispatch to the appropriate type
+
         if isinstance(type, TypeAlias):
-            # TODO: check out against cyclic aliases
             self.type_aliases[name] = type
         elif isinstance(type, StructType):
             self.structs[name] = type
@@ -787,21 +865,27 @@ class TypeEnv:
             self.unions[name] = type
         elif isinstance(type, FunctionType):
             self.functions[name] = type
-        else:
-            raise TypeError(f"Invalid type: {type}")
-        
+
     def get_type(self, name: str) -> Optional[Type]:
         return self.types.get(name)
-    
-    def get_type_alias(self, name: str) -> Optional[TypeAlias]:
-        return self.type_aliases.get(name)
-    
+
     def get_struct(self, name: str) -> Optional[StructType]:
         return self.structs.get(name)
-    
+
     def get_union(self, name: str) -> Optional[UnionType]:
         return self.unions.get(name)
-    
+
     def get_function(self, name: str) -> Optional[FunctionType]:
         return self.functions.get(name)
-    
+
+    def get_alias(self, name: str) -> Optional[TypeAlias]:
+        return self.type_aliases.get(name)
+
+    def __getitem__(self, name: str) -> Optional[Type]:
+        return self.get_type(name)
+
+    def __setitem__(self, name: str, type: Type) -> None:
+        self.set_type(name, type)
+
+    def __delitem__(self, name: str) -> None:
+        del self.types[name]

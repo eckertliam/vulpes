@@ -15,6 +15,12 @@ class ModuleManager:
 
     def get_module(self, name: str) -> Optional["Module"]:
         return self.modules.get(name)
+    
+    def get_module_by_id(self, id: int) -> Optional["Module"]:
+        for module in self.modules.values():
+            if module.id == id:
+                return module
+        return None
 
     def add_module(self, module: "Module") -> None:
         self.modules[module.name] = module
@@ -65,7 +71,7 @@ class Module:
         self.file_path: Optional[str] = file_path
         self.name: str = name
         self.symbol_table: SymbolTable = SymbolTable()
-        self._id: int = Module._next_id
+        self.id: int = Module._next_id
         Module._next_id += 1
         self.top_level_nodes: List[TopLevelNode] = []
         self.source: Optional[str] = source
@@ -96,7 +102,7 @@ class Module:
         return None
 
     def __hash__(self) -> int:
-        return hash(self._id)
+        return hash(self.id)
 
 
 class Node:
@@ -421,7 +427,14 @@ class StructField(Node):
 
 
 class StructDecl(Declaration):
-    """A struct declaration"""
+    """A struct declaration
+
+    Attributes:
+        name (str): The name of the struct.
+        type_params (List[TypeParam]): The generic parameters of the struct.
+        fields (List[StructField]): The fields of the struct.
+        line (int): The line number where the struct is declared.
+    """
 
     def __init__(
         self,
@@ -464,18 +477,17 @@ class StructDecl(Declaration):
         return (min_line, max_line)
 
 
-class UnionField(Node):
-    """A super type for all union fields"""
+class UnionVariant(Node):
+    """A super type for all union variants"""
+    def __init__(self, name: str, line: int) -> None:
+        super().__init__(line)
+        self.name = name
 
-    pass
-
-
-class UnionStructVariant(UnionField):
+class UnionStructVariant(UnionVariant):
     """A union field that is a struct variant"""
 
     def __init__(self, name: str, fields: List[StructField], line: int) -> None:
-        super().__init__(line)
-        self.name = name
+        super().__init__(name, line)
         self.fields = fields
 
     def get_node(self, id: int) -> Optional[Node]:
@@ -497,12 +509,11 @@ class UnionStructVariant(UnionField):
         return (min_line, max_line)
 
 
-class UnionTupleVariant(UnionField):
+class UnionTupleVariant(UnionVariant):
     """A union field that is a tuple variant"""
 
     def __init__(self, name: str, types: List[TypeAnnotation], line: int) -> None:
-        super().__init__(line)
-        self.name = name
+        super().__init__(name, line)
         self.types = types
 
     def get_node(self, id: int) -> Optional[Node]:
@@ -524,28 +535,33 @@ class UnionTupleVariant(UnionField):
         return (min_line, max_line)
 
 
-class UnionTagVariant(UnionField):
+class UnionTagVariant(UnionVariant):
     """A union field that is a tag variant"""
 
     def __init__(self, name: str, line: int) -> None:
-        super().__init__(line)
-        self.name = name
+        super().__init__(name, line)
 
 
 class UnionDecl(Declaration):
-    """A union declaration"""
+    """A union declaration
+    
+    Attributes:
+        name (str): The name of the union.
+        type_params (List[TypeParam]): The generic parameters of the union.
+        variants (List[UnionVariant]): The variants of the union.
+    """
 
     def __init__(
         self,
         name: str,
         type_params: List[TypeParam],
-        fields: List[UnionField],
+        variants: List[UnionVariant],
         line: int,
     ) -> None:
         super().__init__(line)
         self.name = name
         self.type_params = type_params
-        self.fields = fields
+        self.variants = variants
 
     def get_node(self, id: int) -> Optional[Node]:
         if self.id == id:
@@ -554,7 +570,7 @@ class UnionDecl(Declaration):
             node = param.get_node(id)
             if node is not None:
                 return node
-        for field in self.fields:
+        for field in self.variants:
             node = field.get_node(id)
             if node is not None:
                 return node
@@ -568,7 +584,7 @@ class UnionDecl(Declaration):
             min_line = min(min_line, pmin)
             max_line = max(max_line, pmax)
 
-        for field in self.fields:
+        for field in self.variants:
             fmin, fmax = field.get_span()
             min_line = min(min_line, fmin)
             max_line = max(max_line, fmax)
