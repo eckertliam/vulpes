@@ -1,6 +1,8 @@
 import prototype.ast as ast
 from prototype.types import (
     IntType,
+    MonoFunctionType,
+    TypeHole,
 )
 from prototype.module_builder import ModuleBuilder
 from prototype.ast.passes import (
@@ -50,19 +52,19 @@ def test_simple_type_norm():
     assert fn_params[0].name == "x", "Test function has incorrect parameter name"
     assert fn_params[0].symbol is not None, "Test function has incorrect parameter type"
     assert fn_params[0].symbol.type == IntType(), "Test function has incorrect parameter type"
-    fn_ret_type = test_fn_decl.ret_type
-    assert fn_ret_type is not None, "Test function has incorrect return type"
-    assert fn_ret_type.symbol is not None, "Test function has incorrect return type" 
-    assert fn_ret_type.symbol.type == IntType(), "Test function has incorrect return type"
+    fn_sym = test_fn_decl.symbol
+    assert fn_sym is not None, "Test function has incorrect symbol"
+    assert fn_sym.type is not None, "Test function has incorrect symbol type"
+    assert fn_sym.type == MonoFunctionType("test_fn", [], [IntType()], IntType()), "Test function has incorrect symbol type"
     fn_body = test_fn_decl.body
     assert len(fn_body) == 2, "Test function has incorrect number of statements"
     var_decl = fn_body[0]
     assert isinstance(var_decl, ast.VarDecl), "Test function has incorrect statement type"
-    assert var_decl.expr.symbol is not None, "Test function has incorrect variable expression"
-    assert var_decl.expr.symbol.type == IntType(), "Test function has incorrect variable expression type"
+    assert var_decl.symbol is not None, "Test function has incorrect variable symbol"
+    assert isinstance(var_decl.symbol.type, TypeHole), "Test function has incorrect variable symbol type"
     return_stmt = fn_body[1]
     assert isinstance(return_stmt, ast.Return), "Test function has incorrect statement type"
     assert return_stmt.expr is not None, "Test function has incorrect return expression"
     assert return_stmt.expr.symbol is not None, "Test function has incorrect return expression"
-    assert return_stmt.expr.symbol.type == IntType(), "Test function has incorrect return expression type"
+    assert isinstance(return_stmt.expr.symbol.type, TypeHole), "Test function has incorrect return expression type"
     

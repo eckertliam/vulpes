@@ -270,7 +270,7 @@ class TypeHole(Type):
 
     __slots__ = ["_id"]
 
-    def __init__(self, name: str) -> None:
+    def __init__(self) -> None:
         self._id = uuid4()
 
     def __str__(self) -> str:
