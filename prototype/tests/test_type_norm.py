@@ -66,4 +66,3 @@ def test_simple_type_norm():
     assert return_stmt.expr.symbol is not None, "Test function has incorrect return expression"
     assert return_stmt.expr.symbol.type == IntType(), "Test function has incorrect return expression type"
     
-    

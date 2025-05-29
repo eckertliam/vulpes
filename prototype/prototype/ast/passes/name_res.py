@@ -142,6 +142,8 @@ def visit_fn_decl(fn_decl: FnDecl, module: Module) -> List[VulpesError]:
         return [DuplicateDefinitionError(fn_decl.name, module.name)]
     # if its not add it
     fn_symbol = module.symbol_table.add_symbol(fn_decl.name, fn_decl.id, module.id)
+    # attach the function's symbol to the declaration
+    fn_decl.symbol = fn_symbol
     # enter the function scope
     with module.symbol_table.scoped(fn_symbol.ast_id):
         # add the parameters to the symbol table

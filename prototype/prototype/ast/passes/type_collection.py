@@ -22,6 +22,8 @@ from prototype.ast import (
     UnionTupleVariant,
     UnionTagVariant,
     TypeParam,
+    FnDecl,
+    Declaration,
 )
 from prototype.ast.symbol import Symbol
 from prototype.result import Result
@@ -29,9 +31,11 @@ from .pass_types import PassResult
 from prototype.types import (
     AnonymousFunctionType,
     ArrayType,
+    MonoFunctionType,
     MonoStructType,
     MonoTypeAlias,
     MonoUnionType,
+    PolyFunctionType,
     PolyStructType,
     PolyTypeAlias,
     PolyUnionType,
@@ -213,11 +217,7 @@ def visit_module(
     """
     errors: List[VulpesError] = []
     for ty_decl in module.top_level_nodes:
-        if (
-            isinstance(ty_decl, StructDecl)
-            or isinstance(ty_decl, UnionDecl)
-            or isinstance(ty_decl, TypeAliasDecl)
-        ):
+        if isinstance(ty_decl, Declaration):
             res = visit_type_decl(ty_decl, module, mm, type_cache)
             if res.is_err():
                 errors.extend(res.unwrap_err())
@@ -225,7 +225,7 @@ def visit_module(
 
 
 def visit_type_decl(
-    ty_decl: Union[StructDecl, UnionDecl, TypeAliasDecl],
+    ty_decl: Declaration,
     module: Module,
     mm: ModuleManager,
     type_cache: Dict[str, Type],
@@ -247,6 +247,10 @@ def visit_type_decl(
         return visit_union_decl(ty_decl, module, mm, type_cache)
     elif isinstance(ty_decl, TypeAliasDecl):
         return visit_type_alias_decl(ty_decl, module, mm, type_cache)
+    elif isinstance(ty_decl, FnDecl):
+        return visit_fn_decl(ty_decl, module, mm, type_cache)
+    else:
+        raise ValueError(f"Unknown type declaration: {ty_decl}")
 
 
 def collect_type_params(type_params: List[TypeParam]) -> Set[TypeVar]:
@@ -259,6 +263,49 @@ def collect_type_params(type_params: List[TypeParam]) -> Set[TypeVar]:
         Set[TypeVar]: The type variables.
     """
     return {TypeVar(ty_param.name) for ty_param in type_params}
+
+
+def visit_fn_decl(
+    fn_decl: FnDecl, module: Module, mm: ModuleManager, type_cache: Dict[str, Type]
+) -> Result[Type]:
+    """Visit a function and adds the function's type to the symbol of the declaration.
+    Also attaches the function's param types to the symbols of the params. Same for the return type.
+    Does not enter the body of the function. Does not enter the function's type into the type env or the type cache.
+
+    Args:
+        fn_decl (FnDecl): The function declaration to visit.
+        module (Module): The module that the function is being referenced from.
+        mm (ModuleManager): The module manager to use.
+        type_cache (Dict[str, Type]): The cache to use for types.
+
+    Returns:
+        Result[Type]: The type of the function or an error if the type is not found.
+    """
+    fn_type = (
+        MonoFunctionType(fn_decl.name, [], [], VoidType())
+        if len(fn_decl.type_params) == 0
+        else PolyFunctionType(
+            fn_decl.name, collect_type_params(fn_decl.type_params), [], VoidType()
+        )
+    )
+    fn_params: List[Type] = []
+    for param in fn_decl.params:
+        param_res = visit_type_annotation(param.type_annotation, module, mm, type_cache)
+        if param_res.is_err():
+            return param_res
+        param_type = param_res.unwrap()
+        fn_params.append(param_type)
+        assert param.symbol is not None, f"Function {fn_decl.name} has no symbol"
+        param.symbol.type = param_type
+    fn_type.params = fn_params
+    fn_ret_type_res = visit_type_annotation(fn_decl.ret_type, module, mm, type_cache)
+    if fn_ret_type_res.is_err():
+        return fn_ret_type_res
+    fn_ret_type = fn_ret_type_res.unwrap()
+    fn_type.ret_type = fn_ret_type
+    assert fn_decl.symbol is not None, f"Function {fn_decl.name} has no symbol"
+    fn_decl.symbol.type = fn_type
+    return Result.ok(fn_type)
 
 
 def visit_struct_decl(
