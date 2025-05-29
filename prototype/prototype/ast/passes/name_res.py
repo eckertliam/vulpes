@@ -81,7 +81,7 @@ def add_global_symbol(
     """
     if module.symbol_table.lookup_global(node.name) is not None:
         return [DuplicateDefinitionError(node.name, module.name)]
-    symbol = module.symbol_table.add_symbol(node.name, node.id)
+    symbol = module.symbol_table.add_symbol(node.name, node.id, module.id)
     node.symbol = symbol
     return []
 
@@ -98,7 +98,7 @@ def add_local_symbol(node: Union[Param, VarDecl], module: Module) -> List[Vulpes
     """
     if module.symbol_table.lookup_local(node.name) is not None:
         return [DuplicateDefinitionError(node.name, module.name)]
-    symbol = module.symbol_table.add_symbol(node.name, node.id)
+    symbol = module.symbol_table.add_symbol(node.name, node.id, module.id)
     node.symbol = symbol
     return []
 
@@ -141,7 +141,7 @@ def visit_fn_decl(fn_decl: FnDecl, module: Module) -> List[VulpesError]:
     if module.symbol_table.lookup_global(fn_decl.name) is not None:
         return [DuplicateDefinitionError(fn_decl.name, module.name)]
     # if its not add it
-    fn_symbol = module.symbol_table.add_symbol(fn_decl.name, fn_decl.id)
+    fn_symbol = module.symbol_table.add_symbol(fn_decl.name, fn_decl.id, module.id)
     # enter the function scope
     with module.symbol_table.scoped(fn_symbol.ast_id):
         # add the parameters to the symbol table

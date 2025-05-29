@@ -9,6 +9,7 @@ from .name_res import name_res_pass
 from .export_collection import export_collection_pass
 from .import_linker import import_linker_pass
 from .name_ref import name_ref_pass
+from .type_collection import type_collection_pass
 from .pipeline import Pipeline
 
 

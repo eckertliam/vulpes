@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 class Symbol:
     name: str
     ast_id: int
+    module_id: int
     parent_scope_id: int
     type: Optional["Type"] = None
 
@@ -22,7 +23,7 @@ class Scope:
     Scope IDs are derived from the ast id of the scope they represent.
 
     Attributes:
-        scope_id (int): The id of the scope
+        scope_id (int): The id of the scope        
         parent_id (Optional[int]): The id of the parent scope
         symbols (Dict[str, Symbol]): The symbols in the scope
     """
@@ -91,6 +92,7 @@ class SymbolTable:
         self,
         name: str,
         ast_id: int,
+        module_id: int,
     ) -> Symbol:
         """Add a symbol to the current scope.
         If the symbol already exists in the current scope or the top level scope, return None.
@@ -106,7 +108,7 @@ class SymbolTable:
         if name in self.table[self.current_scope_id].symbols or name in self.table[-1].symbols:
             raise RuntimeError("Name already in use")
         else:
-            symbol = Symbol(name, ast_id, self.current_scope_id)
+            symbol = Symbol(name, ast_id, module_id, self.current_scope_id)
             self.table[self.current_scope_id].symbols[name] = symbol
             return symbol
 

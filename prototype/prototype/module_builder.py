@@ -30,14 +30,14 @@ class ModuleBuilder:
     Builder for constructing a Module AST node and its top-level declarations.
     """
 
-    def __init__(self, file_name: str):
+    def __init__(self, module_name: str):
         """
         Initialize the ModuleBuilder.
 
         Args:
-            file_name (str): The file name for the module.
+            module_name (str): The name of the module.
         """
-        self.module: Module = Module(file_name)
+        self.module: Module = Module(module_name)
 
     def build(self) -> Module:
         """
@@ -295,7 +295,7 @@ class UnionDeclBuilder:
             UnionStructVariantBuilder: Builder for the struct variant.
         """
         union_struct_variant = UnionStructVariant(name, [], 0)
-        self.union_decl.fields.append(union_struct_variant)
+        self.union_decl.variants.append(union_struct_variant)
         return UnionStructVariantBuilder(union_struct_variant, self)
 
     def build_tuple_variant(self, name: str) -> "UnionTupleVariantBuilder":
@@ -307,7 +307,7 @@ class UnionDeclBuilder:
             UnionTupleVariantBuilder: Builder for the tuple variant.
         """
         union_tuple_variant = UnionTupleVariant(name, [], 0)
-        self.union_decl.fields.append(union_tuple_variant)
+        self.union_decl.variants.append(union_tuple_variant)
         return UnionTupleVariantBuilder(union_tuple_variant, self)
 
     def add_tag_variant(self, name: str) -> "UnionDeclBuilder":
@@ -318,7 +318,7 @@ class UnionDeclBuilder:
         Returns:
             UnionDeclBuilder: The builder itself.
         """
-        self.union_decl.fields.append(UnionTagVariant(name, 0))
+        self.union_decl.variants.append(UnionTagVariant(name, 0))
         return self
 
 
