@@ -376,7 +376,9 @@ def visit_union_decl(
     union_type = (
         MonoUnionType(union_decl.name, [], {})
         if len(union_decl.type_params) == 0
-        else PolyUnionType(union_decl.name, collect_type_params(union_decl.type_params), {})
+        else PolyUnionType(
+            union_decl.name, collect_type_params(union_decl.type_params), {}
+        )
     )
     add_type(union_decl.name, union_type, union_decl, module, type_cache)
     # collect the type parameters
@@ -504,7 +506,11 @@ def visit_type_alias_decl(
     type_alias_type = (
         MonoTypeAlias(type_alias_decl.name, [], VoidType())
         if len(type_alias_decl.type_params) == 0
-        else PolyTypeAlias(type_alias_decl.name, collect_type_params(type_alias_decl.type_params), VoidType())
+        else PolyTypeAlias(
+            type_alias_decl.name,
+            collect_type_params(type_alias_decl.type_params),
+            VoidType(),
+        )
     )
     add_type(type_alias_decl.name, type_alias_type, type_alias_decl, module, type_cache)
     type_params: Set[TypeVar] = collect_type_params(type_alias_decl.type_params)
