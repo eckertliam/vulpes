@@ -14,7 +14,7 @@ class DummyDecl(Declaration):
 
 def add_declared_symbol(module: Module, name: str, decl: Declaration):
     module.symbol_table.table[-1].symbols[name] = Symbol(
-        name=name, ast_id=decl.id, parent_scope_id=-1
+        name=name, ast_id=decl.id, module_id=module.id, parent_scope_id=-1
     )
     module.top_level_nodes.append(decl)
 
@@ -104,7 +104,9 @@ def test_duplicate_export_error():
     mod = Module("duplicate.vlp")
     decl = DummyDecl()
     add_declared_symbol(mod, "foo", decl)
-    mod.exports["foo"] = Symbol(name="foo", ast_id=decl.id, parent_scope_id=-1)
+    mod.exports["foo"] = Symbol(
+        name="foo", ast_id=decl.id, module_id=mod.id, parent_scope_id=-1
+    )
     mod.top_level_nodes.append(ExportSpec({"foo"}, 0))
     mm.add_module(mod)
 

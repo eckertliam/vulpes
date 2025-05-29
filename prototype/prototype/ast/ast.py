@@ -15,7 +15,7 @@ class ModuleManager:
 
     def get_module(self, name: str) -> Optional["Module"]:
         return self.modules.get(name)
-    
+
     def get_module_by_id(self, id: int) -> Optional["Module"]:
         for module in self.modules.values():
             if module.id == id:
@@ -479,9 +479,11 @@ class StructDecl(Declaration):
 
 class UnionVariant(Node):
     """A super type for all union variants"""
+
     def __init__(self, name: str, line: int) -> None:
         super().__init__(line)
         self.name = name
+
 
 class UnionStructVariant(UnionVariant):
     """A union field that is a struct variant"""
@@ -544,7 +546,7 @@ class UnionTagVariant(UnionVariant):
 
 class UnionDecl(Declaration):
     """A union declaration
-    
+
     Attributes:
         name (str): The name of the union.
         type_params (List[TypeParam]): The generic parameters of the union.
@@ -662,7 +664,7 @@ class TypeAliasDecl(Declaration):
 
 class VarDecl(Statement):
     """A variable declaration
-    
+
     Attributes:
         mutable (bool): Whether the variable is mutable
         name (str): The name of the variable
@@ -670,6 +672,7 @@ class VarDecl(Statement):
         expr (Expr): The expression that initializes the variable
         line: The line number of the declaration
     """
+
     def __init__(
         self,
         mutable: bool,
@@ -717,6 +720,7 @@ class Assign(Statement):
         rhs (Expr): The right hand side of the assign statement
         line (int): The line number of the assign statement
     """
+
     def __init__(self, lhs: AssignableExpr, rhs: "Expr", line: int) -> None:
         super().__init__(line)
         self.lhs = lhs
@@ -782,6 +786,7 @@ class If(Statement):
         else_body (Optional[list[Statement]]): The else body of the if statement
         line (int): The line number of the if statement
     """
+
     def __init__(
         self,
         cond: "Expr",
