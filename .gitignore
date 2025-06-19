@@ -1,8 +1,2 @@
-__pycache__
-*.pyc
-*.pyo
-*.pyd
-*.pyw
-*.pyz
-.pytest_cache
+build/
 .DS_Store
