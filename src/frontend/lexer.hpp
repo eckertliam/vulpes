@@ -4,18 +4,16 @@
 
 #include <string>
 
-namespace vulpes::frontend
-{
+namespace vulpes::frontend {
 
-    class Lexer
-    {
-    public:
+    class Lexer {
+      public:
         Lexer(std::string source)
             : source(std::move(source)), start(0), current(0), line(1), column(1) {}
 
         Token next_token();
 
-    private:
+      private:
         std::string source;
         size_t start;
         size_t current;

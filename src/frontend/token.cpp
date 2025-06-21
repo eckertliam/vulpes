@@ -1,12 +1,9 @@
 #include "token.hpp"
 
-namespace vulpes::frontend
-{
+namespace vulpes::frontend {
 
-    const char *token_kind_to_string(TokenKind kind)
-    {
-        switch (kind)
-        {
+    const char* token_kind_to_string(TokenKind kind) {
+        switch (kind) {
         case TokenKind::Identifier:
             return "Identifier";
         case TokenKind::Number:

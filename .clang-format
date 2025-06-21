@@ -1,0 +1,31 @@
+BasedOnStyle: LLVM
+IndentWidth: 4
+UseTab: Never
+
+ColumnLimit: 100
+
+BreakBeforeBraces: Attach
+AllowShortIfStatementsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: InlineOnly
+AllowShortLoopsOnASingleLine: true
+
+DerivePointerAlignment: false
+PointerAlignment: Left
+
+SpaceBeforeParens: ControlStatements
+SpaceAfterCStyleCast: true
+
+SortIncludes: true
+IncludeBlocks: Regroup
+
+NamespaceIndentation: All
+FixNamespaceComments: true
+
+AlwaysBreakTemplateDeclarations: MultiLine
+
+BreakConstructorInitializers: BeforeColon
+ConstructorInitializerIndentWidth: 4
+
+AllowShortLambdasOnASingleLine: Empty
+
+ReflowComments: true

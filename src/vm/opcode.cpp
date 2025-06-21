@@ -1,4 +1,1 @@
-namespace vulpes::vm
-{
-
-} // namespace vulpes::vm
+namespace vulpes::vm {} // namespace vulpes::vm

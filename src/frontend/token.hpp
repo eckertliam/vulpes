@@ -1,13 +1,10 @@
 #pragma once
 
-#include <string>
 #include <string_view>
 
-namespace vulpes::frontend
-{
+namespace vulpes::frontend {
 
-    enum class TokenKind
-    {
+    enum class TokenKind {
         // Literals
         Identifier,
         Number,
@@ -58,8 +55,7 @@ namespace vulpes::frontend
         Eof,
     };
 
-    struct Token
-    {
+    struct Token {
         TokenKind kind;
         std::string_view lexeme;
         size_t line;
@@ -72,6 +68,6 @@ namespace vulpes::frontend
             : kind(kind), lexeme(""), line(line), column(column) {}
     };
 
-    const char *token_kind_to_string(TokenKind kind);
+    const char* token_kind_to_string(TokenKind kind);
 
 } // namespace vulpes::frontend
