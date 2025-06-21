@@ -3,63 +3,75 @@
 #include <string>
 #include <string_view>
 
-enum class TokenKind {
-    // Literals
-    Identifier,
-    Number,
-    String,
+namespace vulpes::frontend
+{
 
-    // Keywords
-    Let,
-    Fn,
-    If,
-    Else,
-    While,
-    Loop,
-    Return,
-    True,
-    False,
+    enum class TokenKind
+    {
+        // Literals
+        Identifier,
+        Number,
+        String,
 
-    // Punctuation
-    LParen, RParen,
-    LBrace, RBrace,
-    LBracket, RBracket,
-    Comma,
-    Dot,
-    Colon,
-    Semicolon,
+        // Keywords
+        Let,
+        Fn,
+        If,
+        Else,
+        While,
+        Loop,
+        Return,
+        True,
+        False,
 
-    // Operators
-    Plus, Minus,
-    Star, Slash,
-    Percent,
-    Eq,
-    EqEq,
-    Bang,
-    BangEq,
-    Less,
-    LessEq,
-    Greater,
-    GreaterEq,
-    AmpAmp,
-    BarBar,
+        // Punctuation
+        LParen,
+        RParen,
+        LBrace,
+        RBrace,
+        LBracket,
+        RBracket,
+        Comma,
+        Dot,
+        Colon,
+        Semicolon,
 
-    // Special
-    Error,
-    Eof,
-};
+        // Operators
+        Plus,
+        Minus,
+        Star,
+        Slash,
+        Percent,
+        Eq,
+        EqEq,
+        Bang,
+        BangEq,
+        Less,
+        LessEq,
+        Greater,
+        GreaterEq,
+        AmpAmp,
+        BarBar,
 
-struct Token {
-    TokenKind kind;
-    std::string_view lexeme;
-    size_t line;
-    size_t column;
+        // Special
+        Error,
+        Eof,
+    };
 
-    Token(TokenKind kind, std::string_view lexeme, size_t line, size_t column)
-        : kind(kind), lexeme(lexeme), line(line), column(column) {}
+    struct Token
+    {
+        TokenKind kind;
+        std::string_view lexeme;
+        size_t line;
+        size_t column;
 
-    Token(TokenKind kind, size_t line, size_t column)
-        : kind(kind), lexeme(""), line(line), column(column) {}
-};
+        Token(TokenKind kind, std::string_view lexeme, size_t line, size_t column)
+            : kind(kind), lexeme(lexeme), line(line), column(column) {}
 
-const char* token_kind_to_string(TokenKind kind);
+        Token(TokenKind kind, size_t line, size_t column)
+            : kind(kind), lexeme(""), line(line), column(column) {}
+    };
+
+    const char *token_kind_to_string(TokenKind kind);
+
+} // namespace vulpes::frontend
