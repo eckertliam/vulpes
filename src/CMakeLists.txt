@@ -5,7 +5,12 @@ add_library(vulpes_frontend STATIC
 target_include_directories(vulpes_frontend PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_library(vulpes_vm STATIC
-    vm/opcode.cpp)
+    vm/opcode.cpp
+    vm/instruction.cpp
+    vm/value.cpp
+    vm/machine.cpp
+    vm/function.cpp
+    vm/call_frame.cpp)
 
 add_executable(vulpes main.cpp)
 
