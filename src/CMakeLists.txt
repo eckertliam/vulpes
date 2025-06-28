@@ -10,7 +10,9 @@ add_library(vulpes_vm STATIC
     vm/value.cpp
     vm/machine.cpp
     vm/function.cpp
-    vm/call_frame.cpp)
+    vm/call_frame.cpp
+    vm/object.cpp
+    vm/arena.cpp)
 
 add_executable(vulpes main.cpp)
 
