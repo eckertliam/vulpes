@@ -69,7 +69,7 @@ namespace vulpes::vm {
         std::vector<Value> data_;
 
       public:
-        Tuple() { type = ObjectType::Tuple; }
+        Tuple(std::vector<Value> data) : data_(data) { type = ObjectType::Tuple; }
 
         Value length() const { return Value(static_cast<int64_t>(data_.size())); }
 

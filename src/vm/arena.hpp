@@ -63,6 +63,7 @@ namespace vulpes::vm {
 
         void free_all() { current_ = base_; }
 
+        // copy the live objects to a new arena
         Arena copy_live();
     };
 
