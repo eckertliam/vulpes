@@ -58,6 +58,8 @@ namespace vulpes::vm {
         if (idx < 0 || idx >= data_.size()) {
             throw std::runtime_error("Index out of bounds");
         }
+
+        return data_[idx];
     }
 
     void List::push(const Value& value) {

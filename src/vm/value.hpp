@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <stdexcept>
 #include <variant>
 
 namespace vulpes::vm {
@@ -53,7 +54,14 @@ namespace vulpes::vm {
         char as_char() const { return std::get<char>(data); }
         bool as_bool() const { return std::get<bool>(data); }
         std::nullptr_t as_null() const { return std::get<std::nullptr_t>(data); }
-        Object* as_object() const { return std::get<Object*>(data); }
+        Object* as_object() const {
+            if (!is_object()) {
+                throw std::runtime_error("Value is not an object");
+            }
+            return std::get<Object*>(data);
+        }
+
+        std::string to_string() const;
 
       private:
         ValueData data;

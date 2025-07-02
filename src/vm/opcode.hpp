@@ -8,7 +8,6 @@ namespace vulpes::vm {
         // Flag: empty
         // Imm: empty
         Nop,
-        Push,
         Pop,
         Dup,
         Swap,
@@ -40,25 +39,22 @@ namespace vulpes::vm {
         JumpIfNot,
 
         // Const pool, function level constants
+        // Loads a constant from the const pool and pushes it to the stack
         // Flag: empty
         // Imm: constant index
         LoadConst,
 
-        // Global variables
-        // Flag: empty
-        // Imm: global index
-        LoadGlobal,
-        StoreGlobal,
-
-        // Local variables
-        // Flag: empty
-        // Imm: local index
-        LoadLocal,
-        StoreLocal,
-
         // Function handling
         Call,   // Flag: empty, Imm: function index
         Return, // Flag: empty, Imm: empty
+
+        // Object Instantiation
+        // Flag: empty
+        // Imm: empty
+        MakeString,
+        MakeList,
+        MakeTuple,
+        MakeTable,
 
         // VM
         Halt, // Flag: empty, Imm: empty

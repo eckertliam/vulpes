@@ -11,6 +11,8 @@ namespace vulpes::vm {
 
         void execute_instruction(Instruction instruction);
 
+        void run();
+
         void call_function(size_t function_idx);
 
         void push_call_frame(Function* function, size_t callee_arity);
@@ -43,6 +45,10 @@ namespace vulpes::vm {
         /// push the table pointer to the stack
         Table* make_table();
 
+        void print_stack() const;
+
+        std::vector<Value> get_stack() const { return stack; }
+
       private:
         std::vector<Function> functions;
         std::vector<CallFrame> call_frames;
@@ -50,6 +56,7 @@ namespace vulpes::vm {
         Arena arena;
         size_t sp;
         size_t ip;
+        bool running;
         Function* current_function;
     };
 } // namespace vulpes::vm

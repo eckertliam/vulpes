@@ -1,16 +1,114 @@
 #include "machine.hpp"
 
+#include "vm/opcode.hpp"
+
+#include <algorithm>
+#include <iostream>
 #include <utility>
 
 namespace vulpes::vm {
     Machine::Machine(std::vector<Function> functions, size_t entry_point)
-        : functions(std::move(functions)), arena(1024 * 1024), sp(0), ip(0) {
+        : functions(std::move(functions)), arena(1024 * 1024), sp(0), ip(0), running(true) {
         call_frames.push_back(CallFrame(&this->functions[entry_point], 0, 0));
         current_function = &this->functions[entry_point];
     }
 
+    void Machine::run() {
+        while (running) {
+            if (ip >= current_function->instructions.size()) {
+                throw std::runtime_error("Instruction pointer out of bounds");
+            }
+            execute_instruction(current_function->instructions[ip]);
+            ip++;
+        }
+    }
+
     void Machine::execute_instruction(Instruction instruction) {
-        // TODO: Implement
+        switch (instruction.opcode) {
+        case OpCode::Nop:
+            break;
+        case OpCode::Pop:
+            pop_value();
+            break;
+        case OpCode::Dup:
+            push_value(stack[sp - 1]);
+            break;
+        case OpCode::Swap:
+            std::swap(stack[sp - 1], stack[sp - 2]);
+            break;
+        case OpCode::Add:
+            // TODO: Implement
+            break;
+        case OpCode::Sub:
+            // TODO: Implement
+            break;
+        case OpCode::Mul:
+            // TODO: Implement
+            break;
+        case OpCode::Div:
+            // TODO: Implement
+            break;
+        case OpCode::Mod:
+            // TODO: Implement
+            break;
+        case OpCode::Eq:
+            // TODO: Implement
+            break;
+        case OpCode::Neq:
+            // TODO: Implement
+            break;
+        case OpCode::Lt:
+            // TODO: Implement
+            break;
+        case OpCode::Gt:
+            // TODO: Implement
+            break;
+        case OpCode::Lte:
+            // TODO: Implement
+            break;
+        case OpCode::Gte:
+            // TODO: Implement
+            break;
+        case OpCode::Jump:
+            // TODO: Implement
+            break;
+        case OpCode::JumpIf:
+            // TODO: Implement
+            break;
+        case OpCode::JumpIfNot:
+            // TODO: Implement
+            break;
+        case OpCode::LoadConst:
+            if (instruction.imm0 >= current_function->constants.size()) {
+                throw std::runtime_error("Constant index out of bounds");
+            }
+            push_value(current_function->constants[instruction.imm0]);
+            break;
+        case OpCode::Call:
+            call_function(instruction.imm0);
+            break;
+        case OpCode::Return:
+            return_value();
+            break;
+        case OpCode::MakeString:
+            make_string();
+            break;
+        case OpCode::MakeList:
+            make_list();
+            break;
+        case OpCode::MakeTuple:
+            make_tuple();
+            break;
+        case OpCode::MakeTable:
+            make_table();
+            break;
+        case OpCode::Halt:
+            running = false;
+            break;
+        default:
+            throw std::runtime_error("Unknown opcode: " +
+                                     std::to_string(static_cast<int>(instruction.opcode)));
+        }
     }
 
     void Machine::call_function(size_t function_idx) {
@@ -73,8 +171,9 @@ namespace vulpes::vm {
 
         int64_t length = length_value.as_int();
 
-        // pop the chars from the stack
+        // pop the chars from the stack and collect them
         std::string data;
+        data.reserve(length); // optimize for known length
         for (int64_t i = 0; i < length; i++) {
             Value char_value = pop_value();
             if (!char_value.is_char()) {
@@ -82,6 +181,9 @@ namespace vulpes::vm {
             }
             data += char_value.as_char();
         }
+
+        // reverse the string since stack is LIFO
+        std::reverse(data.begin(), data.end());
 
         // create the string
         String* str = arena.make<String>(data);
@@ -96,6 +198,7 @@ namespace vulpes::vm {
     List* Machine::make_list() {
         // pop the bool for whether there are initial values
         Value has_initial_values = pop_value();
+
         if (!has_initial_values.is_bool()) {
             throw std::runtime_error("Expected bool for list");
         }
@@ -108,6 +211,14 @@ namespace vulpes::vm {
             }
             int64_t length = length_value.as_int();
 
+            if (length < 0) {
+                throw std::runtime_error("List length must be non-negative");
+            }
+
+            if (sp < length) {
+                throw std::runtime_error("Not enough values on stack to make list");
+            }
+
             // pop the values from the stack
             std::vector<Value> values;
             for (int64_t i = 0; i < length; i++) {
@@ -118,7 +229,7 @@ namespace vulpes::vm {
             List* list = arena.make<List>(values);
 
             // push the list to the stack
-            push_value(Value(list));
+            push_value(Value(static_cast<Object*>(list)));
 
             // return the list
             return list;
@@ -127,7 +238,7 @@ namespace vulpes::vm {
             List* list = arena.make<List>();
 
             // push the list to the stack
-            push_value(Value(list));
+            push_value(Value(static_cast<Object*>(list)));
 
             // return the list
             return list;
@@ -201,6 +312,13 @@ namespace vulpes::vm {
 
             // return the table
             return table;
+        }
+    }
+
+    void Machine::print_stack() const {
+        std::cout << "Stack (top to bottom):\n";
+        for (ssize_t i = static_cast<ssize_t>(sp) - 1; i >= 0; --i) {
+            std::cout << "  [" << i << "]: " << stack[i].to_string() << "\n";
         }
     }
 } // namespace vulpes::vm
