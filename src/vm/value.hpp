@@ -30,6 +30,13 @@ namespace vulpes::vm {
       public:
         Value(ValueData data) : data(data) {}
 
+        Value(int64_t data) : data(data) {}
+        Value(double data) : data(data) {}
+        Value(char data) : data(data) {}
+        Value(bool data) : data(data) {}
+        Value(std::nullptr_t data) : data(data) {}
+        Value(Object* data) : data(data) {}
+
         const ValueData& raw() const { return data; }
 
         ValueType type_of() const;

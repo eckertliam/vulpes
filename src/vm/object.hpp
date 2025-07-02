@@ -41,6 +41,8 @@ namespace vulpes::vm {
       public:
         List() { type = ObjectType::List; }
 
+        List(const std::vector<Value>& data) : data_(data) { type = ObjectType::List; }
+
         Value length() const { return Value(static_cast<int64_t>(data_.size())); }
 
         Value get(Value index) const;
@@ -84,6 +86,17 @@ namespace vulpes::vm {
 
       public:
         Table() { type = ObjectType::Table; }
+
+        Table(const std::unordered_map<Value, Value>& data) : data_(data) {
+            type = ObjectType::Table;
+        }
+
+        Table(const std::vector<std::pair<Value, Value>>& data) {
+            for (const auto& [key, value] : data) {
+                data_.insert({key, value});
+            }
+            type = ObjectType::Table;
+        }
 
         size_t size() const { return data_.size(); }
 
