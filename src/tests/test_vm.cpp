@@ -4,7 +4,6 @@
 
 #include "vm/function.hpp"
 #include "vm/machine.hpp"
-#include "vm/value.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

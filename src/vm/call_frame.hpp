@@ -2,6 +2,8 @@
 
 #include "function.hpp"
 
+#include <cstddef>
+
 namespace vulpes::vm {
     struct CallFrame {
         Function* function;

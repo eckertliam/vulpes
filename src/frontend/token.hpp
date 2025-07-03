@@ -1,5 +1,7 @@
 #pragma once
 
+#include "location.hpp"
+
 #include <string_view>
 
 namespace vulpes::frontend {
@@ -57,15 +59,11 @@ namespace vulpes::frontend {
 
     struct Token {
         TokenKind kind;
-        std::string_view lexeme;
-        size_t line;
-        size_t column;
+        Location location;
 
-        Token(TokenKind kind, std::string_view lexeme, size_t line, size_t column)
-            : kind(kind), lexeme(lexeme), line(line), column(column) {}
-
-        Token(TokenKind kind, size_t line, size_t column)
-            : kind(kind), lexeme(""), line(line), column(column) {}
+        Token(TokenKind kind, uint32_t start_line, uint32_t start_column, uint32_t end_line,
+              uint32_t end_column, std::string_view lexeme)
+            : kind(kind), location(start_line, start_column, end_line, end_column, lexeme) {}
     };
 
     const char* token_kind_to_string(TokenKind kind);
