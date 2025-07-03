@@ -62,6 +62,8 @@ namespace vulpes::vm::object {
     struct TypeInfo {
         const char* name;
         TypeId type_id;
+        size_t size;
+        size_t align;
 
         // Introspection
         void (*print)(ObjectHeader*);
