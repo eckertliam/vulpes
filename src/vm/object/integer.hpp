@@ -7,8 +7,7 @@ namespace vulpes::vm::object {
         ObjectHeader header;
         int64_t value;
 
-        Integer(int64_t value, TypeInfo* type_info) : header(type_info), value(value) {
-            header.inc_ref_count();
-        }
+        Integer(int64_t value);
+        ~Integer() { header.dec_ref_count(); }
     };
 } // namespace vulpes::vm::object
