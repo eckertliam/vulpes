@@ -29,7 +29,7 @@ namespace vulpes::vm::object {
 
         void trace(const std::function<void(BaseObject*)>& visit) override;
 
-        // TODO: add methods for building functions during compilation
-        // TODO: add methods for executing functions during runtime
+        // TODO: add methods for building functions during vm compilation
+        // TODO: add methods for executing functions during vm runtime
     };
 } // namespace vulpes::vm::object
