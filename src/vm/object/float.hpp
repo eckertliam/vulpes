@@ -3,17 +3,18 @@
 #include "base.hpp"
 
 #include <string>
+
 namespace vulpes::vm::object {
-    class Integer : public BaseObject {
+    class Float : public BaseObject {
       private:
-        int64_t value_;
+        double value_;
 
       public:
-        Integer(int64_t value) : BaseObject(ObjectType::Integer), value_(value) {}
+        Float(double value) : BaseObject(ObjectType::Float), value_(value) {}
 
-        ~Integer() = default;
+        ~Float() = default;
 
-        int64_t value() const { return value_; }
+        double value() const { return value_; }
 
         /* Nothing to trace */
         void trace(const std::function<void(BaseObject*)>& visit) override {}

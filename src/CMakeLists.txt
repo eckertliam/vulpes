@@ -6,13 +6,9 @@ add_library(vulpes_frontend STATIC
 target_include_directories(vulpes_frontend PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_library(vulpes_vm STATIC
-    vm/instruction.cpp
     vm/machine.cpp
-    vm/function.cpp
-    vm/call_frame.cpp
-    vm/object/base.cpp
-    vm/object/integer.cpp
-    vm/arena.cpp)
+    vm/heap.cpp
+    vm/object/function.cpp)
 
 target_include_directories(vulpes_vm PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 

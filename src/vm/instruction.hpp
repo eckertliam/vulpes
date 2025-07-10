@@ -35,20 +35,6 @@ namespace vulpes::vm {
          */
         LOAD_LOCAL,
         /*
-         * Load a name
-         * Imm: name index
-         */
-        LOAD_NAME,
-        /*
-         * Store a name
-         * Imm: name index
-         */
-        STORE_NAME,
-        /*
-         * Store a name
-         * Imm: name index
-         */
-        /*
          * Call a function
          * Imm: function index
          */

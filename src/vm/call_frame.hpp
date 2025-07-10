@@ -1,10 +1,12 @@
 #pragma once
 
-#include "function.hpp"
+#include "object/function.hpp"
 
 #include <cstddef>
 
 namespace vulpes::vm {
+    using Function = object::Function;
+
     struct CallFrame {
         Function* function;
         size_t ip;
