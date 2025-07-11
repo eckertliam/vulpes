@@ -226,53 +226,26 @@ static inline void mod(Machine& machine, const Instruction& instruction) {
   machine.push(result);
 }
 
+using InstructionHandler = void (*)(Machine&, const Instruction&);
+static std::unordered_map<Opcode, InstructionHandler> instruction_handlers = {
+    {Opcode::LOAD_GLOBAL, loadGlobal},
+    {Opcode::STORE_GLOBAL, storeGlobal},
+    {Opcode::LOAD_CONST, loadConst},
+    {Opcode::STORE_LOCAL, storeLocal},
+    {Opcode::LOAD_LOCAL, loadLocal},
+    {Opcode::CALL, callFunction},
+    {Opcode::RETURN_CONST, returnConst},
+    {Opcode::RETURN_LOCAL, returnLocal},
+    {Opcode::RETURN_VALUE, returnValue},
+    {Opcode::ADD, add},
+    {Opcode::SUB, sub},
+    {Opcode::MUL, mul},
+    {Opcode::DIV, div},
+    {Opcode::MOD, mod}};
+
 void Machine::executeInstruction(Instruction instruction) {
-  switch (instruction.opcode) {
-    case Opcode::LOAD_GLOBAL:
-      loadGlobal(*this, instruction);
-      break;
-    case Opcode::STORE_GLOBAL:
-      storeGlobal(*this, instruction);
-      break;
-    case Opcode::LOAD_CONST:
-      loadConst(*this, instruction);
-      break;
-    case Opcode::STORE_LOCAL:
-      storeLocal(*this, instruction);
-      break;
-    case Opcode::LOAD_LOCAL:
-      loadLocal(*this, instruction);
-      break;
-    case Opcode::CALL:
-      callFunction(*this, instruction);
-      break;
-    case Opcode::RETURN_CONST:
-      returnConst(*this, instruction);
-      break;
-    case Opcode::RETURN_LOCAL:
-      returnLocal(*this, instruction);
-      break;
-    case Opcode::RETURN_VALUE:
-      returnValue(*this, instruction);
-      break;
-    case Opcode::ADD:
-      add(*this, instruction);
-      break;
-    case Opcode::SUB:
-      sub(*this, instruction);
-      break;
-    case Opcode::MUL:
-      mul(*this, instruction);
-      break;
-    case Opcode::DIV:
-      div(*this, instruction);
-      break;
-    case Opcode::MOD:
-      mod(*this, instruction);
-      break;
-    default:
-      throwWithLocation("Unknown opcode", instruction.src_loc);
-  }
+  auto handler = instruction_handlers.at(instruction.opcode);
+  handler(*this, instruction);
 }
 
 // END INSTRUCTION EXECUTION
