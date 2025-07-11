@@ -19,7 +19,7 @@ enum class Opcode : uint8_t {
   // Imm: constant index
   LOAD_CONST,
   // Store a local variable
-  // Imm: local index
+  // Imm: none
   STORE_LOCAL,
   // Load a local variable
   // Imm: local index
@@ -36,25 +36,21 @@ enum class Opcode : uint8_t {
   // Pop a value from the stack and return it
   // Imm: none
   RETURN_VALUE,
-  // Make a new class.
-  // Consumes a code object and pushes a new class object to the stack
-  // Code object contains the methods of the class
+  // Add two values
   // Imm: none
-  // Example:
-  // LOAD_CONST 0 (code object index)
-  // MAKE_CLASS
-  // LOAD_CONST 1 (class name)
-  // STORE_NAME 0 (class name)
-  MAKE_CLASS,
-  // Make a new function.
-  // Consumes a code object and pushes a new function object to the stack
+  ADD,
+  // Subtract two values
   // Imm: none
-  // Example:
-  // LOAD_CONST 0 (code object index)
-  // MAKE_FUNCTION
-  // LOAD_CONST 1 (function name)
-  // STORE_NAME 0 (function name)
-  MAKE_FUNCTION,
+  SUB,
+  // Multiply two values
+  // Imm: none
+  MUL,
+  // Divide two values
+  // Imm: none
+  DIV,
+  // Modulo two values
+  // Imm: none
+  MOD,
 };
 
 // Instruction is a struct that represents a single instruction in the VM.

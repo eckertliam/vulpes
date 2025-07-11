@@ -20,5 +20,11 @@ class Float : public BaseObject {
   void trace(const std::function<void(BaseObject*)>& visit) override {}
 
   std::string toString() const override { return std::to_string(value_); }
+
+  BaseObject* add(Machine& machine, BaseObject* other) override;
+  BaseObject* sub(Machine& machine, BaseObject* other) override;
+  BaseObject* mul(Machine& machine, BaseObject* other) override;
+  BaseObject* div(Machine& machine, BaseObject* other) override;
+  BaseObject* mod(Machine& machine, BaseObject* other) override;
 };
 }  // namespace vulpes::vm::object

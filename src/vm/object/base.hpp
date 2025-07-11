@@ -2,6 +2,10 @@
 
 #include <functional>
 
+namespace vulpes::vm {
+class Machine;
+}
+
 namespace vulpes::vm::object {
 
 enum class ObjectType : uint8_t {
@@ -35,6 +39,14 @@ class BaseObject {
   virtual void trace(const std::function<void(BaseObject*)>& visit) = 0;
   virtual std::string toString() const = 0;
 
-  // TODO: add primitives such as add, sub, mul, div, etc.
+  // arithmetic operations
+  virtual BaseObject* add(vulpes::vm::Machine& machine, BaseObject* other) = 0;
+  virtual BaseObject* sub(vulpes::vm::Machine& machine, BaseObject* other) = 0;
+  virtual BaseObject* mul(vulpes::vm::Machine& machine, BaseObject* other) = 0;
+  virtual BaseObject* div(vulpes::vm::Machine& machine, BaseObject* other) = 0;
+  virtual BaseObject* mod(vulpes::vm::Machine& machine, BaseObject* other) = 0;
+
+  // TODO: add comparison operations
+  // TODO: add logical operations
 };
 }  // namespace vulpes::vm::object

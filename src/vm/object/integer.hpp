@@ -19,5 +19,11 @@ class Integer : public BaseObject {
   void trace(const std::function<void(BaseObject*)>& visit) override {}
 
   std::string toString() const override { return std::to_string(value_); }
+
+  BaseObject* add(vulpes::vm::Machine& machine, BaseObject* other) override;
+  BaseObject* sub(vulpes::vm::Machine& machine, BaseObject* other) override;
+  BaseObject* mul(vulpes::vm::Machine& machine, BaseObject* other) override;
+  BaseObject* div(vulpes::vm::Machine& machine, BaseObject* other) override;
+  BaseObject* mod(vulpes::vm::Machine& machine, BaseObject* other) override;
 };
 }  // namespace vulpes::vm::object
