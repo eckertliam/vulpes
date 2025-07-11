@@ -4,20 +4,20 @@
 
 #include <string>
 namespace vulpes::vm::object {
-    class Integer : public BaseObject {
-      private:
-        int64_t value_;
+class Integer : public BaseObject {
+ private:
+  int64_t value_;
 
-      public:
-        Integer(int64_t value) : BaseObject(ObjectType::Integer), value_(value) {}
+ public:
+  Integer(int64_t value) : BaseObject(ObjectType::Integer), value_(value) {}
 
-        ~Integer() = default;
+  ~Integer() = default;
 
-        int64_t value() const { return value_; }
+  int64_t value() const { return value_; }
 
-        /* Nothing to trace */
-        void trace(const std::function<void(BaseObject*)>& visit) override {}
+  /* Nothing to trace */
+  void trace(const std::function<void(BaseObject*)>& visit) override {}
 
-        std::string toString() const override { return std::to_string(value_); }
-    };
-} // namespace vulpes::vm::object
+  std::string toString() const override { return std::to_string(value_); }
+};
+}  // namespace vulpes::vm::object

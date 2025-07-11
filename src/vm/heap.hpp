@@ -5,28 +5,29 @@
 #include <algorithm>
 
 namespace vulpes::vm {
-    using BaseObject = vulpes::vm::object::BaseObject;
+using BaseObject = vulpes::vm::object::BaseObject;
 
-    class Heap {
-      private:
-        std::vector<std::unique_ptr<BaseObject>> objects_;
+class Heap {
+ private:
+  std::vector<std::unique_ptr<BaseObject>> objects_;
 
-      public:
-        Heap() : objects_() {}
+ public:
+  Heap() : objects_() {}
 
-        ~Heap() = default;
+  ~Heap() = default;
 
-        template <typename T, typename... Args> T* allocate(Args&&... args) {
-            auto object = std::make_unique<T>(std::forward<Args>(args)...);
-            T* raw_ptr = object.get();
-            objects_.push_back(std::move(object));
-            return raw_ptr;
-        }
+  template <typename T, typename... Args>
+  T* allocate(Args&&... args) {
+    auto object = std::make_unique<T>(std::forward<Args>(args)...);
+    T* raw_ptr = object.get();
+    objects_.push_back(std::move(object));
+    return raw_ptr;
+  }
 
-        /* Mark objects from roots */
-        void markFromRoots(const std::vector<BaseObject*>& roots);
+  /* Mark objects from roots */
+  void markFromRoots(const std::vector<BaseObject*>& roots);
 
-        /* Sweep unmarked objects, then unmark the remnants*/
-        void sweep();
-    };
-} // namespace vulpes::vm
+  /* Sweep unmarked objects, then unmark the remnants*/
+  void sweep();
+};
+}  // namespace vulpes::vm
