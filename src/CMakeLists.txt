@@ -1,12 +1,14 @@
 add_library(vulpes_frontend STATIC
     frontend/location.cpp
     frontend/lexer.cpp
-    frontend/token.cpp)
+    frontend/token.cpp
+    frontend/parser.cpp)
 
 target_include_directories(vulpes_frontend PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-add_executable(vulpes_tests 
-    tests/test_lexer.cpp)
+add_executable(vulpes_tests
+    tests/test_lexer.cpp
+    tests/test_parser.cpp)
 
 target_link_libraries(vulpes_tests PRIVATE vulpes_frontend Catch2::Catch2WithMain)
 
