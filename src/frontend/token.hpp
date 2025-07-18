@@ -9,19 +9,34 @@ namespace vulpes::frontend {
     enum class TokenKind {
         // Literals
         Identifier,
-        Number,
+        Integer,
+        Float,
         String,
+        Char,
 
         // Keywords
         Let,
+        Const,
         Fn,
+        Return,
         If,
         Else,
         While,
-        Loop,
-        Return,
+        For,
+        In,
+        Break,
+        Continue,
+        Struct,
+        Class,
+        Enum,
+        Pub,
+        From,
+        Import,
+        Export,
         True,
         False,
+        Null,
+        Type,
 
         // Punctuation
         LParen,

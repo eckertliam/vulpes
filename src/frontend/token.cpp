@@ -6,28 +6,58 @@ namespace vulpes::frontend {
         switch (kind) {
         case TokenKind::Identifier:
             return "Identifier";
-        case TokenKind::Number:
-            return "Number";
+        case TokenKind::Integer:
+            return "Integer";
+        case TokenKind::Float:
+            return "Float";
         case TokenKind::String:
             return "String";
+        case TokenKind::Char:
+            return "Char";
         case TokenKind::Let:
             return "Let";
+        case TokenKind::Const:
+            return "Const";
         case TokenKind::Fn:
             return "Fn";
+        case TokenKind::Return:
+            return "Return";
         case TokenKind::If:
             return "If";
         case TokenKind::Else:
             return "Else";
         case TokenKind::While:
             return "While";
-        case TokenKind::Loop:
-            return "Loop";
-        case TokenKind::Return:
-            return "Return";
+        case TokenKind::For:
+            return "For";
+        case TokenKind::In:
+            return "In";
+        case TokenKind::Break:
+            return "Break";
+        case TokenKind::Continue:
+            return "Continue";
+        case TokenKind::Struct:
+            return "Struct";
+        case TokenKind::Class:
+            return "Class";
+        case TokenKind::Enum:
+            return "Enum";
+        case TokenKind::Pub:
+            return "Pub";
+        case TokenKind::From:
+            return "From";
+        case TokenKind::Import:
+            return "Import";
+        case TokenKind::Export:
+            return "Export";
         case TokenKind::True:
             return "True";
         case TokenKind::False:
             return "False";
+        case TokenKind::Null:
+            return "Null";
+        case TokenKind::Type:
+            return "Type";
         case TokenKind::LParen:
             return "(";
         case TokenKind::RParen:
