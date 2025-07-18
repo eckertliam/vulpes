@@ -11,6 +11,7 @@ struct Location {
   uint32_t end_column;
   std::string_view lexeme;
 
+  Location() = default;
   Location(uint32_t start_line, uint32_t start_column, uint32_t end_line,
            uint32_t end_column, std::string_view lexeme)
       : start_line(start_line),

@@ -76,6 +76,7 @@ namespace vulpes::frontend {
         TokenKind kind;
         Location location;
 
+        Token() = default;
         Token(TokenKind kind, uint32_t start_line, uint32_t start_column, uint32_t end_line,
               uint32_t end_column, std::string_view lexeme)
             : kind(kind), location(start_line, start_column, end_line, end_column, lexeme) {}
