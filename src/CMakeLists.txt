@@ -6,6 +6,9 @@ add_library(vulpes_frontend STATIC
 
 target_include_directories(vulpes_frontend PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
+add_library(vulpes_vm STATIC vm/machine.cpp vm/heap.cpp
+        vm/object/float.cpp vm/object/function.cpp vm/object/integer.cpp)
+
 add_executable(vulpes_tests
     tests/test_lexer.cpp
     tests/test_parser.cpp)

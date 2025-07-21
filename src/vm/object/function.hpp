@@ -1,10 +1,10 @@
 #pragma once
 
 #include "base.hpp"
-#include "vm/instruction.hpp"
+#include "../instruction.hpp"
 
-#include <cstdint>
 #include <string>
+#include <utility>
 
 namespace vulpes::vm::object {
 class Function : public BaseObject {
@@ -16,39 +16,48 @@ class Function : public BaseObject {
   std::vector<BaseObject*> locals_;
 
  public:
-  Function(const std::string& name, size_t arity,
+  Function(std::string  name, const size_t arity,
            const std::vector<Instruction>& instructions)
       : BaseObject(ObjectType::Function),
-        name_(name),
+        name_(std::move(name)),
         arity_(arity),
         instructions_(instructions) {}
 
   // BUILDER FUNCTIONS
-  Function(const std::string& name, size_t arity);
+  Function(std::string name, size_t arity)
+      : BaseObject(ObjectType::Function), name_(std::move(name)), arity_(arity) {}
 
-  void addInstruction(const Instruction& instruction);
+  void addInstruction(const Instruction& instruction) { instructions_.push_back(instruction); };
 
-  uint32_t addConstant(BaseObject* constant);
+  uint32_t addConstant(BaseObject* constant) {
+    constants_.push_back(constant);
+    return constants_.size() - 1;
+  }
 
   // END BUILDER FUNCTIONS
 
-  ~Function() = default;
+  ~Function() override = default;
 
-  size_t getArity() const { return arity_; }
+  [[nodiscard]] size_t getArity() const { return arity_; }
 
-  std::string name() const { return name_; }
+  [[nodiscard]] std::string name() const { return name_; }
 
   void trace(const std::function<void(BaseObject*)>& visit) override;
 
-  BaseObject* getConstant(size_t index) const;
+  [[nodiscard]] BaseObject* getConstant(uint32_t index) const;
 
-  BaseObject* getLocal(size_t index) const;
+  [[nodiscard]] BaseObject* getLocal(uint32_t index) const;
 
-  uint32_t addLocal(BaseObject* value);
+  uint32_t addLocal(BaseObject* value) {
+    locals_.push_back(value);
+    return locals_.size() - 1;
+  }
 
-  void addArg(BaseObject* arg);
 
-  // TODO: add methods for building functions from the frontend
+  uint32_t addArg(BaseObject* arg) {
+    locals_.push_back(arg);
+    return locals_.size() - 1;
+  }
 
   BaseObject* add(Machine& machine, BaseObject* other) override {
     return nullptr;

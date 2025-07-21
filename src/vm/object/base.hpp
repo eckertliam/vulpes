@@ -28,9 +28,9 @@ class BaseObject {
   ObjectType type_;
 
  public:
-  BaseObject(ObjectType type) : marked_(false), type_(type) {}
+  explicit BaseObject(ObjectType type) : marked_(false), type_(type) {}
 
-  bool isMarked() const { return marked_; }
+  [[nodiscard]] bool isMarked() const { return marked_; }
   void mark() { marked_ = true; }
   void unmark() { marked_ = false; }
   ObjectType type() const { return type_; }

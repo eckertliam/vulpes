@@ -1,6 +1,7 @@
 #include "function.hpp"
 
 namespace vulpes::vm::object {
+
 void Function::trace(const std::function<void(BaseObject*)>& visit) {
   visit(this);
   for (auto* constant : constants_)
@@ -9,22 +10,18 @@ void Function::trace(const std::function<void(BaseObject*)>& visit) {
     visit(local);
 }
 
-BaseObject* Function::getConstant(size_t index) const {
-  if (index >= constants_.size()) {
+BaseObject* Function::getConstant(const uint32_t index) const {
+  const auto idx = static_cast<size_t>(index);
+  if (idx >= constants_.size()) {
     return nullptr;
   }
-  return constants_[index];
+  return constants_[idx];
 }
 
-BaseObject* Function::getLocal(size_t index) const {
+BaseObject* Function::getLocal(const uint32_t index) const {
   if (index >= locals_.size()) {
     return nullptr;
   }
   return locals_[index];
-}
-
-uint32_t Function::addLocal(BaseObject* value) {
-  locals_.push_back(value);
-  return locals_.size() - 1;
 }
 }  // namespace vulpes::vm::object

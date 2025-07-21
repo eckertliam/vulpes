@@ -5,21 +5,21 @@
 #include <string>
 
 namespace vulpes::vm::object {
-class Float : public BaseObject {
+class Float final : public BaseObject {
  private:
   double value_;
 
  public:
-  Float(double value) : BaseObject(ObjectType::Float), value_(value) {}
+  explicit Float(double value) : BaseObject(ObjectType::Float), value_(value) {}
 
   ~Float() = default;
 
-  double value() const { return value_; }
+  [[nodiscard]] double value() const { return value_; }
 
   /* Nothing to trace */
   void trace(const std::function<void(BaseObject*)>& visit) override {}
 
-  std::string toString() const override { return std::to_string(value_); }
+  [[nodiscard]] std::string toString() const override { return std::to_string(value_); }
 
   BaseObject* add(Machine& machine, BaseObject* other) override;
   BaseObject* sub(Machine& machine, BaseObject* other) override;
