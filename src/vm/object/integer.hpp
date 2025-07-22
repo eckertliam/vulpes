@@ -11,8 +11,6 @@ class Integer final : public BaseObject {
  public:
   explicit Integer(int64_t value) : BaseObject(ObjectType::Integer), value_(value) {}
 
-  ~Integer() = default;
-
   [[nodiscard]] int64_t value() const { return value_; }
 
   /* Nothing to trace */

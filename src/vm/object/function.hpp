@@ -24,7 +24,7 @@ class Function : public BaseObject {
         instructions_(instructions) {}
 
   // BUILDER FUNCTIONS
-  Function(std::string name, size_t arity)
+  Function(std::string name, const size_t arity)
       : BaseObject(ObjectType::Function), name_(std::move(name)), arity_(arity) {}
 
   void addInstruction(const Instruction& instruction) { instructions_.push_back(instruction); };
@@ -37,6 +37,10 @@ class Function : public BaseObject {
   // END BUILDER FUNCTIONS
 
   ~Function() override = default;
+
+  [[nodiscard]] std::string toString() const override {
+    return "Function(" + name_ + ")";
+  }
 
   [[nodiscard]] size_t getArity() const { return arity_; }
 
@@ -58,6 +62,8 @@ class Function : public BaseObject {
     locals_.push_back(arg);
     return locals_.size() - 1;
   }
+
+  Instruction& getInstruction(const size_t index) { return instructions_[index]; }
 
   BaseObject* add(Machine& machine, BaseObject* other) override {
     return nullptr;

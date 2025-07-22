@@ -9,6 +9,9 @@ namespace vulpes::vm {
 using Location = vulpes::frontend::Location;
 
 enum class Opcode : uint8_t {
+  // End the program
+  // Imm: none
+  EOP,
   // Load a global variable
   // Imm: global index
   LOAD_GLOBAL,

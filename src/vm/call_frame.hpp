@@ -10,7 +10,7 @@ struct CallFrame {
   size_t ip;
   size_t sp;
 
-  CallFrame(Function* function, size_t sp)
+  CallFrame(Function* function, const size_t sp)
       : function(function), ip(0), sp(sp) {}
 };
 }  // namespace vulpes::vm
