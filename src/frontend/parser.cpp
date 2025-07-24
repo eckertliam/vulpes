@@ -208,7 +208,7 @@ std::unique_ptr<Expr> Parser::primary() {
 }
 
 bool Parser::match(const std::vector<TokenKind>& types) {
-  for (auto type : types) {
+  for (const auto type : types) {
     if (check(type)) {
       advance();
       return true;
@@ -217,7 +217,7 @@ bool Parser::match(const std::vector<TokenKind>& types) {
   return false;
 }
 
-Token Parser::consume(TokenKind type, const char* message) {
+Token Parser::consume(const TokenKind type, const char* message) {
   if (check(type)) {
     return advance();
   }

@@ -78,49 +78,89 @@ struct AstNode {
 struct Expr : AstNode {};
 struct Stmt : AstNode {};
 
-struct IntegerLiteral : Expr {
-  IntegerLiteral(const Token& token) { location = token.location; }
+struct IntegerLiteral final : Expr {
+  int64_t value;
+
+  explicit IntegerLiteral(const Token& token) {
+    const std::string_view lexeme = token.lexeme();
+    // TODO: handle binary and hex formats
+    value = std::stoll(std::string(lexeme));
+    location = token.location;
+  }
+
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
 };
 
-struct FloatLiteral : Expr {
-  FloatLiteral(const Token& token) { location = token.location; }
+struct FloatLiteral final : Expr {
+  double value;
+
+  explicit FloatLiteral(const Token& token) {
+    const std::string_view lexeme = token.lexeme();
+    value = std::stod(std::string(lexeme));
+    location = token.location;
+  }
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
 };
 
-struct StringLiteral : Expr {
-  StringLiteral(const Token& token) { location = token.location; }
+struct StringLiteral final : Expr {
+  std::string_view value;
+
+  explicit StringLiteral(const Token& token) {
+    const std::string_view lexeme = token.lexeme();
+    // remove quote around the string
+    value = lexeme.substr(1, lexeme.size() - 2);
+    location = token.location;
+  }
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
 };
 
-struct CharLiteral : Expr {
-  CharLiteral(const Token& token) { location = token.location; }
+struct CharLiteral final : Expr {
+  char value;
+
+  explicit CharLiteral(const Token& token) {
+    const std::string_view lexeme = token.lexeme();
+    // TODO: handle escape cases
+    value = lexeme[1];
+    location = token.location;
+  }
+
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
 };
 
-struct BoolLiteral : Expr {
-  BoolLiteral(const Token& token) { location = token.location; }
+struct BoolLiteral final : Expr {
+  bool value;
+
+  explicit BoolLiteral(const Token& token) {
+    value = token.lexeme() == "true";
+    location = token.location;
+  }
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
 };
 
-struct NullLiteral : Expr {
-  NullLiteral(const Token& token) { location = token.location; }
+struct NullLiteral final : Expr {
+  explicit NullLiteral(const Token& token) { location = token.location; }
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
 };
 
-struct UnaryExpr : Expr {
+struct UnaryExpr final : Expr {
+  Token op;
+  std::unique_ptr<Expr> right;
+
   UnaryExpr(const Token& op, std::unique_ptr<Expr> right)
       : op(op), right(std::move(right)) {
     location = op.location;
     location.end_line = this->right->location.end_line;
     location.end_column = this->right->location.end_column;
   }
+
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
-  Token op;
-  std::unique_ptr<Expr> right;
 };
 
-struct BinaryExpr : Expr {
+struct BinaryExpr final : Expr {
+  std::unique_ptr<Expr> left;
+  Token op;
+  std::unique_ptr<Expr> right;
+
   BinaryExpr(std::unique_ptr<Expr> left, const Token& op,
              std::unique_ptr<Expr> right)
       : left(std::move(left)), op(op), right(std::move(right)) {
@@ -128,39 +168,46 @@ struct BinaryExpr : Expr {
     location.end_line = this->right->location.end_line;
     location.end_column = this->right->location.end_column;
   }
+
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
-  std::unique_ptr<Expr> left;
-  Token op;
-  std::unique_ptr<Expr> right;
 };
 
-struct GroupingExpr : Expr {
-  GroupingExpr(std::unique_ptr<Expr> expr) : expr(std::move(expr)) {
+struct GroupingExpr final : Expr {
+  std::unique_ptr<Expr> expr;
+
+  explicit GroupingExpr(std::unique_ptr<Expr> expr) : expr(std::move(expr)) {
     location = this->expr->location;
   }
+
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
-  std::unique_ptr<Expr> expr;
 };
 
-struct VarExpr : Expr {
-  VarExpr(const Token& name) : name(name) { location = name.location; }
+struct VarExpr final : Expr {
+  std::string_view name;
+
+  explicit VarExpr(const Token& name_tok) : name(name_tok.lexeme()) { location = name_tok.location; }
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
-  Token name;
 };
 
-struct AssignExpr : Expr {
-  AssignExpr(const Token& name, std::unique_ptr<Expr> value)
-      : name(name), value(std::move(value)) {
-    location = name.location;
+struct AssignExpr final : Expr {
+  std::string_view name;
+  std::unique_ptr<Expr> value;
+
+  AssignExpr(const Token& name_tok, std::unique_ptr<Expr> value)
+      : name(name_tok.lexeme()), value(std::move(value)) {
+    location = name_tok.location;
     location.end_line = this->value->location.end_line;
     location.end_column = this->value->location.end_column;
   }
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
-  Token name;
-  std::unique_ptr<Expr> value;
+
 };
 
-struct LogicalExpr : Expr {
+struct LogicalExpr final : Expr {
+  std::unique_ptr<Expr> left;
+  Token op;
+  std::unique_ptr<Expr> right;
+
   LogicalExpr(std::unique_ptr<Expr> left, const Token& op,
               std::unique_ptr<Expr> right)
       : left(std::move(left)), op(op), right(std::move(right)) {
@@ -168,92 +215,102 @@ struct LogicalExpr : Expr {
     location.end_line = this->right->location.end_line;
     location.end_column = this->right->location.end_column;
   }
+
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
-  std::unique_ptr<Expr> left;
-  Token op;
-  std::unique_ptr<Expr> right;
 };
 
-struct CallExpr : Expr {
+struct CallExpr final : Expr {
+  std::unique_ptr<Expr> callee;
+  std::vector<std::unique_ptr<Expr>> arguments;
+
   CallExpr(std::unique_ptr<Expr> callee, const Token& paren,
            std::vector<std::unique_ptr<Expr>> arguments)
       : callee(std::move(callee)),
-        paren(paren),
         arguments(std::move(arguments)) {
     location = this->callee->location;
     location.end_line = paren.location.end_line;
     location.end_column = paren.location.end_column;
   }
+
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
-  std::unique_ptr<Expr> callee;
-  Token paren;  // For location of ')'
-  std::vector<std::unique_ptr<Expr>> arguments;
 };
 
-struct GetExpr : Expr {
-  GetExpr(std::unique_ptr<Expr> object, const Token& name)
-      : object(std::move(object)), name(name) {
-    location = this->object->location;
-    location.end_line = name.location.end_line;
-    location.end_column = name.location.end_column;
-  }
-  void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
+struct GetExpr final : Expr {
   std::unique_ptr<Expr> object;
-  Token name;
+  std::string_view name;
+
+  GetExpr(std::unique_ptr<Expr> object, const Token& name_tok)
+      : object(std::move(object)), name(name_tok.lexeme()) {
+    location = this->object->location;
+    location.end_line = name_tok.location.end_line;
+    location.end_column = name_tok.location.end_column;
+  }
+
+  void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
 };
 
-struct SetExpr : Expr {
-  SetExpr(std::unique_ptr<Expr> object, const Token& name,
+struct SetExpr final : Expr {
+  std::unique_ptr<Expr> object;
+  std::string_view name;
+  std::unique_ptr<Expr> value;
+
+  SetExpr(std::unique_ptr<Expr> object, const Token& name_tok,
           std::unique_ptr<Expr> value)
-      : object(std::move(object)), name(name), value(std::move(value)) {
+      : object(std::move(object)), name(name_tok.lexeme()), value(std::move(value)) {
     location = this->object->location;
     location.end_line = this->value->location.end_line;
     location.end_column = this->value->location.end_column;
   }
+
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
-  std::unique_ptr<Expr> object;
-  Token name;
-  std::unique_ptr<Expr> value;
 };
 
-struct ExpressionStmt : Stmt {
-  ExpressionStmt(std::unique_ptr<Expr> expr) : expr(std::move(expr)) {
+struct ExpressionStmt final : Stmt {
+  std::unique_ptr<Expr> expr;
+
+  explicit ExpressionStmt(std::unique_ptr<Expr> expr) : expr(std::move(expr)) {
     location = this->expr->location;
   }
+
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
-  std::unique_ptr<Expr> expr;
 };
 
-struct LetStmt : Stmt {
-  LetStmt(const Token& name, std::unique_ptr<Expr> initializer)
-      : name(name), initializer(std::move(initializer)) {
-    location = name.location;
+struct LetStmt final : Stmt {
+  std::string_view name;
+  std::unique_ptr<Expr> initializer;
+
+  LetStmt(const Token& name_tok, std::unique_ptr<Expr> initializer)
+      : name(name_tok.lexeme()), initializer(std::move(initializer)) {
+    location = name_tok.location;
     if (this->initializer) {
       location.end_line = this->initializer->location.end_line;
       location.end_column = this->initializer->location.end_column;
     }
   }
+
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
-  Token name;
-  std::unique_ptr<Expr> initializer;
 };
 
-struct ConstStmt : Stmt {
-  ConstStmt(const Token& name, std::unique_ptr<Expr> initializer)
-      : name(name), initializer(std::move(initializer)) {
-    location = name.location;
+struct ConstStmt final : Stmt {
+  std::string_view name;
+  std::unique_ptr<Expr> initializer;
+
+  ConstStmt(const Token& name_tok, std::unique_ptr<Expr> initializer)
+      : name(name_tok.lexeme()), initializer(std::move(initializer)) {
+    location = name_tok.location;
     if (this->initializer) {
       location.end_line = this->initializer->location.end_line;
       location.end_column = this->initializer->location.end_column;
     }
   }
+
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
-  Token name;
-  std::unique_ptr<Expr> initializer;
 };
 
-struct BlockStmt : Stmt {
-  BlockStmt(std::vector<std::unique_ptr<Stmt>> statements)
+struct BlockStmt final : Stmt {
+  std::vector<std::unique_ptr<Stmt>> statements;
+
+  explicit BlockStmt(std::vector<std::unique_ptr<Stmt>> statements)
       : statements(std::move(statements)) {
     if (!this->statements.empty()) {
       location = this->statements.front()->location;
@@ -261,11 +318,15 @@ struct BlockStmt : Stmt {
       location.end_column = this->statements.back()->location.end_column;
     }
   }
+
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
-  std::vector<std::unique_ptr<Stmt>> statements;
 };
 
-struct IfStmt : Stmt {
+struct IfStmt final : Stmt {
+  std::unique_ptr<Expr> condition;
+  std::unique_ptr<Stmt> then_branch;
+  std::unique_ptr<Stmt> else_branch;
+
   IfStmt(std::unique_ptr<Expr> condition, std::unique_ptr<Stmt> then_branch,
          std::unique_ptr<Stmt> else_branch)
       : condition(std::move(condition)),
@@ -280,83 +341,90 @@ struct IfStmt : Stmt {
       location.end_column = this->then_branch->location.end_column;
     }
   }
+
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
-  std::unique_ptr<Expr> condition;
-  std::unique_ptr<Stmt> then_branch;
-  std::unique_ptr<Stmt> else_branch;
 };
 
-struct WhileStmt : Stmt {
+struct WhileStmt final : Stmt {
+  std::unique_ptr<Expr> condition;
+  std::unique_ptr<Stmt> body;
+
   WhileStmt(std::unique_ptr<Expr> condition, std::unique_ptr<Stmt> body)
       : condition(std::move(condition)), body(std::move(body)) {
     location = this->condition->location;
     location.end_line = this->body->location.end_line;
     location.end_column = this->body->location.end_column;
   }
+
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
-  std::unique_ptr<Expr> condition;
-  std::unique_ptr<Stmt> body;
 };
 
-struct ForStmt : Stmt {
-  ForStmt(const Token& variable, std::unique_ptr<Expr> iterable,
+struct ForStmt final : Stmt {
+  std::string_view variable_name;
+  std::unique_ptr<Expr> iterable;
+  std::unique_ptr<Stmt> body;
+
+  ForStmt(const Token& variable_tok, std::unique_ptr<Expr> iterable,
           std::unique_ptr<Stmt> body)
-      : variable(variable),
+      : variable_name(variable_tok.lexeme()),
         iterable(std::move(iterable)),
         body(std::move(body)) {
-    location = variable.location;
+    location = variable_tok.location;
     location.end_line = this->body->location.end_line;
     location.end_column = this->body->location.end_column;
   }
+
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
-  Token variable;
-  std::unique_ptr<Expr> iterable;
-  std::unique_ptr<Stmt> body;
 };
 
-struct ReturnStmt : Stmt {
+struct ReturnStmt final : Stmt {
+  std::unique_ptr<Expr> value;
+
   ReturnStmt(const Token& keyword, std::unique_ptr<Expr> value)
-      : keyword(keyword), value(std::move(value)) {
+      : value(std::move(value)) {
     location = keyword.location;
     if (this->value) {
       location.end_line = this->value->location.end_line;
       location.end_column = this->value->location.end_column;
     }
   }
+
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
-  Token keyword;
-  std::unique_ptr<Expr> value;
 };
 
-struct FunctionStmt : Stmt {
-  FunctionStmt(const Token& name, const std::vector<Token>& params,
+struct FunctionStmt final : Stmt {
+  std::string_view name;
+  std::vector<Token> params;
+  std::vector<std::unique_ptr<Stmt>> body;
+
+  FunctionStmt(const Token& name_tok, const std::vector<Token>& params,
                std::vector<std::unique_ptr<Stmt>> body)
-      : name(name), params(params), body(std::move(body)) {
-    location = name.location;
+      : name(name_tok.lexeme()), params(params), body(std::move(body)) {
+    location = name_tok.location;
     if (!this->body.empty()) {
       location.end_line = this->body.back()->location.end_line;
       location.end_column = this->body.back()->location.end_column;
     }
   }
+
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
-  Token name;
-  std::vector<Token> params;
-  std::vector<std::unique_ptr<Stmt>> body;
 };
 
-struct ClassStmt : Stmt {
-  ClassStmt(const Token& name,
+struct ClassStmt final : Stmt {
+  std::string_view name;
+  std::vector<std::unique_ptr<FunctionStmt>> methods;
+
+  ClassStmt(const Token& name_tok,
             std::vector<std::unique_ptr<FunctionStmt>> methods)
-      : name(name), methods(std::move(methods)) {
-    location = name.location;
+      : name(name_tok.lexeme()), methods(std::move(methods)) {
+    location = name_tok.location;
     if (!this->methods.empty()) {
       location.end_line = this->methods.back()->location.end_line;
       location.end_column = this->methods.back()->location.end_column;
     }
   }
+
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
-  Token name;
-  std::vector<std::unique_ptr<FunctionStmt>> methods;
 };
 
 }  // namespace vulpes::frontend
