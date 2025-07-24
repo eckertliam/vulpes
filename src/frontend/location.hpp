@@ -1,8 +1,10 @@
 #pragma once
 
 #include <cstdint>
+#include <queue>
 #include <string>
 #include <string_view>
+
 namespace vulpes::frontend {
 struct Location {
   uint32_t start_line;

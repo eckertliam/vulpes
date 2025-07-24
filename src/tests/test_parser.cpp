@@ -1,58 +1,80 @@
-#include "frontend/parser.hpp"
 #include "frontend/lexer.hpp"
+#include "frontend/parser.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+
+#include "vm/call_frame.hpp"
 
 using namespace vulpes::frontend;
 
 TEST_CASE("Parser parses simple expressions", "[parser]") {
-    std::string source = "1 + 2 * 3;";
-    Lexer lexer(source);
-    Parser parser(lexer);
-    auto statements = parser.parse();
+  std::string source = "1 + 2 * 3;";
+  Lexer lexer(source);
+  Parser parser(lexer);
+  auto statements = parser.parse();
 
-    REQUIRE(statements.size() == 1);
-    auto* expr_stmt = dynamic_cast<ExpressionStmt*>(statements[0].get());
-    REQUIRE(expr_stmt != nullptr);
+  REQUIRE(statements.size() == 1);
+  auto* expr_stmt = dynamic_cast<ExpressionStmt*>(statements[0].get());
+  REQUIRE(expr_stmt != nullptr);
 
-    auto* binary_expr = dynamic_cast<BinaryExpr*>(expr_stmt->expr.get());
-    REQUIRE(binary_expr != nullptr);
-    REQUIRE(binary_expr->op.kind == TokenKind::Plus);
+  auto* binary_expr = dynamic_cast<BinaryExpr*>(expr_stmt->expr.get());
+  REQUIRE(binary_expr != nullptr);
+  REQUIRE(binary_expr->op.kind == TokenKind::Plus);
 
-    auto* literal_expr = dynamic_cast<IntegerLiteral*>(binary_expr->left.get());
-    REQUIRE(literal_expr != nullptr);
+  auto* literal_expr = dynamic_cast<IntegerLiteral*>(binary_expr->left.get());
+  REQUIRE(literal_expr != nullptr);
 
-    auto* mul_expr = dynamic_cast<BinaryExpr*>(binary_expr->right.get());
-    REQUIRE(mul_expr != nullptr);
-    REQUIRE(mul_expr->op.kind == TokenKind::Star);
+  auto* mul_expr = dynamic_cast<BinaryExpr*>(binary_expr->right.get());
+  REQUIRE(mul_expr != nullptr);
+  REQUIRE(mul_expr->op.kind == TokenKind::Star);
 }
 
 TEST_CASE("Parser parses let statements", "[parser]") {
-    std::string source = "let x = 10;";
-    Lexer lexer(source);
-    Parser parser(lexer);
-    auto statements = parser.parse();
+  std::string source = "let x = 10;";
+  Lexer lexer(source);
+  Parser parser(lexer);
+  auto statements = parser.parse();
 
-    REQUIRE(statements.size() == 1);
-    auto* let_stmt = dynamic_cast<LetStmt*>(statements[0].get());
-    REQUIRE(let_stmt != nullptr);
-    REQUIRE(let_stmt->name.location.lexeme == "x");
+  REQUIRE(statements.size() == 1);
+  auto* let_stmt = dynamic_cast<LetStmt*>(statements[0].get());
+  REQUIRE(let_stmt != nullptr);
+  REQUIRE(let_stmt->name == "x");
 
-    auto* literal_expr = dynamic_cast<IntegerLiteral*>(let_stmt->initializer.get());
-    REQUIRE(literal_expr != nullptr);
+  auto* literal_expr =
+      dynamic_cast<IntegerLiteral*>(let_stmt->initializer.get());
+  REQUIRE(literal_expr != nullptr);
 }
 
 TEST_CASE("Parser parses const statements", "[parser]") {
-    std::string source = "const y = \"hello\";";
-    Lexer lexer(source);
-    Parser parser(lexer);
-    auto statements = parser.parse();
+  std::string source = "const y = \"hello\";";
+  Lexer lexer(source);
+  Parser parser(lexer);
+  auto statements = parser.parse();
 
-    REQUIRE(statements.size() == 1);
-    auto* const_stmt = dynamic_cast<ConstStmt*>(statements[0].get());
-    REQUIRE(const_stmt != nullptr);
-    REQUIRE(const_stmt->name.location.lexeme == "y");
+  REQUIRE(statements.size() == 1);
+  auto* const_stmt = dynamic_cast<ConstStmt*>(statements[0].get());
+  REQUIRE(const_stmt != nullptr);
+  REQUIRE(const_stmt->name == "y");
 
-    auto* literal_expr = dynamic_cast<StringLiteral*>(const_stmt->initializer.get());
-    REQUIRE(literal_expr != nullptr);
+  auto* literal_expr =
+      dynamic_cast<StringLiteral*>(const_stmt->initializer.get());
+  REQUIRE(literal_expr != nullptr);
+}
+
+TEST_CASE("Parser parses function", "[parser]") {
+  std::string source = "fn add(x, y) { const z = x + y; return z; }";
+  Lexer lexer(source);
+  Parser parser(lexer);
+  auto statements = parser.parse();
+  const auto& func = dynamic_cast<FunctionStmt*>(statements[0].get());
+  REQUIRE(statements.size() == 1);
+  REQUIRE(func->name == "add");
+  REQUIRE(func->params.size() == 2);
+  auto const& body = func->body;
+  REQUIRE(body->size() == 2);
+  auto const& ret_stmt = dynamic_cast<ReturnStmt*>(body->statements[1].get());
+  REQUIRE(ret_stmt != nullptr);
+  REQUIRE(ret_stmt->value != nullptr);
+  auto const& ret_val = dynamic_cast<VarExpr*>(ret_stmt->value.get());
+  REQUIRE(ret_val->name == "z");
 }

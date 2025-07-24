@@ -22,6 +22,11 @@ std::unique_ptr<Stmt> Parser::declaration() {
   if (match({TokenKind::Const})) {
     return const_declaration();
   }
+
+  if (match({TokenKind::Fn})) {
+    return function_declaration();
+  }
+
   // TODO: Add error handling and synchronization
   return statement();
 }
@@ -44,7 +49,55 @@ std::unique_ptr<Stmt> Parser::const_declaration() {
   return std::make_unique<ConstStmt>(name, std::move(initializer));
 }
 
+std::unique_ptr<BlockStmt> Parser::block_statement() {
+  std::vector<std::unique_ptr<Stmt>> statements;
+  while (!check(TokenKind::RBrace) && !is_at_end()) {
+    statements.push_back(declaration());
+  }
+  return std::make_unique<BlockStmt>(std::move(statements));
+}
+
+std::unique_ptr<Stmt> Parser::function_declaration() {
+  Token name = consume(TokenKind::Identifier, "Expect a valid function name");
+  consume(TokenKind::LParen, "Expect '(' after function name");
+  auto parameters = std::vector<std::string_view>();
+  while (!check(TokenKind::RParen) && !is_at_end()) {
+    auto param =
+        consume(TokenKind::Identifier, "Expect a valid parameter name");
+    parameters.push_back(param.lexeme());
+    if (match({TokenKind::Comma})) {
+      continue;
+    }
+    break;
+  }
+  consume(TokenKind::RParen, "Expect ')' after function arguments");
+
+  if (match({TokenKind::Colon})) {
+    // TODO: Implement more rigorous ret ty parsing
+    Token return_type = consume(TokenKind::Type, "Expect a valid return type");
+  }
+
+  consume(TokenKind::LBrace, "Expect '{' before function body");
+  auto body = block_statement();
+  consume(TokenKind::RBrace, "Expect '}' after function body");
+  return std::make_unique<FunctionStmt>(name, parameters, std::move(body));
+}
+
+std::unique_ptr<Stmt> Parser::return_statement() {
+  Token keyword = previous();
+  std::unique_ptr<Expr> value = nullptr;
+  if (!check(TokenKind::Semicolon)) {
+    value = expression();
+  }
+  consume(TokenKind::Semicolon, "Expect ';' after return statement.");
+  return std::make_unique<ReturnStmt>(keyword, std::move(value));
+}
+
 std::unique_ptr<Stmt> Parser::statement() {
+  if (match({TokenKind::Return})) {
+    return return_statement();
+  }
+
   return expression_statement();
 }
 
@@ -65,7 +118,7 @@ std::unique_ptr<Expr> Parser::assignment() {
     auto value = assignment();
 
     if (const auto var_expr = dynamic_cast<VarExpr*>(expr.get())) {
-      return std::make_unique<AssignExpr>(var_expr->name, std::move(value));
+      return std::make_unique<AssignExpr>(var_expr, std::move(value));
     }
 
     // TODO: Error, invalid assignment target

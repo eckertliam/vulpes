@@ -84,8 +84,8 @@ struct Token {
   }
 
   Token(const TokenKind kind, const uint32_t start_line,
-        const uint32_t start_column,
-        const uint32_t end_line, const uint32_t end_column, const std::string_view lexeme)
+        const uint32_t start_column, const uint32_t end_line,
+        const uint32_t end_column, const std::string_view lexeme)
       : kind(kind),
         location(start_line, start_column, end_line, end_column, lexeme) {}
 

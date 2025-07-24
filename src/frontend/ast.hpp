@@ -4,6 +4,7 @@
 #include "token.hpp"
 
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace vulpes::frontend {
@@ -185,7 +186,9 @@ struct GroupingExpr final : Expr {
 struct VarExpr final : Expr {
   std::string_view name;
 
-  explicit VarExpr(const Token& name_tok) : name(name_tok.lexeme()) { location = name_tok.location; }
+  explicit VarExpr(const Token& name_tok) : name(name_tok.lexeme()) {
+    location = name_tok.location;
+  }
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
 };
 
@@ -199,8 +202,14 @@ struct AssignExpr final : Expr {
     location.end_line = this->value->location.end_line;
     location.end_column = this->value->location.end_column;
   }
-  void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
 
+  AssignExpr(const VarExpr* var_expr, std::unique_ptr<Expr> value)
+      : name(var_expr->name), value(std::move(value)) {
+    location = var_expr->location;
+    location.end_line = this->value->location.end_line;
+    location.end_column = this->value->location.end_column;
+  }
+  void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
 };
 
 struct LogicalExpr final : Expr {
@@ -225,8 +234,7 @@ struct CallExpr final : Expr {
 
   CallExpr(std::unique_ptr<Expr> callee, const Token& paren,
            std::vector<std::unique_ptr<Expr>> arguments)
-      : callee(std::move(callee)),
-        arguments(std::move(arguments)) {
+      : callee(std::move(callee)), arguments(std::move(arguments)) {
     location = this->callee->location;
     location.end_line = paren.location.end_line;
     location.end_column = paren.location.end_column;
@@ -256,7 +264,9 @@ struct SetExpr final : Expr {
 
   SetExpr(std::unique_ptr<Expr> object, const Token& name_tok,
           std::unique_ptr<Expr> value)
-      : object(std::move(object)), name(name_tok.lexeme()), value(std::move(value)) {
+      : object(std::move(object)),
+        name(name_tok.lexeme()),
+        value(std::move(value)) {
     location = this->object->location;
     location.end_line = this->value->location.end_line;
     location.end_column = this->value->location.end_column;
@@ -317,6 +327,12 @@ struct BlockStmt final : Stmt {
       location.end_line = this->statements.back()->location.end_line;
       location.end_column = this->statements.back()->location.end_column;
     }
+  }
+
+  [[nodiscard]] size_t size() const { return statements.size(); }
+  [[nodiscard]] bool empty() const { return statements.empty(); }
+  [[nodiscard]] const std::unique_ptr<Stmt>& back() const {
+    return statements.back();
   }
 
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
@@ -394,16 +410,20 @@ struct ReturnStmt final : Stmt {
 
 struct FunctionStmt final : Stmt {
   std::string_view name;
-  std::vector<Token> params;
-  std::vector<std::unique_ptr<Stmt>> body;
+  // TODO: support type annotations with params
+  std::vector<std::string_view> params;
+  // TODO: improve type annotation support beyond a string
+  std::optional<std::string_view> return_type;
+  std::unique_ptr<BlockStmt> body;
 
-  FunctionStmt(const Token& name_tok, const std::vector<Token>& params,
-               std::vector<std::unique_ptr<Stmt>> body)
+  FunctionStmt(const Token& name_tok,
+               const std::vector<std::string_view>& params,
+               std::unique_ptr<BlockStmt> body)
       : name(name_tok.lexeme()), params(params), body(std::move(body)) {
     location = name_tok.location;
-    if (!this->body.empty()) {
-      location.end_line = this->body.back()->location.end_line;
-      location.end_column = this->body.back()->location.end_column;
+    if (!this->body->empty()) {
+      location.end_line = this->body->back()->location.end_line;
+      location.end_column = this->body->back()->location.end_column;
     }
   }
 
