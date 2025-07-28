@@ -5,6 +5,7 @@
 #include "instruction.hpp"
 
 #include <stack>
+#include <unordered_map>
 
 namespace vulpes::vm {
 
@@ -23,7 +24,7 @@ class Machine {
   // Builds a hollow function and returns its pointer
   // Also enters the function into the function table
   // The function is not yet compiled, and the instructions are empty
-  Function* buildFunction(const std::string& name, size_t arity);
+  Function* buildFunction(const std::string_view name, size_t arity);
 
   // Add a global and return the index
   uint32_t addGlobal(BaseObject* global);
@@ -31,6 +32,11 @@ class Machine {
   [[nodiscard]] BaseObject* getGlobal(uint32_t index) const;
   // Set a value at a global index
   void setGlobal(uint32_t index, BaseObject* value);
+
+  // Get the function table for code generation
+  [[nodiscard]] const std::unordered_map<std::string, uint32_t>& getFunctionTable() const {
+    return function_table_;
+  }
 
   void push(BaseObject* object);
   BaseObject* pop();

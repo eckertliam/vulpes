@@ -27,6 +27,10 @@ class Function : public BaseObject {
   Function(std::string name, const size_t arity)
       : BaseObject(ObjectType::Function), name_(std::move(name)), arity_(arity) {}
 
+
+  Function(std::string_view name, const size_t arity) 
+      : BaseObject(ObjectType::Function), name_(name), arity_(arity) {}
+      
   void addInstruction(const Instruction& instruction) { instructions_.push_back(instruction); };
 
   uint32_t addConstant(BaseObject* constant) {

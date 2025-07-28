@@ -23,13 +23,13 @@ void Machine::run() {
   }
 }
 
-Function* Machine::buildFunction(const std::string& name, size_t arity) {
+Function* Machine::buildFunction(const std::string_view name, size_t arity) {
   // create a new function
   auto* function = allocate<Function>(name, arity);
   // push the function to the global table
   const auto index = addGlobal(function);
   // add the function to the function table
-  function_table_[name] = index;
+  function_table_[function->name()] = index;
   // return the function
   return function;
 }
@@ -241,6 +241,10 @@ static inline void mod(Machine& machine, const Instruction& instruction) {
   machine.push(result);
 }
 
+static inline void pop(Machine& machine, const Instruction& instruction) {
+  machine.pop();
+}
+
 using InstructionHandler = void (*)(Machine&, const Instruction&);
 static std::unordered_map<Opcode, InstructionHandler> instruction_handlers = {
     {Opcode::LOAD_GLOBAL, loadGlobal},
@@ -256,7 +260,8 @@ static std::unordered_map<Opcode, InstructionHandler> instruction_handlers = {
     {Opcode::SUB, sub},
     {Opcode::MUL, mul},
     {Opcode::DIV, div},
-    {Opcode::MOD, mod}};
+    {Opcode::MOD, mod},
+    {Opcode::POP, pop}};
 
 void Machine::executeInstruction(const Instruction& instruction) {
   const auto handler = instruction_handlers.at(instruction.opcode);

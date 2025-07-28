@@ -1,17 +1,30 @@
 add_library(vulpes_frontend STATIC
-    frontend/location.cpp
-    frontend/lexer.cpp
-    frontend/token.cpp
-    frontend/parser.cpp)
+        frontend/lexer.cpp
+        frontend/token.cpp
+        frontend/parser.cpp
+        codegen/bytecode_emitter.cpp
+        codegen/bytecode_emitter.hpp)
 
 target_include_directories(vulpes_frontend PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-add_library(vulpes_vm STATIC vm/instruction.hpp vm/machine.cpp vm/heap.cpp vm/object/float.cpp vm/object/function.cpp vm/object/integer.cpp)
+add_library(vulpes_vm STATIC 
+        vm/instruction.hpp 
+        vm/machine.cpp 
+        vm/heap.cpp 
+        vm/object/float.cpp 
+        vm/object/function.cpp 
+        vm/object/integer.cpp)
+
+target_include_directories(vulpes_vm PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_library(vulpes_codegen STATIC codegen/bytecode_emitter.cpp)
+
+target_include_directories(vulpes_codegen PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(vulpes_tests
-    tests/test_lexer.cpp
-    tests/test_parser.cpp
-    tests/test_vm.cpp)
+        tests/test_lexer.cpp
+        tests/test_parser.cpp
+        tests/test_vm.cpp)
 
 target_link_libraries(vulpes_tests PRIVATE vulpes_frontend vulpes_vm Catch2::Catch2WithMain)
 

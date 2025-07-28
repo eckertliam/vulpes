@@ -30,8 +30,6 @@ static const std::unordered_map<std::string_view, TokenKind> keywords = {
     {"type", TokenKind::Type},
 };
 
-Lexer::Lexer(std::string_view source) : m_source(source) {}
-
 Token Lexer::next_token() {
   skip_whitespace();
 
@@ -104,21 +102,23 @@ Token Lexer::next_token() {
       return string();
     case '\'':
       return character();
+    default:
+      throw std::runtime_error("Unexpected character.");
   }
 
   return error_token("Unexpected character.");
 }
 
-Token Lexer::make_token(TokenKind type) {
-  return Token(type, m_line, m_column - (m_current - m_start), m_line, m_column,
-               m_source.substr(m_start, m_current - m_start));
+Token Lexer::make_token(const TokenKind type) const {
+  return {type,   m_line,   m_column - (m_current - m_start),
+          m_line, m_column, m_source.substr(m_start, m_current - m_start)};
 }
 
-Token Lexer::error_token(const char* message) {
-  return Token(TokenKind::Error, m_line, m_column, m_line, m_column, message);
+Token Lexer::error_token(const char* message) const {
+  return {TokenKind::Error, m_line, m_column, m_line, m_column, message};
 }
 
-bool Lexer::is_at_end() {
+bool Lexer::is_at_end() const {
   return m_current >= m_source.length();
 }
 
@@ -142,8 +142,7 @@ bool Lexer::match(char expected) {
 
 void Lexer::skip_whitespace() {
   for (;;) {
-    char c = peek();
-    switch (c) {
+    switch (peek()) {
       case ' ':
       case '\r':
       case '\t':
@@ -169,14 +168,14 @@ void Lexer::skip_whitespace() {
   }
 }
 
-char Lexer::peek() {
+char Lexer::peek() const {
   if (is_at_end()) {
     return '\0';
   }
   return m_source[m_current];
 }
 
-char Lexer::peek_next() {
+char Lexer::peek_next() const {
   if (m_current + 1 >= m_source.length()) {
     return '\0';
   }

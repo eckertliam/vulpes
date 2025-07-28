@@ -27,6 +27,8 @@ std::unique_ptr<Stmt> Parser::declaration() {
     return function_declaration();
   }
 
+  // TODO: implement class parsing
+
   // TODO: Add error handling and synchronization
   return statement();
 }
@@ -97,6 +99,8 @@ std::unique_ptr<Stmt> Parser::statement() {
   if (match({TokenKind::Return})) {
     return return_statement();
   }
+
+  // TODO: implement handling for all statement types
 
   return expression_statement();
 }

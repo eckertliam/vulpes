@@ -48,5 +48,6 @@ class BaseObject {
 
   // TODO: add comparison operations
   // TODO: add logical operations
+  // TODO: add truthiness
 };
 }  // namespace vulpes::vm::object

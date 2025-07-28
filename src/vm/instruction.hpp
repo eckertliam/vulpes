@@ -28,7 +28,7 @@ enum class Opcode : uint8_t {
   // Imm: local index
   LOAD_LOCAL,
   // Call a function
-  // Imm: function index
+  // Imm: none
   CALL,
   // Return a const from a function
   // Imm: const index
@@ -54,6 +54,9 @@ enum class Opcode : uint8_t {
   // Modulo two values
   // Imm: none
   MOD,
+  // Pop a value from the stack and discard it
+  // Imm: none
+  POP,
 };
 
 // Instruction is a struct that represents a single instruction in the VM.
