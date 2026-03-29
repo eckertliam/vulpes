@@ -19,9 +19,15 @@ class Parser {
   std::unique_ptr<Stmt> const_declaration();
   std::unique_ptr<BlockStmt> block_statement();
   std::unique_ptr<Stmt> function_declaration();
+  std::unique_ptr<Stmt> enum_declaration();
+  std::unique_ptr<Stmt> struct_declaration();
+  std::unique_ptr<Stmt> class_declaration();
+  std::unique_ptr<Stmt> import_statement();
+  std::unique_ptr<Stmt> export_statement();
   std::unique_ptr<Stmt> return_statement();
   std::unique_ptr<Stmt> if_statement();
   std::unique_ptr<Stmt> while_statement();
+  std::unique_ptr<Stmt> for_statement();
   std::unique_ptr<Stmt> statement();
   std::unique_ptr<Stmt> expression_statement();
   std::unique_ptr<Expr> expression();
@@ -30,9 +36,14 @@ class Parser {
   std::unique_ptr<Expr> logical_and();
   std::unique_ptr<Expr> equality();
   std::unique_ptr<Expr> comparison();
+  std::unique_ptr<Expr> bitwise_or();
+  std::unique_ptr<Expr> bitwise_xor();
+  std::unique_ptr<Expr> bitwise_and();
+  std::unique_ptr<Expr> shift();
   std::unique_ptr<Expr> term();
   std::unique_ptr<Expr> factor();
   std::unique_ptr<Expr> unary();
+  std::unique_ptr<Expr> power();
   std::unique_ptr<Expr> call();
   std::unique_ptr<Expr> primary();
 

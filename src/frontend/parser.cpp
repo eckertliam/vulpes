@@ -27,7 +27,25 @@ std::unique_ptr<Stmt> Parser::declaration() {
     return function_declaration();
   }
 
-  // TODO: implement class parsing
+  if (match({TokenKind::Enum})) {
+    return enum_declaration();
+  }
+
+  if (match({TokenKind::Struct})) {
+    return struct_declaration();
+  }
+
+  if (match({TokenKind::Class})) {
+    return class_declaration();
+  }
+
+  if (match({TokenKind::From})) {
+    return import_statement();
+  }
+
+  if (match({TokenKind::Export})) {
+    return export_statement();
+  }
 
   // TODO: Add error handling and synchronization
   return statement();
@@ -67,6 +85,11 @@ std::unique_ptr<Stmt> Parser::function_declaration() {
     auto param =
         consume(TokenKind::Identifier, "Expect a valid parameter name");
     parameters.push_back(param.lexeme());
+    // Optional type annotation on parameter
+    if (match({TokenKind::Colon})) {
+      // Consume the type name (ignored at runtime per spec)
+      consume(TokenKind::Identifier, "Expect type annotation.");
+    }
     if (match({TokenKind::Comma})) {
       continue;
     }
@@ -74,9 +97,9 @@ std::unique_ptr<Stmt> Parser::function_declaration() {
   }
   consume(TokenKind::RParen, "Expect ')' after function arguments");
 
+  // Optional return type annotation
   if (match({TokenKind::Colon})) {
-    // TODO: Implement more rigorous ret ty parsing
-    consume(TokenKind::Type, "Expect a valid return type");
+    consume(TokenKind::Identifier, "Expect a valid return type");
   }
 
   consume(TokenKind::LBrace, "Expect '{' before function body");
@@ -112,6 +135,10 @@ std::unique_ptr<Stmt> Parser::statement() {
 
   if (match({TokenKind::While})) {
     return while_statement();
+  }
+
+  if (match({TokenKind::For})) {
+    return for_statement();
   }
 
   if (match({TokenKind::Break})) {
@@ -152,6 +179,100 @@ std::unique_ptr<Stmt> Parser::while_statement() {
   auto body = block_statement();
   consume(TokenKind::RBrace, "Expect '}' after while body.");
   return std::make_unique<WhileStmt>(std::move(condition), std::move(body));
+}
+
+std::unique_ptr<Stmt> Parser::for_statement() {
+  Token var = consume(TokenKind::Identifier, "Expect variable name after 'for'.");
+  consume(TokenKind::In, "Expect 'in' after for variable.");
+  auto iterable = expression();
+  consume(TokenKind::LBrace, "Expect '{' after for iterable.");
+  auto body = block_statement();
+  consume(TokenKind::RBrace, "Expect '}' after for body.");
+  return std::make_unique<ForStmt>(var, std::move(iterable), std::move(body));
+}
+
+std::unique_ptr<Stmt> Parser::enum_declaration() {
+  Token name = consume(TokenKind::Identifier, "Expect enum name.");
+  consume(TokenKind::LBrace, "Expect '{' after enum name.");
+  std::vector<std::string_view> tags;
+  while (!check(TokenKind::RBrace) && !is_at_end()) {
+    Token tag = consume(TokenKind::Identifier, "Expect enum tag name.");
+    tags.push_back(tag.lexeme());
+    if (!match({TokenKind::Comma})) break;
+  }
+  consume(TokenKind::RBrace, "Expect '}' after enum tags.");
+  consume(TokenKind::Semicolon, "Expect ';' after enum declaration.");
+  return std::make_unique<EnumStmt>(name, std::move(tags));
+}
+
+std::unique_ptr<Stmt> Parser::struct_declaration() {
+  Token name = consume(TokenKind::Identifier, "Expect struct name.");
+  consume(TokenKind::LBrace, "Expect '{' after struct name.");
+  std::vector<StructField> fields;
+  while (!check(TokenKind::RBrace) && !is_at_end()) {
+    Token field_name = consume(TokenKind::Identifier, "Expect field name.");
+    consume(TokenKind::Colon, "Expect ':' after field name.");
+    Token type_name = consume(TokenKind::Identifier, "Expect type annotation.");
+    fields.push_back({field_name.lexeme(), type_name.lexeme()});
+    if (!match({TokenKind::Comma})) break;
+  }
+  consume(TokenKind::RBrace, "Expect '}' after struct fields.");
+  consume(TokenKind::Semicolon, "Expect ';' after struct declaration.");
+  return std::make_unique<StructStmt>(name, std::move(fields));
+}
+
+std::unique_ptr<Stmt> Parser::class_declaration() {
+  Token name = consume(TokenKind::Identifier, "Expect class name.");
+  consume(TokenKind::LBrace, "Expect '{' after class name.");
+  std::vector<ClassField> fields;
+  std::vector<std::unique_ptr<FunctionStmt>> methods;
+  while (!check(TokenKind::RBrace) && !is_at_end()) {
+    if (match({TokenKind::Fn})) {
+      auto method = function_declaration();
+      methods.push_back(std::unique_ptr<FunctionStmt>(
+          static_cast<FunctionStmt*>(method.release())));
+    } else {
+      bool is_pub = match({TokenKind::Pub});
+      Token field_name = consume(TokenKind::Identifier, "Expect field or method name.");
+      consume(TokenKind::Colon, "Expect ':' after field name.");
+      Token type_name = consume(TokenKind::Identifier, "Expect type annotation.");
+      consume(TokenKind::Semicolon, "Expect ';' after field declaration.");
+      fields.push_back({is_pub, field_name.lexeme(), type_name.lexeme()});
+    }
+  }
+  consume(TokenKind::RBrace, "Expect '}' after class body.");
+  consume(TokenKind::Semicolon, "Expect ';' after class declaration.");
+  return std::make_unique<ClassStmt>(name, std::move(fields), std::move(methods));
+}
+
+std::unique_ptr<Stmt> Parser::import_statement() {
+  Token from_tok = previous();
+  Token module = consume(TokenKind::Identifier, "Expect module path.");
+  consume(TokenKind::Import, "Expect 'import' after module path.");
+  consume(TokenKind::LBrace, "Expect '{' after 'import'.");
+  std::vector<std::string_view> names;
+  while (!check(TokenKind::RBrace) && !is_at_end()) {
+    Token ident = consume(TokenKind::Identifier, "Expect import name.");
+    names.push_back(ident.lexeme());
+    if (!match({TokenKind::Comma})) break;
+  }
+  consume(TokenKind::RBrace, "Expect '}' after import names.");
+  consume(TokenKind::Semicolon, "Expect ';' after import statement.");
+  return std::make_unique<ImportStmt>(from_tok, module.lexeme(), std::move(names));
+}
+
+std::unique_ptr<Stmt> Parser::export_statement() {
+  Token export_tok = previous();
+  consume(TokenKind::LBrace, "Expect '{' after 'export'.");
+  std::vector<std::string_view> names;
+  while (!check(TokenKind::RBrace) && !is_at_end()) {
+    Token ident = consume(TokenKind::Identifier, "Expect export name.");
+    names.push_back(ident.lexeme());
+    if (!match({TokenKind::Comma})) break;
+  }
+  consume(TokenKind::RBrace, "Expect '}' after export names.");
+  consume(TokenKind::Semicolon, "Expect ';' after export statement.");
+  return std::make_unique<ExportStmt>(export_tok, std::move(names));
 }
 
 std::unique_ptr<Stmt> Parser::expression_statement() {
@@ -217,10 +338,58 @@ std::unique_ptr<Expr> Parser::equality() {
 }
 
 std::unique_ptr<Expr> Parser::comparison() {
-  auto expr = term();
+  auto expr = bitwise_or();
 
   while (match({TokenKind::Greater, TokenKind::GreaterEq, TokenKind::Less,
                 TokenKind::LessEq})) {
+    Token op = previous();
+    auto right = bitwise_or();
+    expr = std::make_unique<BinaryExpr>(std::move(expr), op, std::move(right));
+  }
+
+  return expr;
+}
+
+std::unique_ptr<Expr> Parser::bitwise_or() {
+  auto expr = bitwise_xor();
+
+  while (match({TokenKind::Bar})) {
+    Token op = previous();
+    auto right = bitwise_xor();
+    expr = std::make_unique<BinaryExpr>(std::move(expr), op, std::move(right));
+  }
+
+  return expr;
+}
+
+std::unique_ptr<Expr> Parser::bitwise_xor() {
+  auto expr = bitwise_and();
+
+  while (match({TokenKind::Caret})) {
+    Token op = previous();
+    auto right = bitwise_and();
+    expr = std::make_unique<BinaryExpr>(std::move(expr), op, std::move(right));
+  }
+
+  return expr;
+}
+
+std::unique_ptr<Expr> Parser::bitwise_and() {
+  auto expr = shift();
+
+  while (match({TokenKind::Amp})) {
+    Token op = previous();
+    auto right = shift();
+    expr = std::make_unique<BinaryExpr>(std::move(expr), op, std::move(right));
+  }
+
+  return expr;
+}
+
+std::unique_ptr<Expr> Parser::shift() {
+  auto expr = term();
+
+  while (match({TokenKind::LessLess, TokenKind::GreaterGreater})) {
     Token op = previous();
     auto right = term();
     expr = std::make_unique<BinaryExpr>(std::move(expr), op, std::move(right));
@@ -260,7 +429,20 @@ std::unique_ptr<Expr> Parser::unary() {
     return std::make_unique<UnaryExpr>(op, std::move(right));
   }
 
-  return call();
+  return power();
+}
+
+std::unique_ptr<Expr> Parser::power() {
+  auto expr = call();
+
+  if (match({TokenKind::StarStar})) {
+    Token op = previous();
+    // Right-associative: recurse into power() not call()
+    auto right = power();
+    expr = std::make_unique<BinaryExpr>(std::move(expr), op, std::move(right));
+  }
+
+  return expr;
 }
 
 std::unique_ptr<Expr> Parser::call() {
@@ -277,6 +459,25 @@ std::unique_ptr<Expr> Parser::call() {
       Token paren = consume(TokenKind::RParen, "Expect ')' after arguments.");
       expr = std::make_unique<CallExpr>(std::move(expr), paren,
                                         std::move(arguments));
+    } else if (match({TokenKind::Dot})) {
+      Token name = consume(TokenKind::Identifier, "Expect property name after '.'.");
+      if (match({TokenKind::Eq})) {
+        auto value = expression();
+        expr = std::make_unique<SetExpr>(std::move(expr), name, std::move(value));
+      } else {
+        expr = std::make_unique<GetExpr>(std::move(expr), name);
+      }
+    } else if (match({TokenKind::LBracket})) {
+      auto index = expression();
+      Token bracket = consume(TokenKind::RBracket, "Expect ']' after index.");
+      if (match({TokenKind::Eq})) {
+        auto value = expression();
+        expr = std::make_unique<IndexSetExpr>(std::move(expr), std::move(index),
+                                              std::move(value));
+      } else {
+        expr = std::make_unique<IndexExpr>(std::move(expr), bracket,
+                                           std::move(index));
+      }
     } else {
       break;
     }
