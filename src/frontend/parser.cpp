@@ -500,7 +500,7 @@ std::unique_ptr<Expr> Parser::primary() {
   if (match({TokenKind::Null}))
     return std::make_unique<NullLiteral>(previous());
 
-  if (match({TokenKind::Identifier})) {
+  if (match({TokenKind::Identifier, TokenKind::Type})) {
     return std::make_unique<VarExpr>(previous());
   }
 
