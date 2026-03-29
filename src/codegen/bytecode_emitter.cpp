@@ -276,8 +276,44 @@ void BytecodeEmitter::visit(const frontend::AssignExpr& expr) {
     }
 }
 
-void BytecodeEmitter::visit([[maybe_unused]] const frontend::LogicalExpr& expr) {
-    // TODO: Implement logical expressions (&&, ||)
+void BytecodeEmitter::visit(const frontend::LogicalExpr& expr) {
+    if (expr.op.lexeme() == "&&") {
+        // Short-circuit AND: if left is falsy, skip right and push false
+        expr.left->accept(*this);
+        auto false_jump = current_function->instructionCount();
+        current_function->addInstruction(vm::Instruction(vm::Opcode::JUMP_IF_FALSE, 0));
+
+        // Left was truthy — evaluate right (its value is the result)
+        expr.right->accept(*this);
+        auto end_jump = current_function->instructionCount();
+        current_function->addInstruction(vm::Instruction(vm::Opcode::JUMP, 0));
+
+        // Short-circuit: push false
+        current_function->patchInstruction(false_jump, current_function->instructionCount());
+        auto* false_obj = machine.allocate<vm::object::Boolean>(false);
+        emit_constant(false_obj);
+
+        current_function->patchInstruction(end_jump, current_function->instructionCount());
+    } else if (expr.op.lexeme() == "||") {
+        // Short-circuit OR: if left is truthy, skip right and push true
+        expr.left->accept(*this);
+        // NOT + JUMP_IF_FALSE = jump if truthy
+        current_function->addInstruction(vm::Instruction(vm::Opcode::NOT));
+        auto true_jump = current_function->instructionCount();
+        current_function->addInstruction(vm::Instruction(vm::Opcode::JUMP_IF_FALSE, 0));
+
+        // Left was falsy — evaluate right (its value is the result)
+        expr.right->accept(*this);
+        auto end_jump = current_function->instructionCount();
+        current_function->addInstruction(vm::Instruction(vm::Opcode::JUMP, 0));
+
+        // Short-circuit: push true
+        current_function->patchInstruction(true_jump, current_function->instructionCount());
+        auto* true_obj = machine.allocate<vm::object::Boolean>(true);
+        emit_constant(true_obj);
+
+        current_function->patchInstruction(end_jump, current_function->instructionCount());
+    }
 }
 
 void BytecodeEmitter::visit(const frontend::CallExpr& expr) {

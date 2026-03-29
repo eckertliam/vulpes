@@ -23,7 +23,10 @@ class String final : public BaseObject {
 
   [[nodiscard]] std::string toString() const override { return value_; }
 
-  BaseObject* add([[maybe_unused]] vulpes::vm::Machine& machine, [[maybe_unused]] BaseObject* other) override {
+  BaseObject* add(vulpes::vm::Machine& machine, BaseObject* other) override {
+    if (other->type() == ObjectType::String) {
+      return machine.allocate<String>(value_ + dynamic_cast<String*>(other)->value());
+    }
     return nullptr;
   }
   BaseObject* sub([[maybe_unused]] vulpes::vm::Machine& machine, [[maybe_unused]] BaseObject* other) override {

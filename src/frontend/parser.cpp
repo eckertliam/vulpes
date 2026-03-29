@@ -238,7 +238,7 @@ std::unique_ptr<Expr> Parser::term() {
 std::unique_ptr<Expr> Parser::factor() {
   auto expr = unary();
 
-  while (match({TokenKind::Slash, TokenKind::Star})) {
+  while (match({TokenKind::Slash, TokenKind::Star, TokenKind::Percent})) {
     Token op = previous();
     auto right = unary();
     expr = std::make_unique<BinaryExpr>(std::move(expr), op, std::move(right));
