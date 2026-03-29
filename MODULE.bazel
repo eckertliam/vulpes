@@ -1,0 +1,6 @@
+module(
+    name = "vulpes",
+    version = "0.1.0",
+)
+
+bazel_dep(name = "catch2", version = "3.7.1")

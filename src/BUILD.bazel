@@ -1,0 +1,66 @@
+cc_library(
+    name = "frontend",
+    srcs = [
+        "frontend/lexer.cpp",
+        "frontend/parser.cpp",
+        "frontend/token.cpp",
+    ],
+    hdrs = [
+        "frontend/ast.hpp",
+        "frontend/lexer.hpp",
+        "frontend/location.hpp",
+        "frontend/parser.hpp",
+        "frontend/token.hpp",
+    ],
+    includes = ["."],
+)
+
+cc_library(
+    name = "vm",
+    srcs = [
+        "vm/heap.cpp",
+        "vm/machine.cpp",
+        "vm/object/float.cpp",
+        "vm/object/function.cpp",
+        "vm/object/integer.cpp",
+    ],
+    hdrs = [
+        "vm/call_frame.hpp",
+        "vm/heap.hpp",
+        "vm/instruction.hpp",
+        "vm/machine.hpp",
+        "vm/object/base.hpp",
+        "vm/object/float.hpp",
+        "vm/object/function.hpp",
+        "vm/object/integer.hpp",
+        "vm/object/null.hpp",
+    ],
+    includes = ["."],
+    deps = [":frontend"],
+)
+
+cc_library(
+    name = "codegen",
+    srcs = ["codegen/bytecode_emitter.cpp"],
+    hdrs = ["codegen/bytecode_emitter.hpp"],
+    includes = ["."],
+    deps = [
+        ":frontend",
+        ":vm",
+    ],
+)
+
+cc_test(
+    name = "vulpes_tests",
+    srcs = [
+        "tests/test_lexer.cpp",
+        "tests/test_parser.cpp",
+        "tests/test_vm.cpp",
+    ],
+    deps = [
+        ":codegen",
+        ":frontend",
+        ":vm",
+        "@catch2//:catch2_main",
+    ],
+)

@@ -1,10 +1,8 @@
 all:
-	cmake -B build
-	cmake --build build
+	bazel build //src/...
 
 clean:
-	rm -rf build
+	bazel clean
 
 test:
-	build/vm test/test.vm
-
+	bazel test //src:vulpes_tests
