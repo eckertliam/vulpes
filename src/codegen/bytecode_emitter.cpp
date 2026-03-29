@@ -980,8 +980,19 @@ void BytecodeEmitter::visit(const frontend::StructStmt& stmt) {
         });
 }
 
-void BytecodeEmitter::visit([[maybe_unused]] const frontend::ImportStmt& stmt) {
-    // TODO: Implement module imports
+void BytecodeEmitter::visit(const frontend::ImportStmt& stmt) {
+    // Load the module
+    machine.loadModule(std::string(stmt.module_path));
+
+    // Make imported names available in the current scope
+    // The imported module's functions/globals are already in the machine's function table
+    // and global table since the module was compiled and run
+    for (auto& name : stmt.names) {
+        auto fn_it = machine.getFunctionTable().find(std::string(name));
+        if (fn_it != machine.getFunctionTable().end()) {
+            global_vars[name] = fn_it->second;
+        }
+    }
 }
 
 void BytecodeEmitter::visit([[maybe_unused]] const frontend::ExportStmt& stmt) {

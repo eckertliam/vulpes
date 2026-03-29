@@ -634,6 +634,33 @@ void Machine::setIP(size_t ip) {
   call_frames_.back().ip = ip;
 }
 
+bool Machine::isModuleLoaded(const std::string& module_path) const {
+  return loaded_modules_.count(module_path) > 0;
+}
+
+bool Machine::isModuleLoading(const std::string& module_path) const {
+  return loading_modules_.count(module_path) > 0;
+}
+
+void Machine::markModuleLoaded(const std::string& module_path) {
+  loaded_modules_.insert(module_path);
+}
+
+void Machine::markModuleLoading(const std::string& module_path) {
+  loading_modules_.insert(module_path);
+}
+
+void Machine::unmarkModuleLoading(const std::string& module_path) {
+  loading_modules_.erase(module_path);
+}
+
+bool Machine::loadModule(const std::string& module_path) {
+  if (module_loader_) {
+    return module_loader_(*this, module_path);
+  }
+  throw std::runtime_error("ImportError: no module loader configured");
+}
+
 void Machine::registerNative(const std::string& name, size_t arity,
                              object::NativeFn fn) {
   auto* native =

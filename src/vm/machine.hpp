@@ -7,6 +7,7 @@
 
 #include <stack>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace vulpes::vm {
 
@@ -58,6 +59,18 @@ class Machine {
   void registerBuiltins();
   void registerNative(const std::string& name, size_t arity, object::NativeFn fn);
 
+  // Module system
+  using ModuleLoader = std::function<bool(Machine&, const std::string&)>;
+  void setBaseDir(const std::string& dir) { base_dir_ = dir; }
+  [[nodiscard]] const std::string& getBaseDir() const { return base_dir_; }
+  void setModuleLoader(ModuleLoader loader) { module_loader_ = std::move(loader); }
+  bool loadModule(const std::string& module_path);
+  [[nodiscard]] bool isModuleLoaded(const std::string& module_path) const;
+  [[nodiscard]] bool isModuleLoading(const std::string& module_path) const;
+  void markModuleLoaded(const std::string& module_path);
+  void markModuleLoading(const std::string& module_path);
+  void unmarkModuleLoading(const std::string& module_path);
+
   // peek pack with offset from the top of the stack
   // used for loading args into functions from previous call frames
   [[nodiscard]] BaseObject* peek(size_t offset = 0) const;
@@ -69,6 +82,10 @@ class Machine {
   std::unordered_map<std::string, uint32_t> function_table_;
   std::deque<CallFrame> call_frames_;
   std::array<BaseObject*, STACK_SIZE> stack_;
+  std::string base_dir_;
+  ModuleLoader module_loader_;
+  std::unordered_set<std::string> loaded_modules_;
+  std::unordered_set<std::string> loading_modules_;  // for cycle detection
 
   void incrStackPointer();
   void decrStackPointer();
