@@ -42,7 +42,7 @@ uint32_t Machine::getStackPointer() const {
   if (call_frames_.empty()) {
     return 0;
   } else {
-    return call_frames_.back().sp;
+    return static_cast<uint32_t>(call_frames_.back().sp);
   }
 }
 
@@ -72,7 +72,7 @@ BaseObject* Machine::pop() {
 }
 
 BaseObject* Machine::peek(const size_t offset) const {
-  if (getStackPointer() - offset < 0) [[unlikely]] {
+  if (offset > getStackPointer()) [[unlikely]] {
     throw std::runtime_error("Stack underflow");
   }
   return stack_[getStackPointer() - offset];
@@ -82,7 +82,7 @@ BaseObject* Machine::peek() const {
 }
 
 // BEGIN INSTRUCTION EXECUTION
-static inline void throwWithLocation(const std::string& message,
+[[noreturn]] static inline void throwWithLocation(const std::string& message,
                                      const std::optional<Location>& src_loc) {
   if (src_loc.has_value()) {
     throw std::runtime_error(message + ": " + src_loc.value().toString());
@@ -116,7 +116,7 @@ static inline void loadConst(Machine& machine, const Instruction& instruction) {
 }
 
 static inline void storeLocal(Machine& machine,
-                              const Instruction& instruction) {
+                              [[maybe_unused]] const Instruction& instruction) {
   // pop the value from the stack
   const auto value = machine.pop();
   // store the value at the local index
@@ -196,7 +196,7 @@ static inline void returnLocal(Machine& machine,
 }
 
 static inline void returnValue(Machine& machine,
-                               const Instruction& instruction) {
+                               [[maybe_unused]] const Instruction& instruction) {
   // pop the value from the stack
   const auto value = machine.pop();
   // pop back to the previous call frame
@@ -255,7 +255,7 @@ static inline void mod(Machine& machine, const Instruction& instruction) {
   machine.push(result);
 }
 
-static inline void pop(Machine& machine, const Instruction& instruction) {
+static inline void pop(Machine& machine, [[maybe_unused]] const Instruction& instruction) {
   machine.pop();
 }
 
@@ -316,7 +316,7 @@ for (auto* global : globals_) {
 
 uint32_t Machine::addGlobal(BaseObject* global) {
   globals_.push_back(global);
-  return globals_.size() - 1;
+  return static_cast<uint32_t>(globals_.size() - 1);
 }
 
 BaseObject* Machine::getGlobal(const uint32_t index) const {

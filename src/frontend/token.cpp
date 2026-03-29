@@ -112,6 +112,8 @@ const char* token_kind_to_string(TokenKind kind) {
       return "Error";
     case TokenKind::Eof:
       return "Eof";
+    case TokenKind::NoToken:
+      return "NoToken";
     default:
       return "Unknown";
   }

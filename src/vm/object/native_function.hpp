@@ -32,25 +32,25 @@ class NativeFunction final : public BaseObject {
     return function_(machine, args);
   }
 
-  void trace(const std::function<void(BaseObject*)>& visit) override {}
+  void trace(const std::function<void(BaseObject*)>& /*visit*/) override {}
 
   [[nodiscard]] std::string toString() const override {
     return "NativeFunction(" + name_ + ")";
   }
 
-  BaseObject* add(Machine& machine, BaseObject* other) override {
+  BaseObject* add([[maybe_unused]] Machine& machine, [[maybe_unused]] BaseObject* other) override {
     return nullptr;
   }
-  BaseObject* sub(Machine& machine, BaseObject* other) override {
+  BaseObject* sub([[maybe_unused]] Machine& machine, [[maybe_unused]] BaseObject* other) override {
     return nullptr;
   }
-  BaseObject* mul(Machine& machine, BaseObject* other) override {
+  BaseObject* mul([[maybe_unused]] Machine& machine, [[maybe_unused]] BaseObject* other) override {
     return nullptr;
   }
-  BaseObject* div(Machine& machine, BaseObject* other) override {
+  BaseObject* div([[maybe_unused]] Machine& machine, [[maybe_unused]] BaseObject* other) override {
     return nullptr;
   }
-  BaseObject* mod(Machine& machine, BaseObject* other) override {
+  BaseObject* mod([[maybe_unused]] Machine& machine, [[maybe_unused]] BaseObject* other) override {
     return nullptr;
   }
 };

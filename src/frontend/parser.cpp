@@ -76,7 +76,7 @@ std::unique_ptr<Stmt> Parser::function_declaration() {
 
   if (match({TokenKind::Colon})) {
     // TODO: Implement more rigorous ret ty parsing
-    Token return_type = consume(TokenKind::Type, "Expect a valid return type");
+    consume(TokenKind::Type, "Expect a valid return type");
   }
 
   consume(TokenKind::LBrace, "Expect '{' before function body");
@@ -274,7 +274,7 @@ bool Parser::match(const std::vector<TokenKind>& types) {
   return false;
 }
 
-Token Parser::consume(const TokenKind type, const char* message) {
+Token Parser::consume(const TokenKind type, [[maybe_unused]] const char* message) {
   if (check(type)) {
     return advance();
   }

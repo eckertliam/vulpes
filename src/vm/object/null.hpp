@@ -13,25 +13,27 @@ class Null : public BaseObject {
 
   std::string toString() const override { return "null"; }
 
+  ~Null() override = default;
+
   void trace(const std::function<void(BaseObject*)>& visit) override { visit(this); }
 
-  BaseObject* add(vulpes::vm::Machine& machine, BaseObject* other) override {
+  BaseObject* add([[maybe_unused]] vulpes::vm::Machine& machine, [[maybe_unused]] BaseObject* other) override {
     return nullptr;
   }
 
-  BaseObject* sub(vulpes::vm::Machine& machine, BaseObject* other) override {
+  BaseObject* sub([[maybe_unused]] vulpes::vm::Machine& machine, [[maybe_unused]] BaseObject* other) override {
     return nullptr;
   }
 
-  BaseObject* mul(vulpes::vm::Machine& machine, BaseObject* other) override {
+  BaseObject* mul([[maybe_unused]] vulpes::vm::Machine& machine, [[maybe_unused]] BaseObject* other) override {
     return nullptr;
   }
 
-  BaseObject* div(vulpes::vm::Machine& machine, BaseObject* other) override {
+  BaseObject* div([[maybe_unused]] vulpes::vm::Machine& machine, [[maybe_unused]] BaseObject* other) override {
     return nullptr;
   }
 
-  BaseObject* mod(vulpes::vm::Machine& machine, BaseObject* other) override {
+  BaseObject* mod([[maybe_unused]] vulpes::vm::Machine& machine, [[maybe_unused]] BaseObject* other) override {
     return nullptr;
   }
 };

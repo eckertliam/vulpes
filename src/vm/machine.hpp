@@ -10,7 +10,7 @@
 
 namespace vulpes::vm {
 
-#define STACK_SIZE 1024
+static constexpr size_t STACK_SIZE = 1024;
 
 class Machine {
  public:

@@ -45,7 +45,7 @@ class Parser {
   Lexer& m_lexer;
   Token m_current;
   Token m_previous;
-  bool m_had_error = false;
+  [[maybe_unused]] bool m_had_error = false;
 };
 
 }  // namespace vulpes::frontend

@@ -12,6 +12,12 @@ BaseObject* Integer::add(vulpes::vm::Machine& machine, BaseObject* other) {
     case ObjectType::Float:
       return machine.allocate<Float>(static_cast<double>(value_) +
                                      dynamic_cast<Float*>(other)->value());
+    case ObjectType::String:
+    case ObjectType::Boolean:
+    case ObjectType::Null:
+    case ObjectType::Object:
+    case ObjectType::Function:
+    case ObjectType::NativeFunction:
     default:
       return nullptr;
   }
@@ -25,6 +31,12 @@ BaseObject* Integer::sub(vulpes::vm::Machine& machine, BaseObject* other) {
     case ObjectType::Float:
       return machine.allocate<Float>(static_cast<double>(value_) -
                                      dynamic_cast<Float*>(other)->value());
+    case ObjectType::String:
+    case ObjectType::Boolean:
+    case ObjectType::Null:
+    case ObjectType::Object:
+    case ObjectType::Function:
+    case ObjectType::NativeFunction:
     default:
       return nullptr;
   }
@@ -38,6 +50,12 @@ BaseObject* Integer::mul(vulpes::vm::Machine& machine, BaseObject* other) {
     case ObjectType::Float:
       return machine.allocate<Float>(static_cast<double>(value_) *
                                      dynamic_cast<Float*>(other)->value());
+    case ObjectType::String:
+    case ObjectType::Boolean:
+    case ObjectType::Null:
+    case ObjectType::Object:
+    case ObjectType::Function:
+    case ObjectType::NativeFunction:
     default:
       return nullptr;
   }
@@ -51,6 +69,12 @@ BaseObject* Integer::div(vulpes::vm::Machine& machine, BaseObject* other) {
     case ObjectType::Float:
       return machine.allocate<Float>(static_cast<double>(value_) /
                                      dynamic_cast<Float*>(other)->value());
+    case ObjectType::String:
+    case ObjectType::Boolean:
+    case ObjectType::Null:
+    case ObjectType::Object:
+    case ObjectType::Function:
+    case ObjectType::NativeFunction:
     default:
       return nullptr;
   }

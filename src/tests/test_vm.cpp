@@ -1,5 +1,3 @@
-#define CATCH_CONFIG_MAIN
-
 #include "vm/object/function.hpp"
 #include "vm/machine.hpp"
 
@@ -43,5 +41,4 @@ TEST_CASE("Machine can add two ints", "[vm]") {
   auto* as_int = dynamic_cast<vulpes::vm::object::Integer*>(result);
   REQUIRE(as_int != nullptr);
   REQUIRE(as_int->value() == static_cast<int64_t>(3));
-
 }

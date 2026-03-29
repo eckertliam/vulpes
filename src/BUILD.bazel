@@ -1,15 +1,16 @@
-VULPES_COPTS = select({
-    "@platforms//os:macos": [
-        "-Weverything",
-        "-Wno-c++98-compat",
-        "-Wno-c++98-compat-pedantic",
-        "-Wno-padded",
-    ],
-    "//conditions:default": [
-        "-Wall",
-        "-Wextra",
-    ],
-})
+VULPES_COPTS = [
+    "-Weverything",
+    "-Werror",
+    "-Wno-c++98-compat",
+    "-Wno-c++98-compat-pedantic",
+    "-Wno-padded",
+    "-Wno-shadow-field-in-constructor",
+    "-Wno-weak-vtables",
+    "-Wno-global-constructors",
+    "-Wno-exit-time-destructors",
+    "-Wno-poison-system-directories",
+    "-Wno-covered-switch-default",
+]
 
 cc_library(
     name = "frontend",

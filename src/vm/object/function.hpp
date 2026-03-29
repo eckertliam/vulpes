@@ -31,11 +31,11 @@ class Function : public BaseObject {
   Function(std::string_view name, const size_t arity) 
       : BaseObject(ObjectType::Function), name_(name), arity_(arity) {}
       
-  void addInstruction(const Instruction& instruction) { instructions_.push_back(instruction); };
+  void addInstruction(const Instruction& instruction) { instructions_.push_back(instruction); }
 
   uint32_t addConstant(BaseObject* constant) {
     constants_.push_back(constant);
-    return constants_.size() - 1;
+    return static_cast<uint32_t>(constants_.size() - 1);
   }
 
   // END BUILDER FUNCTIONS
@@ -58,34 +58,33 @@ class Function : public BaseObject {
 
   uint32_t addLocal(BaseObject* value) {
     locals_.push_back(value);
-    return locals_.size() - 1;
+    return static_cast<uint32_t>(locals_.size() - 1);
   }
-
 
   uint32_t addArg(BaseObject* arg) {
     locals_.push_back(arg);
-    return locals_.size() - 1;
+    return static_cast<uint32_t>(locals_.size() - 1);
   }
 
   Instruction& getInstruction(const size_t index) { return instructions_[index]; }
 
-  BaseObject* add(Machine& machine, BaseObject* other) override {
+  BaseObject* add([[maybe_unused]] Machine& machine, [[maybe_unused]] BaseObject* other) override {
     return nullptr;
   }
 
-  BaseObject* sub(Machine& machine, BaseObject* other) override {
+  BaseObject* sub([[maybe_unused]] Machine& machine, [[maybe_unused]] BaseObject* other) override {
     return nullptr;
   }
 
-  BaseObject* mul(Machine& machine, BaseObject* other) override {
+  BaseObject* mul([[maybe_unused]] Machine& machine, [[maybe_unused]] BaseObject* other) override {
     return nullptr;
   }
 
-  BaseObject* div(Machine& machine, BaseObject* other) override {
+  BaseObject* div([[maybe_unused]] Machine& machine, [[maybe_unused]] BaseObject* other) override {
     return nullptr;
   }
 
-  BaseObject* mod(Machine& machine, BaseObject* other) override {
+  BaseObject* mod([[maybe_unused]] Machine& machine, [[maybe_unused]] BaseObject* other) override {
     return nullptr;
   }
 };

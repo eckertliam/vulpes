@@ -50,7 +50,7 @@ void BytecodeEmitter::emit_store_local(std::string_view name) {
         current_function->addInstruction(vm::Instruction(vm::Opcode::STORE_LOCAL, it->second));
     } else {
         // Allocate new local
-        uint32_t local_index = locals.size();
+        uint32_t local_index = static_cast<uint32_t>(locals.size());
         locals[name] = local_index;
         current_function->addInstruction(vm::Instruction(vm::Opcode::STORE_LOCAL, local_index));
     }
@@ -89,22 +89,22 @@ void BytecodeEmitter::emit_binary_op(const frontend::Token& op) {
     // TODO: Implement comparison operators
 }
 
-void BytecodeEmitter::emit_unary_op(const frontend::Token& op) {
+void BytecodeEmitter::emit_unary_op([[maybe_unused]] const frontend::Token& op) {
     // TODO: Implement unary operators (negate, not)
     // Current instruction set doesn't support these
 }
 
-void BytecodeEmitter::emit_jump(size_t offset) {
+void BytecodeEmitter::emit_jump([[maybe_unused]] size_t offset) {
     // TODO: Implement jump instruction
     // Current instruction set doesn't support jumps
 }
 
-void BytecodeEmitter::emit_jump_if_false(size_t offset) {
+void BytecodeEmitter::emit_jump_if_false([[maybe_unused]] size_t offset) {
     // TODO: Implement conditional jump
     // Current instruction set doesn't support conditional jumps
 }
 
-void BytecodeEmitter::emit_call(size_t arg_count) {
+void BytecodeEmitter::emit_call([[maybe_unused]] size_t arg_count) {
     // Emit CALL instruction - function object should already be on stack
     // The VM will pop the function object and arguments from the stack
     current_function->addInstruction(vm::Instruction(vm::Opcode::CALL));
@@ -145,17 +145,17 @@ vm::object::BaseObject* BytecodeEmitter::try_get_constant(const frontend::Expr& 
     if (auto* float_lit = dynamic_cast<const frontend::FloatLiteral*>(&expr)) {
         return machine.allocate<vm::object::Float>(float_lit->value);
     }
-    if (auto* null_lit = dynamic_cast<const frontend::NullLiteral*>(&expr)) {
+    if (dynamic_cast<const frontend::NullLiteral*>(&expr)) {
         return machine.allocate<vm::object::Null>();
     }
-    if (auto* bool_lit = dynamic_cast<const frontend::BoolLiteral*>(&expr)) {
+    if (dynamic_cast<const frontend::BoolLiteral*>(&expr)) {
         // TODO: Implement boolean objects
         return machine.allocate<vm::object::Null>();
     }
     if (auto* string_lit = dynamic_cast<const frontend::StringLiteral*>(&expr)) {
         return machine.allocate<vm::object::String>(std::string(string_lit->value));
     }
-    if (auto* char_lit = dynamic_cast<const frontend::CharLiteral*>(&expr)) {
+    if (dynamic_cast<const frontend::CharLiteral*>(&expr)) {
         // TODO: Implement char objects
         return machine.allocate<vm::object::Null>();
     }
@@ -181,19 +181,19 @@ void BytecodeEmitter::visit(const frontend::StringLiteral& expr) {
     emit_constant(str_obj);
 }
 
-void BytecodeEmitter::visit(const frontend::CharLiteral& expr) {
+void BytecodeEmitter::visit([[maybe_unused]] const frontend::CharLiteral& expr) {
     // TODO: Implement char literal emission
     auto* null_obj = machine.allocate<vm::object::Null>();
     emit_constant(null_obj);
 }
 
-void BytecodeEmitter::visit(const frontend::BoolLiteral& expr) {
+void BytecodeEmitter::visit([[maybe_unused]] const frontend::BoolLiteral& expr) {
     // TODO: Implement boolean literal emission
     auto* null_obj = machine.allocate<vm::object::Null>();
     emit_constant(null_obj);
 }
 
-void BytecodeEmitter::visit(const frontend::NullLiteral& expr) {
+void BytecodeEmitter::visit([[maybe_unused]] const frontend::NullLiteral& expr) {
     auto* null_obj = machine.allocate<vm::object::Null>();
     emit_constant(null_obj);
 }
@@ -259,7 +259,7 @@ void BytecodeEmitter::visit(const frontend::AssignExpr& expr) {
     }
 }
 
-void BytecodeEmitter::visit(const frontend::LogicalExpr& expr) {
+void BytecodeEmitter::visit([[maybe_unused]] const frontend::LogicalExpr& expr) {
     // TODO: Implement logical expressions (&&, ||)
 }
 
@@ -274,11 +274,11 @@ void BytecodeEmitter::visit(const frontend::CallExpr& expr) {
     emit_call(expr.arguments.size());
 }
 
-void BytecodeEmitter::visit(const frontend::GetExpr& expr) {
+void BytecodeEmitter::visit([[maybe_unused]] const frontend::GetExpr& expr) {
     // TODO: Implement property access
 }
 
-void BytecodeEmitter::visit(const frontend::SetExpr& expr) {
+void BytecodeEmitter::visit([[maybe_unused]] const frontend::SetExpr& expr) {
     // TODO: Implement property assignment
 }
 
@@ -317,17 +317,17 @@ void BytecodeEmitter::visit(const frontend::BlockStmt& stmt) {
     }
 }
 
-void BytecodeEmitter::visit(const frontend::IfStmt& stmt) {
+void BytecodeEmitter::visit([[maybe_unused]] const frontend::IfStmt& stmt) {
     // TODO: Implement conditional jumps
     // Current instruction set doesn't support conditional jumps
 }
 
-void BytecodeEmitter::visit(const frontend::WhileStmt& stmt) {
+void BytecodeEmitter::visit([[maybe_unused]] const frontend::WhileStmt& stmt) {
     // TODO: Implement while loops
     // Current instruction set doesn't support jumps
 }
 
-void BytecodeEmitter::visit(const frontend::ForStmt& stmt) {
+void BytecodeEmitter::visit([[maybe_unused]] const frontend::ForStmt& stmt) {
     // TODO: Implement for loop
 }
 
@@ -375,7 +375,7 @@ void BytecodeEmitter::visit(const frontend::FunctionStmt& stmt) {
     
     // Set up argument mapping
     for (size_t i = 0; i < stmt.params.size(); i++) {
-        args[stmt.params[i]] = i;
+        args[stmt.params[i]] = static_cast<uint32_t>(i);
     }
     
     // Visit function body

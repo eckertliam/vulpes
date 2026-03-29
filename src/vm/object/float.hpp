@@ -12,12 +12,12 @@ class Float final : public BaseObject {
  public:
   explicit Float(double value) : BaseObject(ObjectType::Float), value_(value) {}
 
-  ~Float() = default;
+  ~Float() override = default;
 
   [[nodiscard]] double value() const { return value_; }
 
   /* Nothing to trace */
-  void trace(const std::function<void(BaseObject*)>& visit) override {}
+  void trace(const std::function<void(BaseObject*)>& /*visit*/) override {}
 
   [[nodiscard]] std::string toString() const override { return std::to_string(value_); }
 

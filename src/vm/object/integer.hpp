@@ -14,7 +14,7 @@ class Integer final : public BaseObject {
   [[nodiscard]] int64_t value() const { return value_; }
 
   /* Nothing to trace */
-  void trace(const std::function<void(BaseObject*)>& visit) override {}
+  void trace(const std::function<void(BaseObject*)>& /*visit*/) override {}
 
   [[nodiscard]] std::string toString() const override { return std::to_string(value_); }
 
