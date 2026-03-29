@@ -69,12 +69,20 @@ BaseObject* Integer::mul(vulpes::vm::Machine& machine, BaseObject* other) {
 
 BaseObject* Integer::div(vulpes::vm::Machine& machine, BaseObject* other) {
   switch (other->type()) {
-    case ObjectType::Integer:
-      return machine.allocate<Integer>(value_ /
-                                       dynamic_cast<Integer*>(other)->value_);
-    case ObjectType::Float:
-      return machine.allocate<Float>(static_cast<double>(value_) /
-                                     dynamic_cast<Float*>(other)->value());
+    case ObjectType::Integer: {
+      auto divisor = dynamic_cast<Integer*>(other)->value_;
+      if (divisor == 0) {
+        throw std::runtime_error("DivideByZero");
+      }
+      return machine.allocate<Integer>(value_ / divisor);
+    }
+    case ObjectType::Float: {
+      auto divisor = dynamic_cast<Float*>(other)->value();
+      if (divisor == 0.0) {
+        throw std::runtime_error("DivideByZero");
+      }
+      return machine.allocate<Float>(static_cast<double>(value_) / divisor);
+    }
     case ObjectType::String:
     case ObjectType::Char:
     case ObjectType::Boolean:
@@ -91,8 +99,11 @@ BaseObject* Integer::mod(vulpes::vm::Machine& machine, BaseObject* other) {
   if (other->type() != ObjectType::Integer) {
     return nullptr;
   }
-  return machine.allocate<Integer>(value_ %
-                                   dynamic_cast<Integer*>(other)->value_);
+  auto divisor = dynamic_cast<Integer*>(other)->value_;
+  if (divisor == 0) {
+    throw std::runtime_error("DivideByZero");
+  }
+  return machine.allocate<Integer>(value_ % divisor);
 }
 
 BaseObject* Integer::pow(vulpes::vm::Machine& machine, BaseObject* other) {
