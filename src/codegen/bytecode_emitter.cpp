@@ -542,7 +542,7 @@ void BytecodeEmitter::visit(const frontend::FunctionExpr& expr) {
     current_function = fn;
     scope_stack.clear();
     scope_stack.emplace_back();
-    next_local_index = 0;
+    next_local_index = static_cast<uint32_t>(expr.params.size());
     args.clear();
     constants.clear();
     upvalues.clear();
@@ -838,7 +838,7 @@ void BytecodeEmitter::visit(const frontend::FunctionStmt& stmt) {
     current_function = fn;
     scope_stack.clear();
     scope_stack.emplace_back();
-    next_local_index = 0;
+    next_local_index = static_cast<uint32_t>(stmt.params.size());
     args.clear();
     constants.clear();
     upvalues.clear();

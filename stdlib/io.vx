@@ -1,0 +1,23 @@
+// io.vx — Standard I/O library for Vulpes
+
+fn read_line() {
+    return __read_line();
+}
+
+fn read_file(path) {
+    return __read_file(path);
+}
+
+fn write_file(path, content) {
+    return __write_file(path, content);
+}
+
+fn prompt(message) {
+    print(message);
+    return read_line();
+}
+
+fn eprintln(msg) {
+    // Print to stderr by prefixing with [ERROR]
+    println("[ERROR] " + __to_string(msg));
+}

@@ -1,0 +1,162 @@
+// string.vx — Standard string library for Vulpes
+
+fn to_string(x)  { return __to_string(x); }
+fn to_int(x)     { return __to_int(x); }
+fn to_float(x)   { return __to_float(x); }
+
+fn substr(s, start, length) {
+    return __str_substr(s, start, length);
+}
+
+fn find(s, needle) {
+    return __str_find(s, needle);
+}
+
+fn split(s, delim) {
+    return __str_split(s, delim);
+}
+
+fn contains(s, sub) {
+    return find(s, sub) != -1;
+}
+
+fn starts_with(s, prefix) {
+    if len(prefix) > len(s) { return false; }
+    return substr(s, 0, len(prefix)) == prefix;
+}
+
+fn ends_with(s, suffix) {
+    let slen = len(s);
+    let suflen = len(suffix);
+    if suflen > slen { return false; }
+    return substr(s, slen - suflen, suflen) == suffix;
+}
+
+fn repeat(s, n) {
+    let result = "";
+    for i in n {
+        result = result + s;
+    }
+    return result;
+}
+
+fn join(parts, sep) {
+    let result = "";
+    for i in len(parts) {
+        if i > 0 { result = result + sep; }
+        result = result + to_string(parts[i]);
+    }
+    return result;
+}
+
+fn replace(s, old, new_s) {
+    let parts = split(s, old);
+    return join(parts, new_s);
+}
+
+fn char_code(c) { return __char_code(c); }
+fn from_char_code(n) { return __from_char_code(n); }
+
+fn is_digit(c) {
+    let code = char_code(c);
+    return code >= 48 && code <= 57;
+}
+
+fn is_alpha(c) {
+    let code = char_code(c);
+    return (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
+}
+
+fn is_upper(c) {
+    let code = char_code(c);
+    return code >= 65 && code <= 90;
+}
+
+fn is_lower(c) {
+    let code = char_code(c);
+    return code >= 97 && code <= 122;
+}
+
+fn to_upper(s) {
+    let result = "";
+    for i in len(s) {
+        let c = s[i];
+        let code = char_code(c);
+        if code >= 97 && code <= 122 {
+            result = result + from_char_code(code - 32);
+        } else {
+            result = result + c;
+        }
+    }
+    return result;
+}
+
+fn to_lower(s) {
+    let result = "";
+    for i in len(s) {
+        let c = s[i];
+        let code = char_code(c);
+        if code >= 65 && code <= 90 {
+            result = result + from_char_code(code + 32);
+        } else {
+            result = result + c;
+        }
+    }
+    return result;
+}
+
+fn trim(s) {
+    let start = 0;
+    while start < len(s) {
+        let c = s[start];
+        if c == " " || c == "\t" || c == "\n" || c == "\r" {
+            start = start + 1;
+        } else {
+            break;
+        }
+    }
+    let end = len(s);
+    while end > start {
+        let c = s[end - 1];
+        if c == " " || c == "\t" || c == "\n" || c == "\r" {
+            end = end - 1;
+        } else {
+            break;
+        }
+    }
+    return substr(s, start, end - start);
+}
+
+fn reverse_string(s) {
+    let result = "";
+    let i = len(s) - 1;
+    while i >= 0 {
+        result = result + s[i];
+        i = i - 1;
+    }
+    return result;
+}
+
+fn chars(s) {
+    let result = vec();
+    for i in len(s) {
+        push(result, s[i]);
+    }
+    return result;
+}
+
+fn pad_left(s, width, ch) {
+    let result = s;
+    while len(result) < width {
+        result = ch + result;
+    }
+    return result;
+}
+
+fn pad_right(s, width, ch) {
+    let result = s;
+    while len(result) < width {
+        result = result + ch;
+    }
+    return result;
+}

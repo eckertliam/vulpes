@@ -1,0 +1,205 @@
+// collections.vx — Standard collection utilities for Vulpes
+
+fn range(n) {
+    let result = vec();
+    for i in n {
+        push(result, i);
+    }
+    return result;
+}
+
+fn range_from(start, stop) {
+    let result = vec();
+    let i = start;
+    while i < stop {
+        push(result, i);
+        i = i + 1;
+    }
+    return result;
+}
+
+fn range_step(start, stop, step) {
+    let result = vec();
+    let i = start;
+    if step > 0 {
+        while i < stop {
+            push(result, i);
+            i = i + step;
+        }
+    } else {
+        while i > stop {
+            push(result, i);
+            i = i + step;
+        }
+    }
+    return result;
+}
+
+fn map_vec(v, f) {
+    let result = vec();
+    for i in len(v) {
+        push(result, f(v[i]));
+    }
+    return result;
+}
+
+fn filter(v, f) {
+    let result = vec();
+    for i in len(v) {
+        if f(v[i]) {
+            push(result, v[i]);
+        }
+    }
+    return result;
+}
+
+fn reduce(v, init, f) {
+    let acc = init;
+    for i in len(v) {
+        acc = f(acc, v[i]);
+    }
+    return acc;
+}
+
+fn for_each(v, f) {
+    for i in len(v) {
+        f(v[i]);
+    }
+}
+
+fn sum(v) {
+    return reduce(v, 0, fn(a, b) { return a + b; });
+}
+
+fn product(v) {
+    return reduce(v, 1, fn(a, b) { return a * b; });
+}
+
+fn any(v, f) {
+    for i in len(v) {
+        if f(v[i]) { return true; }
+    }
+    return false;
+}
+
+fn all(v, f) {
+    for i in len(v) {
+        if !f(v[i]) { return false; }
+    }
+    return true;
+}
+
+fn contains_val(v, val) {
+    for i in len(v) {
+        if v[i] == val { return true; }
+    }
+    return false;
+}
+
+fn index_of(v, val) {
+    for i in len(v) {
+        if v[i] == val { return i; }
+    }
+    return -1;
+}
+
+fn count(v, f) {
+    let n = 0;
+    for i in len(v) {
+        if f(v[i]) { n = n + 1; }
+    }
+    return n;
+}
+
+fn reverse(v) {
+    let result = vec();
+    let i = len(v) - 1;
+    while i >= 0 {
+        push(result, v[i]);
+        i = i - 1;
+    }
+    return result;
+}
+
+fn zip(a, b) {
+    let result = vec();
+    let n = len(a);
+    if len(b) < n { n = len(b); }
+    for i in n {
+        push(result, vec(a[i], b[i]));
+    }
+    return result;
+}
+
+fn enumerate(v) {
+    let result = vec();
+    for i in len(v) {
+        push(result, vec(i, v[i]));
+    }
+    return result;
+}
+
+fn flat_map(v, f) {
+    let result = vec();
+    for i in len(v) {
+        let inner = f(v[i]);
+        for j in len(inner) {
+            push(result, inner[j]);
+        }
+    }
+    return result;
+}
+
+fn take(v, n) {
+    let result = vec();
+    let limit = n;
+    if limit > len(v) { limit = len(v); }
+    for i in limit {
+        push(result, v[i]);
+    }
+    return result;
+}
+
+fn drop(v, n) {
+    let result = vec();
+    let i = n;
+    while i < len(v) {
+        push(result, v[i]);
+        i = i + 1;
+    }
+    return result;
+}
+
+fn sort(v) {
+    // Simple insertion sort (in-place on a copy)
+    let result = vec();
+    for i in len(v) { push(result, v[i]); }
+    for i in len(result) {
+        let j = i;
+        while j > 0 && result[j - 1] > result[j] {
+            let temp = result[j];
+            result[j] = result[j - 1];
+            result[j - 1] = temp;
+            j = j - 1;
+        }
+    }
+    return result;
+}
+
+fn min_val(v) {
+    if len(v) == 0 { return null; }
+    let m = v[0];
+    for i in len(v) {
+        if v[i] < m { m = v[i]; }
+    }
+    return m;
+}
+
+fn max_val(v) {
+    if len(v) == 0 { return null; }
+    let m = v[0];
+    for i in len(v) {
+        if v[i] > m { m = v[i]; }
+    }
+    return m;
+}

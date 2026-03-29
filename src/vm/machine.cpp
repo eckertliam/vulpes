@@ -1,12 +1,16 @@
 #include "machine.hpp"
 
+#include <cmath>
+#include <fstream>
 #include <functional>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include "instruction.hpp"
 #include "object/integer.hpp"
 #include "object/native_function.hpp"
 #include "object/boolean.hpp"
+#include "object/float.hpp"
 #include "object/null.hpp"
 #include "object/string.hpp"
 #include "object/base.hpp"
@@ -15,6 +19,7 @@
 #include "object/map.hpp"
 #include "object/upvalue.hpp"
 #include "object/byte.hpp"
+#include "object/char.hpp"
 #include "object/list.hpp"
 
 namespace vulpes::vm {
@@ -827,6 +832,250 @@ void Machine::registerBuiltins() {
                  []([[maybe_unused]] Machine& machine,
                     const std::vector<BaseObject*>& args) -> BaseObject* {
                    throw std::runtime_error(args[0]->toString());
+                 });
+
+  // Math primitives
+  registerNative("__sqrt", 1,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   double val = 0;
+                   if (fn_args[0]->type() == ObjectType::Float)
+                     val = dynamic_cast<Float*>(fn_args[0])->value();
+                   else if (fn_args[0]->type() == ObjectType::Integer)
+                     val = static_cast<double>(dynamic_cast<Integer*>(fn_args[0])->value());
+                   else
+                     throw std::runtime_error("TypeError: sqrt expects a number");
+                   if (val < 0) throw std::runtime_error("ValueError: sqrt of negative number");
+                   return machine.allocate<Float>(std::sqrt(val));
+                 });
+
+  registerNative("__floor", 1,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   double val = 0;
+                   if (fn_args[0]->type() == ObjectType::Float)
+                     val = dynamic_cast<Float*>(fn_args[0])->value();
+                   else if (fn_args[0]->type() == ObjectType::Integer)
+                     return fn_args[0];
+                   else
+                     throw std::runtime_error("TypeError: floor expects a number");
+                   return machine.allocate<Integer>(static_cast<int64_t>(std::floor(val)));
+                 });
+
+  registerNative("__ceil", 1,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   double val = 0;
+                   if (fn_args[0]->type() == ObjectType::Float)
+                     val = dynamic_cast<Float*>(fn_args[0])->value();
+                   else if (fn_args[0]->type() == ObjectType::Integer)
+                     return fn_args[0];
+                   else
+                     throw std::runtime_error("TypeError: ceil expects a number");
+                   return machine.allocate<Integer>(static_cast<int64_t>(std::ceil(val)));
+                 });
+
+  registerNative("__sin", 1,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   double val = 0;
+                   if (fn_args[0]->type() == ObjectType::Float)
+                     val = dynamic_cast<Float*>(fn_args[0])->value();
+                   else if (fn_args[0]->type() == ObjectType::Integer)
+                     val = static_cast<double>(dynamic_cast<Integer*>(fn_args[0])->value());
+                   else
+                     throw std::runtime_error("TypeError: sin expects a number");
+                   return machine.allocate<Float>(std::sin(val));
+                 });
+
+  registerNative("__cos", 1,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   double val = 0;
+                   if (fn_args[0]->type() == ObjectType::Float)
+                     val = dynamic_cast<Float*>(fn_args[0])->value();
+                   else if (fn_args[0]->type() == ObjectType::Integer)
+                     val = static_cast<double>(dynamic_cast<Integer*>(fn_args[0])->value());
+                   else
+                     throw std::runtime_error("TypeError: cos expects a number");
+                   return machine.allocate<Float>(std::cos(val));
+                 });
+
+  registerNative("__log", 1,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   double val = 0;
+                   if (fn_args[0]->type() == ObjectType::Float)
+                     val = dynamic_cast<Float*>(fn_args[0])->value();
+                   else if (fn_args[0]->type() == ObjectType::Integer)
+                     val = static_cast<double>(dynamic_cast<Integer*>(fn_args[0])->value());
+                   else
+                     throw std::runtime_error("TypeError: log expects a number");
+                   if (val <= 0) throw std::runtime_error("ValueError: log of non-positive number");
+                   return machine.allocate<Float>(std::log(val));
+                 });
+
+  registerNative("__abs_float", 1,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   if (fn_args[0]->type() == ObjectType::Float)
+                     return machine.allocate<Float>(std::fabs(dynamic_cast<Float*>(fn_args[0])->value()));
+                   if (fn_args[0]->type() == ObjectType::Integer) {
+                     auto v = dynamic_cast<Integer*>(fn_args[0])->value();
+                     return machine.allocate<Integer>(v < 0 ? -v : v);
+                   }
+                   throw std::runtime_error("TypeError: abs expects a number");
+                 });
+
+  // Conversion primitives
+  registerNative("__to_int", 1,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   auto* obj = fn_args[0];
+                   if (obj->type() == ObjectType::Integer) return obj;
+                   if (obj->type() == ObjectType::Float)
+                     return machine.allocate<Integer>(static_cast<int64_t>(dynamic_cast<Float*>(obj)->value()));
+                   if (obj->type() == ObjectType::String) {
+                     try {
+                       return machine.allocate<Integer>(std::stoll(dynamic_cast<String*>(obj)->value()));
+                     } catch (...) {
+                       throw std::runtime_error("ValueError: cannot convert string to int");
+                     }
+                   }
+                   if (obj->type() == ObjectType::Boolean)
+                     return machine.allocate<Integer>(dynamic_cast<Boolean*>(obj)->value() ? 1 : 0);
+                   throw std::runtime_error("TypeError: cannot convert to int");
+                 });
+
+  registerNative("__to_float", 1,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   auto* obj = fn_args[0];
+                   if (obj->type() == ObjectType::Float) return obj;
+                   if (obj->type() == ObjectType::Integer)
+                     return machine.allocate<Float>(static_cast<double>(dynamic_cast<Integer*>(obj)->value()));
+                   if (obj->type() == ObjectType::String) {
+                     try {
+                       return machine.allocate<Float>(std::stod(dynamic_cast<String*>(obj)->value()));
+                     } catch (...) {
+                       throw std::runtime_error("ValueError: cannot convert string to float");
+                     }
+                   }
+                   throw std::runtime_error("TypeError: cannot convert to float");
+                 });
+
+  registerNative("__to_string", 1,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   return machine.allocate<String>(fn_args[0]->toString());
+                 });
+
+  // I/O primitives
+  registerNative("__read_line", 0,
+                 [](Machine& machine,
+                    [[maybe_unused]] const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   std::string line;
+                   if (std::getline(std::cin, line)) {
+                     return machine.allocate<String>(std::move(line));
+                   }
+                   return machine.allocate<Null>();
+                 });
+
+  registerNative("__read_file", 1,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   if (fn_args[0]->type() != ObjectType::String)
+                     throw std::runtime_error("TypeError: read_file expects a string path");
+                   auto path = dynamic_cast<String*>(fn_args[0])->value();
+                   std::ifstream file(path);
+                   if (!file.is_open())
+                     throw std::runtime_error("IOError: could not open file '" + path + "'");
+                   std::stringstream ss;
+                   ss << file.rdbuf();
+                   return machine.allocate<String>(ss.str());
+                 });
+
+  registerNative("__write_file", 2,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   if (fn_args[0]->type() != ObjectType::String)
+                     throw std::runtime_error("TypeError: write_file expects a string path");
+                   auto path = dynamic_cast<String*>(fn_args[0])->value();
+                   std::ofstream file(path);
+                   if (!file.is_open())
+                     throw std::runtime_error("IOError: could not open file '" + path + "' for writing");
+                   file << fn_args[1]->toString();
+                   return machine.allocate<Null>();
+                 });
+
+  // String primitives
+  registerNative("__str_substr", 3,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   if (fn_args[0]->type() != ObjectType::String)
+                     throw std::runtime_error("TypeError: substr expects a string");
+                   auto& s = dynamic_cast<String*>(fn_args[0])->value();
+                   auto start = dynamic_cast<Integer*>(fn_args[1])->value();
+                   auto length = dynamic_cast<Integer*>(fn_args[2])->value();
+                   if (start < 0 || static_cast<size_t>(start) > s.size())
+                     throw std::runtime_error("IndexOutOfBounds");
+                   return machine.allocate<String>(s.substr(
+                       static_cast<size_t>(start),
+                       static_cast<size_t>(length)));
+                 });
+
+  registerNative("__str_find", 2,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   if (fn_args[0]->type() != ObjectType::String || fn_args[1]->type() != ObjectType::String)
+                     throw std::runtime_error("TypeError: find expects strings");
+                   auto& haystack = dynamic_cast<String*>(fn_args[0])->value();
+                   auto& needle = dynamic_cast<String*>(fn_args[1])->value();
+                   auto pos = haystack.find(needle);
+                   if (pos == std::string::npos)
+                     return machine.allocate<Integer>(-1);
+                   return machine.allocate<Integer>(static_cast<int64_t>(pos));
+                 });
+
+  registerNative("__str_split", 2,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   if (fn_args[0]->type() != ObjectType::String || fn_args[1]->type() != ObjectType::String)
+                     throw std::runtime_error("TypeError: split expects strings");
+                   auto& s = dynamic_cast<String*>(fn_args[0])->value();
+                   auto& delim = dynamic_cast<String*>(fn_args[1])->value();
+                   std::vector<BaseObject*> parts;
+                   size_t start = 0;
+                   size_t end;
+                   while ((end = s.find(delim, start)) != std::string::npos) {
+                     parts.push_back(machine.allocate<String>(s.substr(start, end - start)));
+                     start = end + delim.size();
+                   }
+                   parts.push_back(machine.allocate<String>(s.substr(start)));
+                   return machine.allocate<Vec>(std::move(parts));
+                 });
+
+  registerNative("__char_code", 1,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   if (fn_args[0]->type() == ObjectType::String) {
+                     auto& s = dynamic_cast<String*>(fn_args[0])->value();
+                     if (s.empty()) throw std::runtime_error("ValueError: empty string");
+                     return machine.allocate<Integer>(static_cast<int64_t>(s[0]));
+                   }
+                   if (fn_args[0]->type() == ObjectType::Char) {
+                     return machine.allocate<Integer>(static_cast<int64_t>(dynamic_cast<object::Char*>(fn_args[0])->value()));
+                   }
+                   throw std::runtime_error("TypeError: char_code expects a string or char");
+                 });
+
+  registerNative("__from_char_code", 1,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   if (fn_args[0]->type() != ObjectType::Integer)
+                     throw std::runtime_error("TypeError: from_char_code expects an integer");
+                   auto code = dynamic_cast<Integer*>(fn_args[0])->value();
+                   return machine.allocate<String>(std::string(1, static_cast<char>(code)));
                  });
 }
 
