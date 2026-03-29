@@ -11,6 +11,7 @@
 #include "object/string.hpp"
 #include "object/base.hpp"
 #include "object/instance.hpp"
+#include "object/vec.hpp"
 
 namespace vulpes::vm {
 
@@ -340,10 +341,61 @@ static inline void setField(Machine& machine, const Instruction& instruction) {
     throwWithLocation("NullAccess: cannot set field on non-object", instruction.src_loc);
   }
   auto* instance = dynamic_cast<Instance*>(obj);
+  if (instance->isImmutable()) {
+    auto* name_obj = machine.getCurrentFunction()->getConstant(instruction.imm);
+    auto* name_str = dynamic_cast<String*>(name_obj);
+    throwWithLocation("TypeError: cannot mutate immutable struct field '" + name_str->value() + "'", instruction.src_loc);
+  }
   auto* name_obj = machine.getCurrentFunction()->getConstant(instruction.imm);
   auto* name_str = dynamic_cast<String*>(name_obj);
   instance->setField(name_str->value(), value);
   machine.push(value);
+}
+
+static inline void indexGet(Machine& machine, const Instruction& instruction) {
+  auto* index = machine.pop();
+  auto* obj = machine.pop();
+  if (obj->type() == ObjectType::Vec) {
+    auto* vec = dynamic_cast<Vec*>(obj);
+    if (index->type() != ObjectType::Integer) {
+      throwWithLocation("TypeError: vec index must be an integer", instruction.src_loc);
+    }
+    auto idx = dynamic_cast<Integer*>(index)->value();
+    machine.push(vec->get(idx));
+  } else if (obj->type() == ObjectType::String) {
+    auto* str = dynamic_cast<String*>(obj);
+    if (index->type() != ObjectType::Integer) {
+      throwWithLocation("TypeError: string index must be an integer", instruction.src_loc);
+    }
+    auto idx = dynamic_cast<Integer*>(index)->value();
+    if (idx < 0 || static_cast<size_t>(idx) >= str->value().size()) {
+      throwWithLocation("IndexOutOfBounds", instruction.src_loc);
+    }
+    machine.push(machine.allocate<String>(std::string(1, str->value()[static_cast<size_t>(idx)])));
+  } else if (obj->type() == ObjectType::Null) {
+    throwWithLocation("NullAccess: cannot index null", instruction.src_loc);
+  } else {
+    throwWithLocation("TypeError: cannot index this type", instruction.src_loc);
+  }
+}
+
+static inline void indexSet(Machine& machine, const Instruction& instruction) {
+  auto* value = machine.pop();
+  auto* index = machine.pop();
+  auto* obj = machine.pop();
+  if (obj->type() == ObjectType::Vec) {
+    auto* vec = dynamic_cast<Vec*>(obj);
+    if (index->type() != ObjectType::Integer) {
+      throwWithLocation("TypeError: vec index must be an integer", instruction.src_loc);
+    }
+    auto idx = dynamic_cast<Integer*>(index)->value();
+    vec->set(idx, value);
+    machine.push(value);
+  } else if (obj->type() == ObjectType::Null) {
+    throwWithLocation("NullAccess: cannot index null", instruction.src_loc);
+  } else {
+    throwWithLocation("TypeError: cannot index-assign this type", instruction.src_loc);
+  }
 }
 
 static inline void pop(Machine& machine, [[maybe_unused]] const Instruction& instruction) {
@@ -459,6 +511,8 @@ static std::unordered_map<Opcode, InstructionHandler> instruction_handlers = {
     {Opcode::MOD, mod},
     {Opcode::GET_FIELD, getField},
     {Opcode::SET_FIELD, setField},
+    {Opcode::INDEX_GET, indexGet},
+    {Opcode::INDEX_SET, indexSet},
     {Opcode::POP, pop},
     {Opcode::POW, power},
     {Opcode::SHL, shl},
@@ -587,11 +641,55 @@ void Machine::registerBuiltins() {
                      case ObjectType::Boolean: name = "bool"; break;
                      case ObjectType::Null: name = "null"; break;
                      case ObjectType::Object: name = "object"; break;
+                     case ObjectType::Vec: name = "vec"; break;
+                     case ObjectType::Map: name = "map"; break;
                      case ObjectType::Function:
                      case ObjectType::NativeFunction: name = "function"; break;
                      default: name = "unknown"; break;
                    }
                    return machine.allocate<String>(std::move(name));
+                 });
+
+  registerNative("vec", 0,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   auto* v = machine.allocate<Vec>(
+                       std::vector<BaseObject*>(fn_args.begin(), fn_args.end()));
+                   return v;
+                 });
+
+  registerNative("len", 1,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   auto* obj = fn_args[0];
+                   if (obj->type() == ObjectType::Vec) {
+                     return machine.allocate<Integer>(
+                         static_cast<int64_t>(dynamic_cast<Vec*>(obj)->length()));
+                   }
+                   if (obj->type() == ObjectType::String) {
+                     return machine.allocate<Integer>(
+                         static_cast<int64_t>(dynamic_cast<String*>(obj)->value().size()));
+                   }
+                   throw std::runtime_error("TypeError: len() not supported for this type");
+                 });
+
+  registerNative("push", 2,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   if (fn_args[0]->type() != ObjectType::Vec) {
+                     throw std::runtime_error("TypeError: push() requires a vec");
+                   }
+                   dynamic_cast<Vec*>(fn_args[0])->push(fn_args[1]);
+                   return machine.allocate<Null>();
+                 });
+
+  registerNative("pop", 1,
+                 []([[maybe_unused]] Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   if (fn_args[0]->type() != ObjectType::Vec) {
+                     throw std::runtime_error("TypeError: pop() requires a vec");
+                   }
+                   return dynamic_cast<Vec*>(fn_args[0])->pop();
                  });
 
   registerNative("throw_err", 1,

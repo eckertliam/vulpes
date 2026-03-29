@@ -20,6 +20,8 @@ BaseObject* Integer::add(vulpes::vm::Machine& machine, BaseObject* other) {
     case ObjectType::Boolean:
     case ObjectType::Null:
     case ObjectType::Object:
+    case ObjectType::Vec:
+    case ObjectType::Map:
     case ObjectType::Function:
     case ObjectType::NativeFunction:
     default:
@@ -40,6 +42,8 @@ BaseObject* Integer::sub(vulpes::vm::Machine& machine, BaseObject* other) {
     case ObjectType::Boolean:
     case ObjectType::Null:
     case ObjectType::Object:
+    case ObjectType::Vec:
+    case ObjectType::Map:
     case ObjectType::Function:
     case ObjectType::NativeFunction:
     default:
@@ -60,6 +64,8 @@ BaseObject* Integer::mul(vulpes::vm::Machine& machine, BaseObject* other) {
     case ObjectType::Boolean:
     case ObjectType::Null:
     case ObjectType::Object:
+    case ObjectType::Vec:
+    case ObjectType::Map:
     case ObjectType::Function:
     case ObjectType::NativeFunction:
     default:
@@ -88,6 +94,8 @@ BaseObject* Integer::div(vulpes::vm::Machine& machine, BaseObject* other) {
     case ObjectType::Boolean:
     case ObjectType::Null:
     case ObjectType::Object:
+    case ObjectType::Vec:
+    case ObjectType::Map:
     case ObjectType::Function:
     case ObjectType::NativeFunction:
     default:
@@ -169,6 +177,8 @@ BaseObject* Integer::eq(vulpes::vm::Machine& machine, BaseObject* other) {
     case ObjectType::Boolean:
     case ObjectType::Null:
     case ObjectType::Object:
+    case ObjectType::Vec:
+    case ObjectType::Map:
     case ObjectType::Function:
     case ObjectType::NativeFunction:
     default:
@@ -189,6 +199,8 @@ BaseObject* Integer::lt(vulpes::vm::Machine& machine, BaseObject* other) {
     case ObjectType::Boolean:
     case ObjectType::Null:
     case ObjectType::Object:
+    case ObjectType::Vec:
+    case ObjectType::Map:
     case ObjectType::Function:
     case ObjectType::NativeFunction:
     default:

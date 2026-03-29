@@ -78,6 +78,9 @@ enum class Opcode : uint8_t {
   // Field access — imm is constant index holding the field name string
   GET_FIELD,
   SET_FIELD,
+  // Index access — pop index and object, push result
+  INDEX_GET,
+  INDEX_SET,
   // Comparison operators — pop two values, push Boolean result
   EQ,
   NEQ,

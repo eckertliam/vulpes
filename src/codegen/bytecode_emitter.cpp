@@ -367,12 +367,17 @@ void BytecodeEmitter::visit(const frontend::CallExpr& expr) {
     emit_call(expr.arguments.size());
 }
 
-void BytecodeEmitter::visit([[maybe_unused]] const frontend::IndexExpr& expr) {
-    // TODO: Implement index access
+void BytecodeEmitter::visit(const frontend::IndexExpr& expr) {
+    expr.object->accept(*this);
+    expr.index->accept(*this);
+    current_function->addInstruction(vm::Instruction(vm::Opcode::INDEX_GET));
 }
 
-void BytecodeEmitter::visit([[maybe_unused]] const frontend::IndexSetExpr& expr) {
-    // TODO: Implement index assignment
+void BytecodeEmitter::visit(const frontend::IndexSetExpr& expr) {
+    expr.object->accept(*this);
+    expr.index->accept(*this);
+    expr.value->accept(*this);
+    current_function->addInstruction(vm::Instruction(vm::Opcode::INDEX_SET));
 }
 
 void BytecodeEmitter::visit(const frontend::GetExpr& expr) {
@@ -733,6 +738,7 @@ void BytecodeEmitter::visit(const frontend::StructStmt& stmt) {
             for (size_t i = 0; i < field_names.size(); i++) {
                 instance->setField(std::string(field_names[i].name), fn_args[i]);
             }
+            instance->freeze();  // struct values are always immutable
             return instance;
         });
 }
