@@ -7,6 +7,7 @@
 #include "vm/object/string.hpp"
 #include "vm/object/boolean.hpp"
 #include "vm/object/char.hpp"
+#include "vm/object/instance.hpp"
 
 namespace vulpes::codegen {
 
@@ -372,12 +373,24 @@ void BytecodeEmitter::visit([[maybe_unused]] const frontend::IndexSetExpr& expr)
     // TODO: Implement index assignment
 }
 
-void BytecodeEmitter::visit([[maybe_unused]] const frontend::GetExpr& expr) {
-    // TODO: Implement property access
+void BytecodeEmitter::visit(const frontend::GetExpr& expr) {
+    // Push the object
+    expr.object->accept(*this);
+    // Push field name as constant string
+    auto* name_obj = machine.allocate<vm::object::String>(std::string(expr.name));
+    uint32_t name_idx = current_function->addConstant(name_obj);
+    current_function->addInstruction(vm::Instruction(vm::Opcode::GET_FIELD, name_idx));
 }
 
-void BytecodeEmitter::visit([[maybe_unused]] const frontend::SetExpr& expr) {
-    // TODO: Implement property assignment
+void BytecodeEmitter::visit(const frontend::SetExpr& expr) {
+    // Push the object
+    expr.object->accept(*this);
+    // Push the value
+    expr.value->accept(*this);
+    // Set field
+    auto* name_obj = machine.allocate<vm::object::String>(std::string(expr.name));
+    uint32_t name_idx = current_function->addConstant(name_obj);
+    current_function->addInstruction(vm::Instruction(vm::Opcode::SET_FIELD, name_idx));
 }
 
 void BytecodeEmitter::visit(const frontend::FunctionExpr& expr) {
@@ -707,8 +720,18 @@ void BytecodeEmitter::visit([[maybe_unused]] const frontend::EnumStmt& stmt) {
     }
 }
 
-void BytecodeEmitter::visit([[maybe_unused]] const frontend::StructStmt& stmt) {
-    // TODO: Implement struct definition
+void BytecodeEmitter::visit(const frontend::StructStmt& stmt) {
+    // Register a constructor function that creates struct instances
+    std::string name(stmt.name);
+    auto field_names = stmt.fields;
+    machine.registerNative(name, field_names.size(),
+        [name, field_names](vm::Machine& m, const std::vector<vm::object::BaseObject*>& fn_args) -> vm::object::BaseObject* {
+            auto* instance = m.allocate<vm::object::Instance>(name);
+            for (size_t i = 0; i < field_names.size(); i++) {
+                instance->setField(std::string(field_names[i].name), fn_args[i]);
+            }
+            return instance;
+        });
 }
 
 void BytecodeEmitter::visit([[maybe_unused]] const frontend::ImportStmt& stmt) {
@@ -720,10 +743,22 @@ void BytecodeEmitter::visit([[maybe_unused]] const frontend::ExportStmt& stmt) {
 }
 
 void BytecodeEmitter::visit(const frontend::ClassStmt& stmt) {
-    // TODO: Implement class definition
+    // Register methods first
     for (const auto& method : stmt.methods) {
         method->accept(*this);
     }
+
+    // Register a constructor that creates class instances with default null fields
+    std::string name(stmt.name);
+    auto fields = stmt.fields;
+    machine.registerNative(name, 0,
+        [name, fields](vm::Machine& m, [[maybe_unused]] const std::vector<vm::object::BaseObject*>& fn_args) -> vm::object::BaseObject* {
+            auto* instance = m.allocate<vm::object::Instance>(name);
+            for (const auto& field : fields) {
+                instance->setField(std::string(field.name), m.allocate<vm::object::Null>());
+            }
+            return instance;
+        });
 }
 
 }  // namespace vulpes::codegen

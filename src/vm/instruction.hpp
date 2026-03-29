@@ -75,6 +75,9 @@ enum class Opcode : uint8_t {
   BIT_AND,
   BIT_XOR,
   BIT_OR,
+  // Field access — imm is constant index holding the field name string
+  GET_FIELD,
+  SET_FIELD,
   // Comparison operators — pop two values, push Boolean result
   EQ,
   NEQ,

@@ -10,6 +10,7 @@
 #include "object/null.hpp"
 #include "object/string.hpp"
 #include "object/base.hpp"
+#include "object/instance.hpp"
 
 namespace vulpes::vm {
 
@@ -316,6 +317,34 @@ static inline void bitOr(Machine& machine, const Instruction& instruction) {
   machine.push(result);
 }
 
+static inline void getField(Machine& machine, const Instruction& instruction) {
+  auto* obj = machine.pop();
+  if (obj->type() != ObjectType::Object) {
+    throwWithLocation("NullAccess: cannot access field on non-object", instruction.src_loc);
+  }
+  auto* instance = dynamic_cast<Instance*>(obj);
+  auto* name_obj = machine.getCurrentFunction()->getConstant(instruction.imm);
+  auto* name_str = dynamic_cast<String*>(name_obj);
+  auto* value = instance->getField(name_str->value());
+  if (value == nullptr) {
+    throwWithLocation("Field not found: " + name_str->value(), instruction.src_loc);
+  }
+  machine.push(value);
+}
+
+static inline void setField(Machine& machine, const Instruction& instruction) {
+  auto* value = machine.pop();
+  auto* obj = machine.pop();
+  if (obj->type() != ObjectType::Object) {
+    throwWithLocation("NullAccess: cannot set field on non-object", instruction.src_loc);
+  }
+  auto* instance = dynamic_cast<Instance*>(obj);
+  auto* name_obj = machine.getCurrentFunction()->getConstant(instruction.imm);
+  auto* name_str = dynamic_cast<String*>(name_obj);
+  instance->setField(name_str->value(), value);
+  machine.push(value);
+}
+
 static inline void pop(Machine& machine, [[maybe_unused]] const Instruction& instruction) {
   machine.pop();
 }
@@ -427,6 +456,8 @@ static std::unordered_map<Opcode, InstructionHandler> instruction_handlers = {
     {Opcode::MUL, mul},
     {Opcode::DIV, div},
     {Opcode::MOD, mod},
+    {Opcode::GET_FIELD, getField},
+    {Opcode::SET_FIELD, setField},
     {Opcode::POP, pop},
     {Opcode::POW, power},
     {Opcode::SHL, shl},
