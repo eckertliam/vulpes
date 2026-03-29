@@ -3,6 +3,7 @@
 #include "call_frame.hpp"
 #include "heap.hpp"
 #include "instruction.hpp"
+#include "object/native_function.hpp"
 
 #include <stack>
 #include <unordered_map>
@@ -52,6 +53,9 @@ class Machine {
 
   void pushCallFrame(Function* function);
   void popCallFrame();
+
+  void registerBuiltins();
+  void registerNative(const std::string& name, size_t arity, object::NativeFn fn);
 
   // peek pack with offset from the top of the stack
   // used for loading args into functions from previous call frames

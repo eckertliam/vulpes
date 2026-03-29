@@ -41,7 +41,9 @@ cc_library(
         "vm/object/float.hpp",
         "vm/object/function.hpp",
         "vm/object/integer.hpp",
+        "vm/object/native_function.hpp",
         "vm/object/null.hpp",
+        "vm/object/string.hpp",
     ],
     copts = VULPES_COPTS,
     includes = ["."],
@@ -55,6 +57,17 @@ cc_library(
     copts = VULPES_COPTS,
     includes = ["."],
     deps = [
+        ":frontend",
+        ":vm",
+    ],
+)
+
+cc_binary(
+    name = "vulpes",
+    srcs = ["main.cpp"],
+    copts = VULPES_COPTS,
+    deps = [
+        ":codegen",
         ":frontend",
         ":vm",
     ],

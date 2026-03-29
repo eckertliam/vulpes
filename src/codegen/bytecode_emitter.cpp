@@ -4,21 +4,27 @@
 #include "vm/object/integer.hpp"
 #include "vm/object/float.hpp"
 #include "vm/object/function.hpp"
+#include "vm/object/string.hpp"
 
 namespace vulpes::codegen {
 
 vm::object::Function* BytecodeEmitter::emit_program(const std::vector<std::unique_ptr<frontend::Stmt>>& statements) {
-    // Create a main function to hold the program
-    current_function = machine.buildFunction("main", 0);
-    
-    // Visit each statement in the program
+    current_function = machine.buildFunction("__entry__", 0);
+
     for (const auto& stmt : statements) {
         stmt->accept(*this);
     }
-    
-    // Add a return instruction at the end
-    emit_return_value();
-    
+
+    // Auto-call main() if it was defined
+    auto main_it = machine.getFunctionTable().find("main");
+    if (main_it != machine.getFunctionTable().end()) {
+        current_function->addInstruction(vm::Instruction(vm::Opcode::LOAD_GLOBAL, main_it->second));
+        current_function->addInstruction(vm::Instruction(vm::Opcode::CALL));
+        current_function->addInstruction(vm::Instruction(vm::Opcode::POP));
+    }
+
+    current_function->addInstruction(vm::Instruction(vm::Opcode::EOP));
+
     return current_function;
 }
 
@@ -147,8 +153,7 @@ vm::object::BaseObject* BytecodeEmitter::try_get_constant(const frontend::Expr& 
         return machine.allocate<vm::object::Null>();
     }
     if (auto* string_lit = dynamic_cast<const frontend::StringLiteral*>(&expr)) {
-        // TODO: Implement string objects
-        return machine.allocate<vm::object::Null>();
+        return machine.allocate<vm::object::String>(std::string(string_lit->value));
     }
     if (auto* char_lit = dynamic_cast<const frontend::CharLiteral*>(&expr)) {
         // TODO: Implement char objects
@@ -172,9 +177,8 @@ void BytecodeEmitter::visit(const frontend::FloatLiteral& expr) {
 }
 
 void BytecodeEmitter::visit(const frontend::StringLiteral& expr) {
-    // TODO: Implement string literal emission
-    auto* null_obj = machine.allocate<vm::object::Null>();
-    emit_constant(null_obj);
+    auto* str_obj = machine.allocate<vm::object::String>(std::string(expr.value));
+    emit_constant(str_obj);
 }
 
 void BytecodeEmitter::visit(const frontend::CharLiteral& expr) {
@@ -376,15 +380,13 @@ void BytecodeEmitter::visit(const frontend::FunctionStmt& stmt) {
     
     // Visit function body
     stmt.body->accept(*this);
-    
-    // Add return instruction if not already present
-    emit_return_value();
+
+    // Implicit return null at end of function
+    auto* null_obj = machine.allocate<vm::object::Null>();
+    emit_return_constant(null_obj);
     
     // Restore previous function
     current_function = prev_function;
-    
-    // Add the function to current function's constants
-    emit_constant(fn);
 }
 
 void BytecodeEmitter::visit(const frontend::ClassStmt& stmt) {

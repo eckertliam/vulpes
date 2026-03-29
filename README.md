@@ -2,14 +2,27 @@
 
 **Vulpes** (*Vulpes Vulpes*) is a statically-typed, dynamically-dispatched language inspired by Rust and Lisp. Designed for rapid prototyping, clean syntax, instant REPL feedback, and high-performance AOT compilation.
 
+## Hello, World!
+
+```vulpes
+fn main() {
+    println("Hello, World!");
+}
+```
+
+```sh
+bazel run //src:vulpes -- hello.vx
+```
+
 ## Development Status
 
 Following a prototype in Python, the compiler and VM are now being implemented in C++23. Current progress:
 
 - **Lexer** — complete tokenization of all keywords, operators, and literals
 - **Parser** — recursive descent parser with full operator precedence, function declarations, and variable bindings
-- **Bytecode emitter** — AST-to-bytecode compilation for arithmetic, variables, and function calls
-- **VM** — stack-based virtual machine with garbage collection, function call frames, and integer/float arithmetic
+- **Bytecode emitter** — AST-to-bytecode compilation for arithmetic, variables, function calls, and string literals
+- **VM** — stack-based virtual machine with garbage collection, function call frames, native function support, and integer/float/string types
+- **Builtins** — `print` and `println`
 
 For the full language spec see [docs/spec.md](docs/spec.md).
 
@@ -23,6 +36,9 @@ bazel build //src/...
 
 # Run tests
 bazel test //src:vulpes_tests
+
+# Run a program
+bazel run //src:vulpes -- path/to/program.vx
 ```
 
 Or use the Makefile shortcuts: `make`, `make test`, `make clean`.

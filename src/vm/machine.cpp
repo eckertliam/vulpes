@@ -1,9 +1,13 @@
 #include "machine.hpp"
 
 #include <functional>
+#include <iostream>
 #include <string>
 #include "instruction.hpp"
 #include "object/integer.hpp"
+#include "object/native_function.hpp"
+#include "object/null.hpp"
+#include "object/string.hpp"
 
 namespace vulpes::vm {
 
@@ -135,22 +139,32 @@ static inline void loadLocal(Machine& machine, const Instruction& instruction) {
 
 static inline void callFunction(Machine& machine,
                                 const Instruction& instruction) {
-  // pop the function from the stack
   const auto functionObj = machine.pop();
-  // NOTE: in the future this will be more flexible
+
+  if (functionObj->type() == ObjectType::NativeFunction) {
+    auto* native = dynamic_cast<NativeFunction*>(functionObj);
+    const auto arity = native->getArity();
+    std::vector<BaseObject*> args(arity);
+    for (size_t i = 0; i < arity; i++) {
+      args[i] = machine.pop();
+    }
+    auto* result = native->call(machine, args);
+    if (result == nullptr) {
+      result = machine.allocate<Null>();
+    }
+    machine.push(result);
+    return;
+  }
+
   if (functionObj->type() != ObjectType::Function) {
     throwWithLocation("Expected function object", instruction.src_loc);
   }
-  // cast the function object to a function
   const auto function = dynamic_cast<Function*>(functionObj);
-  // get the number of arguments
   const auto arity = function->getArity();
-  // pop the args from the stack and save them to local slots
   for (size_t i = 0; i < arity; i++) {
     const auto arg = machine.pop();
     machine.getCurrentFunction()->addLocal(arg);
   }
-  // make a new call frame
   machine.pushCallFrame(function);
 }
 
@@ -325,6 +339,35 @@ void Machine::pushCallFrame(Function* function) {
 
 void Machine::popCallFrame() {
   call_frames_.pop_back();
+}
+
+void Machine::registerNative(const std::string& name, size_t arity,
+                             object::NativeFn fn) {
+  auto* native =
+      allocate<NativeFunction>(name, arity, std::move(fn));
+  const auto index = addGlobal(native);
+  function_table_[name] = index;
+}
+
+void Machine::registerBuiltins() {
+  registerNative("println", 1,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& args) -> BaseObject* {
+                   for (const auto* arg : args) {
+                     std::cout << arg->toString();
+                   }
+                   std::cout << "\n";
+                   return machine.allocate<Null>();
+                 });
+
+  registerNative("print", 1,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& args) -> BaseObject* {
+                   for (const auto* arg : args) {
+                     std::cout << arg->toString();
+                   }
+                   return machine.allocate<Null>();
+                 });
 }
 
 }  // namespace vulpes::vm
