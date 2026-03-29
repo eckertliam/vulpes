@@ -13,6 +13,7 @@
 #include "object/instance.hpp"
 #include "object/vec.hpp"
 #include "object/map.hpp"
+#include "object/upvalue.hpp"
 
 namespace vulpes::vm {
 
@@ -415,6 +416,23 @@ static inline void pop(Machine& machine, [[maybe_unused]] const Instruction& ins
   machine.pop();
 }
 
+static inline void loadUpvalue(Machine& machine, const Instruction& instruction) {
+  auto* upval = machine.getCurrentFunction()->getUpvalue(instruction.imm);
+  if (upval == nullptr || upval->type() != ObjectType::Upvalue) {
+    throwWithLocation("Upvalue not found", instruction.src_loc);
+  }
+  machine.push(dynamic_cast<Upvalue*>(upval)->get());
+}
+
+static inline void storeUpvalue(Machine& machine, const Instruction& instruction) {
+  auto* value = machine.pop();
+  auto* upval = machine.getCurrentFunction()->getUpvalue(instruction.imm);
+  if (upval == nullptr || upval->type() != ObjectType::Upvalue) {
+    throwWithLocation("Upvalue not found", instruction.src_loc);
+  }
+  dynamic_cast<Upvalue*>(upval)->set(value);
+}
+
 static inline void jump(Machine& machine, const Instruction& instruction) {
   machine.setIP(instruction.imm);
 }
@@ -526,6 +544,8 @@ static std::unordered_map<Opcode, InstructionHandler> instruction_handlers = {
     {Opcode::SET_FIELD, setField},
     {Opcode::INDEX_GET, indexGet},
     {Opcode::INDEX_SET, indexSet},
+    {Opcode::LOAD_UPVALUE, loadUpvalue},
+    {Opcode::STORE_UPVALUE, storeUpvalue},
     {Opcode::POP, pop},
     {Opcode::POW, power},
     {Opcode::SHL, shl},
@@ -656,6 +676,7 @@ void Machine::registerBuiltins() {
                      case ObjectType::Object: name = "object"; break;
                      case ObjectType::Vec: name = "vec"; break;
                      case ObjectType::Map: name = "map"; break;
+                     case ObjectType::Upvalue: name = "upvalue"; break;
                      case ObjectType::Function:
                      case ObjectType::NativeFunction: name = "function"; break;
                      default: name = "unknown"; break;

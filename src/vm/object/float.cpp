@@ -22,6 +22,7 @@ BaseObject* Float::add(vulpes::vm::Machine& machine, BaseObject* other) {
     case ObjectType::Object:
     case ObjectType::Vec:
     case ObjectType::Map:
+    case ObjectType::Upvalue:
     case ObjectType::Function:
     case ObjectType::NativeFunction:
     default:
@@ -44,6 +45,7 @@ BaseObject* Float::sub(vulpes::vm::Machine& machine, BaseObject* other) {
     case ObjectType::Object:
     case ObjectType::Vec:
     case ObjectType::Map:
+    case ObjectType::Upvalue:
     case ObjectType::Function:
     case ObjectType::NativeFunction:
     default:
@@ -66,6 +68,7 @@ BaseObject* Float::mul(vulpes::vm::Machine& machine, BaseObject* other) {
     case ObjectType::Object:
     case ObjectType::Vec:
     case ObjectType::Map:
+    case ObjectType::Upvalue:
     case ObjectType::Function:
     case ObjectType::NativeFunction:
     default:
@@ -96,6 +99,7 @@ BaseObject* Float::div(vulpes::vm::Machine& machine, BaseObject* other) {
     case ObjectType::Object:
     case ObjectType::Vec:
     case ObjectType::Map:
+    case ObjectType::Upvalue:
     case ObjectType::Function:
     case ObjectType::NativeFunction:
     default:
@@ -164,6 +168,7 @@ BaseObject* Float::eq(vulpes::vm::Machine& machine, BaseObject* other) {
     case ObjectType::Object:
     case ObjectType::Vec:
     case ObjectType::Map:
+    case ObjectType::Upvalue:
     case ObjectType::Function:
     case ObjectType::NativeFunction:
     default:
@@ -186,6 +191,7 @@ BaseObject* Float::lt(vulpes::vm::Machine& machine, BaseObject* other) {
     case ObjectType::Object:
     case ObjectType::Vec:
     case ObjectType::Map:
+    case ObjectType::Upvalue:
     case ObjectType::Function:
     case ObjectType::NativeFunction:
     default:

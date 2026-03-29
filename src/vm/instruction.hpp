@@ -81,6 +81,12 @@ enum class Opcode : uint8_t {
   // Index access — pop index and object, push result
   INDEX_GET,
   INDEX_SET,
+  // Upvalue access for closures
+  LOAD_UPVALUE,
+  STORE_UPVALUE,
+  // Create a closure: pop function, attach upvalues from current frame
+  // imm = number of upvalue descriptors that follow
+  MAKE_CLOSURE,
   // Comparison operators — pop two values, push Boolean result
   EQ,
   NEQ,

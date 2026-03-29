@@ -14,6 +14,7 @@ class Function : public BaseObject {
   std::vector<Instruction> instructions_;
   std::vector<BaseObject*> constants_;
   std::vector<BaseObject*> locals_;
+  std::vector<BaseObject*> upvalues_;  // captured upvalue cells
 
  public:
   Function(std::string  name, const size_t arity,
@@ -82,6 +83,26 @@ class Function : public BaseObject {
   }
 
   Instruction& getInstruction(const size_t index) { return instructions_[index]; }
+
+  // Upvalue support for closures
+  uint32_t addUpvalue(BaseObject* upvalue) {
+    upvalues_.push_back(upvalue);
+    return static_cast<uint32_t>(upvalues_.size() - 1);
+  }
+
+  [[nodiscard]] BaseObject* getUpvalue(uint32_t index) const {
+    if (index >= upvalues_.size()) return nullptr;
+    return upvalues_[index];
+  }
+
+  void setUpvalue(uint32_t index, BaseObject* value) {
+    if (index >= upvalues_.size()) {
+      upvalues_.resize(index + 1, nullptr);
+    }
+    upvalues_[index] = value;
+  }
+
+  [[nodiscard]] size_t upvalueCount() const { return upvalues_.size(); }
 
   BaseObject* add([[maybe_unused]] Machine& machine, [[maybe_unused]] BaseObject* other) override {
     return nullptr;

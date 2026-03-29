@@ -39,12 +39,35 @@ class BytecodeEmitter : public frontend::AstVisitor {
   std::unordered_map<std::string_view, uint32_t> global_vars;
   // Track which variable names are const (immutable)
   std::unordered_set<std::string_view> const_vars;
+  // Variables promoted to globals specifically for closure capture
+  std::unordered_set<std::string_view> closure_promoted_vars;
+
+  // Closure / upvalue tracking
+  // Maps captured variable name -> upvalue index in the current function
+  std::unordered_map<std::string_view, uint32_t> upvalues;
+  // Pointer to the enclosing emitter state for upvalue resolution
+  struct EnclosingState {
+    std::vector<std::unordered_map<std::string_view, uint32_t>>* scope_stack;
+    std::unordered_map<std::string_view, uint32_t>* args;
+    std::unordered_map<std::string_view, uint32_t>* upvalues;
+    vm::object::Function* function;
+  };
+  std::vector<EnclosingState> enclosing_stack;
 
   // Loop context stack for break/continue
   std::vector<LoopContext> loop_stack;
   
   // Scope helpers
   [[nodiscard]] std::optional<uint32_t> find_local(std::string_view name) const;
+  // Resolve a variable as an upvalue, creating cells as needed
+  [[nodiscard]] std::optional<uint32_t> resolve_upvalue(std::string_view name);
+
+  // Pre-scan a function body to find free variables (captures)
+  void collect_free_vars(const frontend::AstNode& node,
+                         const std::unordered_set<std::string_view>& locals,
+                         std::unordered_set<std::string_view>& free_vars);
+  // Promote a variable from the enclosing scope to a global
+  void promote_to_global(std::string_view name);
 
   // Helper methods for bytecode generation
   void emit_constant(vm::object::BaseObject* value);

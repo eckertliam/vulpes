@@ -55,6 +55,7 @@ cc_library(
         "vm/object/native_function.hpp",
         "vm/object/null.hpp",
         "vm/object/string.hpp",
+        "vm/object/upvalue.hpp",
         "vm/object/vec.hpp",
     ],
     copts = VULPES_COPTS,
@@ -90,6 +91,7 @@ cc_test(
     srcs = [
         "tests/test_booleans.cpp",
         "tests/test_builtins.cpp",
+        "tests/test_closures.cpp",
         "tests/test_comparisons.cpp",
         "tests/test_control_flow.cpp",
         "tests/test_enums.cpp",

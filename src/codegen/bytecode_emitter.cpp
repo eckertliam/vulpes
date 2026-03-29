@@ -7,6 +7,7 @@
 #include "vm/object/string.hpp"
 #include "vm/object/boolean.hpp"
 #include "vm/object/char.hpp"
+#include "vm/object/upvalue.hpp"
 #include "vm/object/instance.hpp"
 
 namespace vulpes::codegen {
@@ -53,6 +54,122 @@ std::optional<uint32_t> BytecodeEmitter::find_local(std::string_view name) const
         }
     }
     return std::nullopt;
+}
+
+std::optional<uint32_t> BytecodeEmitter::resolve_upvalue(std::string_view name) {
+    // If already promoted to a global, nothing to do
+    if (global_vars.count(name)) {
+        return std::nullopt;
+    }
+
+    // Walk the enclosing stack to find the variable and promote it
+    for (auto enc_it = enclosing_stack.rbegin(); enc_it != enclosing_stack.rend(); ++enc_it) {
+        // Check enclosing locals
+        for (auto scope_it = enc_it->scope_stack->rbegin(); scope_it != enc_it->scope_stack->rend(); ++scope_it) {
+            if (scope_it->count(name)) {
+                promote_to_global(name);
+                return std::nullopt;
+            }
+        }
+        // Check enclosing args
+        if (enc_it->args->count(name)) {
+            promote_to_global(name);
+            return std::nullopt;
+        }
+    }
+
+    return std::nullopt;
+}
+
+void BytecodeEmitter::collect_free_vars(
+    const frontend::AstNode& node,
+    const std::unordered_set<std::string_view>& locals,
+    std::unordered_set<std::string_view>& free_vars) {
+
+    if (auto* var = dynamic_cast<const frontend::VarExpr*>(&node)) {
+        if (!locals.count(var->name)) {
+            free_vars.insert(var->name);
+        }
+    } else if (auto* assign = dynamic_cast<const frontend::AssignExpr*>(&node)) {
+        if (!locals.count(assign->name)) {
+            free_vars.insert(assign->name);
+        }
+        collect_free_vars(*assign->value, locals, free_vars);
+    } else if (auto* block = dynamic_cast<const frontend::BlockStmt*>(&node)) {
+        auto extended_locals = locals;
+        for (auto& stmt : block->statements) {
+            if (auto* let_stmt = dynamic_cast<const frontend::LetStmt*>(stmt.get())) {
+                if (let_stmt->initializer) {
+                    collect_free_vars(*let_stmt->initializer, extended_locals, free_vars);
+                }
+                extended_locals.insert(let_stmt->name);
+            } else if (auto* const_stmt = dynamic_cast<const frontend::ConstStmt*>(stmt.get())) {
+                if (const_stmt->initializer) {
+                    collect_free_vars(*const_stmt->initializer, extended_locals, free_vars);
+                }
+                extended_locals.insert(const_stmt->name);
+            } else {
+                collect_free_vars(*stmt, extended_locals, free_vars);
+            }
+        }
+    } else if (auto* expr_stmt = dynamic_cast<const frontend::ExpressionStmt*>(&node)) {
+        collect_free_vars(*expr_stmt->expr, locals, free_vars);
+    } else if (auto* binary = dynamic_cast<const frontend::BinaryExpr*>(&node)) {
+        collect_free_vars(*binary->left, locals, free_vars);
+        collect_free_vars(*binary->right, locals, free_vars);
+    } else if (auto* unary = dynamic_cast<const frontend::UnaryExpr*>(&node)) {
+        collect_free_vars(*unary->right, locals, free_vars);
+    } else if (auto* call = dynamic_cast<const frontend::CallExpr*>(&node)) {
+        collect_free_vars(*call->callee, locals, free_vars);
+        for (auto& arg : call->arguments) {
+            collect_free_vars(*arg, locals, free_vars);
+        }
+    } else if (auto* if_stmt = dynamic_cast<const frontend::IfStmt*>(&node)) {
+        collect_free_vars(*if_stmt->condition, locals, free_vars);
+        collect_free_vars(*if_stmt->then_branch, locals, free_vars);
+        if (if_stmt->else_branch) collect_free_vars(*if_stmt->else_branch, locals, free_vars);
+    } else if (auto* while_stmt = dynamic_cast<const frontend::WhileStmt*>(&node)) {
+        collect_free_vars(*while_stmt->condition, locals, free_vars);
+        collect_free_vars(*while_stmt->body, locals, free_vars);
+    } else if (auto* for_stmt = dynamic_cast<const frontend::ForStmt*>(&node)) {
+        collect_free_vars(*for_stmt->iterable, locals, free_vars);
+        auto extended = locals;
+        extended.insert(for_stmt->variable_name);
+        collect_free_vars(*for_stmt->body, extended, free_vars);
+    } else if (auto* ret = dynamic_cast<const frontend::ReturnStmt*>(&node)) {
+        if (ret->value) collect_free_vars(*ret->value, locals, free_vars);
+    } else if (auto* logical = dynamic_cast<const frontend::LogicalExpr*>(&node)) {
+        collect_free_vars(*logical->left, locals, free_vars);
+        collect_free_vars(*logical->right, locals, free_vars);
+    } else if (auto* grouping = dynamic_cast<const frontend::GroupingExpr*>(&node)) {
+        collect_free_vars(*grouping->expr, locals, free_vars);
+    } else if (auto* get = dynamic_cast<const frontend::GetExpr*>(&node)) {
+        collect_free_vars(*get->object, locals, free_vars);
+    } else if (auto* set_expr = dynamic_cast<const frontend::SetExpr*>(&node)) {
+        collect_free_vars(*set_expr->object, locals, free_vars);
+        collect_free_vars(*set_expr->value, locals, free_vars);
+    } else if (auto* idx = dynamic_cast<const frontend::IndexExpr*>(&node)) {
+        collect_free_vars(*idx->object, locals, free_vars);
+        collect_free_vars(*idx->index, locals, free_vars);
+    } else if (auto* idx_set = dynamic_cast<const frontend::IndexSetExpr*>(&node)) {
+        collect_free_vars(*idx_set->object, locals, free_vars);
+        collect_free_vars(*idx_set->index, locals, free_vars);
+        collect_free_vars(*idx_set->value, locals, free_vars);
+    } else if (auto* fn_expr = dynamic_cast<const frontend::FunctionExpr*>(&node)) {
+        auto fn_locals = locals;
+        for (auto& p : fn_expr->params) fn_locals.insert(p);
+        collect_free_vars(*fn_expr->body, fn_locals, free_vars);
+    }
+    // Literals and other nodes don't reference variables
+}
+
+void BytecodeEmitter::promote_to_global(std::string_view name) {
+    if (global_vars.count(name)) return;  // Already global
+
+    auto* null_placeholder = machine.allocate<vm::object::Null>();
+    auto global_idx = machine.addGlobal(null_placeholder);
+    global_vars[name] = global_idx;
+    closure_promoted_vars.insert(name);
 }
 
 void BytecodeEmitter::emit_load_local(std::string_view name) {
@@ -266,25 +383,27 @@ void BytecodeEmitter::visit(const frontend::GroupingExpr& expr) {
 }
 
 void BytecodeEmitter::visit(const frontend::VarExpr& expr) {
-    // Try locals (scope stack), then args, then global vars, then function table
+    // Try locals (scope stack), then args, then upvalues, then global vars, then function table
     auto local_idx = find_local(expr.name);
     if (local_idx) {
         emit_load_local(expr.name);
-    } else {
-        auto arg_it = args.find(expr.name);
-        if (arg_it != args.end()) {
-            emit_load_arg(expr.name);
-        } else {
-            auto gvar_it = global_vars.find(expr.name);
-            if (gvar_it != global_vars.end()) {
-                current_function->addInstruction(vm::Instruction(vm::Opcode::LOAD_GLOBAL, gvar_it->second));
-            } else {
-                auto global_it = machine.getFunctionTable().find(std::string(expr.name));
-                if (global_it != machine.getFunctionTable().end()) {
-                    current_function->addInstruction(vm::Instruction(vm::Opcode::LOAD_GLOBAL, global_it->second));
-                }
-            }
-        }
+        return;
+    }
+    auto arg_it = args.find(expr.name);
+    if (arg_it != args.end()) {
+        emit_load_arg(expr.name);
+        return;
+    }
+    // Try to resolve as a captured variable (promotes to global if found)
+    (void)resolve_upvalue(expr.name);
+    auto gvar_it = global_vars.find(expr.name);
+    if (gvar_it != global_vars.end()) {
+        current_function->addInstruction(vm::Instruction(vm::Opcode::LOAD_GLOBAL, gvar_it->second));
+        return;
+    }
+    auto global_it = machine.getFunctionTable().find(std::string(expr.name));
+    if (global_it != machine.getFunctionTable().end()) {
+        current_function->addInstruction(vm::Instruction(vm::Opcode::LOAD_GLOBAL, global_it->second));
     }
 }
 
@@ -298,22 +417,24 @@ void BytecodeEmitter::visit(const frontend::AssignExpr& expr) {
     if (local_idx) {
         emit_store_local(expr.name);
         emit_load_local(expr.name);
-    } else {
-        auto arg_it = args.find(expr.name);
-        if (arg_it != args.end()) {
-            emit_store_arg(expr.name);
-            emit_load_arg(expr.name);
-        } else {
-            auto gvar_it = global_vars.find(expr.name);
-            if (gvar_it != global_vars.end()) {
-                current_function->addInstruction(vm::Instruction(vm::Opcode::STORE_GLOBAL, gvar_it->second));
-                current_function->addInstruction(vm::Instruction(vm::Opcode::LOAD_GLOBAL, gvar_it->second));
-            } else {
-                emit_store_local(expr.name);
-                emit_load_local(expr.name);
-            }
-        }
+        return;
     }
+    auto arg_it = args.find(expr.name);
+    if (arg_it != args.end()) {
+        emit_store_arg(expr.name);
+        emit_load_arg(expr.name);
+        return;
+    }
+    // Try to resolve as captured variable (promotes to global)
+    (void)resolve_upvalue(expr.name);
+    auto gvar_it = global_vars.find(expr.name);
+    if (gvar_it != global_vars.end()) {
+        current_function->addInstruction(vm::Instruction(vm::Opcode::STORE_GLOBAL, gvar_it->second));
+        current_function->addInstruction(vm::Instruction(vm::Opcode::LOAD_GLOBAL, gvar_it->second));
+        return;
+    }
+    emit_store_local(expr.name);
+    emit_load_local(expr.name);
 }
 
 void BytecodeEmitter::visit(const frontend::LogicalExpr& expr) {
@@ -407,13 +528,16 @@ void BytecodeEmitter::visit(const frontend::FunctionExpr& expr) {
 
     vm::object::Function* fn = machine.buildFunction(name, expr.params.size());
 
-    // Save current state and switch to new function
+    // Save current state and push enclosing context
     vm::object::Function* prev_function = current_function;
     auto prev_scope_stack = std::move(scope_stack);
     auto prev_next_local = next_local_index;
     auto prev_args = std::move(args);
     auto prev_constants = std::move(constants);
     auto prev_in_top_level = in_top_level;
+    auto prev_upvalues = std::move(upvalues);
+
+    enclosing_stack.push_back({&prev_scope_stack, &prev_args, &prev_upvalues, prev_function});
 
     current_function = fn;
     scope_stack.clear();
@@ -421,6 +545,7 @@ void BytecodeEmitter::visit(const frontend::FunctionExpr& expr) {
     next_local_index = 0;
     args.clear();
     constants.clear();
+    upvalues.clear();
     in_top_level = false;
 
     for (size_t i = 0; i < expr.params.size(); i++) {
@@ -432,13 +557,24 @@ void BytecodeEmitter::visit(const frontend::FunctionExpr& expr) {
     auto* null_obj = machine.allocate<vm::object::Null>();
     emit_return_constant(null_obj);
 
+    auto captured_upvalues = std::move(upvalues);
+
     // Restore previous state
+    enclosing_stack.pop_back();
     current_function = prev_function;
     scope_stack = std::move(prev_scope_stack);
     next_local_index = prev_next_local;
     args = std::move(prev_args);
     constants = std::move(prev_constants);
     in_top_level = prev_in_top_level;
+    upvalues = std::move(prev_upvalues);
+
+    // Set up upvalue cells
+    for (auto& [uv_name, idx] : captured_upvalues) {
+        auto* upval_cell = machine.allocate<vm::object::Upvalue>(
+            machine.allocate<vm::object::Null>());
+        fn->setUpvalue(idx, upval_cell);
+    }
 
     // Load the function object onto the stack
     auto global_it = machine.getFunctionTable().find(name);
@@ -461,7 +597,12 @@ void BytecodeEmitter::visit(const frontend::LetStmt& stmt) {
         auto* null_obj = machine.allocate<vm::object::Null>();
         emit_constant(null_obj);
     }
-    if (in_top_level && scope_stack.size() == 1) {
+    // Check if this variable was pre-promoted to a global (for closures)
+    // Only use global if we're at the function's outermost scope (not in a nested block)
+    if (closure_promoted_vars.count(stmt.name) && scope_stack.size() <= 2) {
+        auto gvar_it = global_vars.find(stmt.name);
+        current_function->addInstruction(vm::Instruction(vm::Opcode::STORE_GLOBAL, gvar_it->second));
+    } else if (in_top_level && scope_stack.size() == 1) {
         // Store as a global so functions can access it
         auto* null_placeholder = machine.allocate<vm::object::Null>();
         auto idx = machine.addGlobal(null_placeholder);
@@ -682,13 +823,17 @@ void BytecodeEmitter::visit(const frontend::FunctionStmt& stmt) {
     // Create a new function
     vm::object::Function* fn = machine.buildFunction(stmt.name, stmt.params.size());
 
-    // Save current state and switch to new function
+    // Save current state and push enclosing context for closure resolution
     vm::object::Function* prev_function = current_function;
     auto prev_scope_stack = std::move(scope_stack);
     auto prev_next_local = next_local_index;
     auto prev_args = std::move(args);
     auto prev_constants = std::move(constants);
     auto prev_in_top_level = in_top_level;
+    auto prev_upvalues = std::move(upvalues);
+
+    // Push enclosing state for upvalue resolution
+    enclosing_stack.push_back({&prev_scope_stack, &prev_args, &prev_upvalues, prev_function});
 
     current_function = fn;
     scope_stack.clear();
@@ -696,27 +841,119 @@ void BytecodeEmitter::visit(const frontend::FunctionStmt& stmt) {
     next_local_index = 0;
     args.clear();
     constants.clear();
+    upvalues.clear();
     in_top_level = false;
 
     // Set up argument mapping
     for (size_t i = 0; i < stmt.params.size(); i++) {
         args[stmt.params[i]] = static_cast<uint32_t>(i);
     }
-    
+
+    // Pre-scan: find variables captured by inner functions and promote them
+    {
+        // Collect all locals/params defined in this function
+        std::unordered_set<std::string_view> fn_locals;
+        for (auto& p : stmt.params) fn_locals.insert(p);
+        for (auto& s : stmt.body->statements) {
+            if (auto* let_s = dynamic_cast<const frontend::LetStmt*>(s.get())) {
+                fn_locals.insert(let_s->name);
+            } else if (auto* const_s = dynamic_cast<const frontend::ConstStmt*>(s.get())) {
+                fn_locals.insert(const_s->name);
+            }
+        }
+
+        std::unordered_set<std::string_view> free_vars;
+        // Scan entire body for inner function expressions and their free variables
+        // Use collect_free_vars with fn_locals to find references that escape
+        // We find all FunctionExprs anywhere in the body
+        std::function<void(const frontend::AstNode&)> find_inner_fns;
+        find_inner_fns = [&](const frontend::AstNode& node) {
+            if (auto* fn_e = dynamic_cast<const frontend::FunctionExpr*>(&node)) {
+                std::unordered_set<std::string_view> inner_locals;
+                for (auto& p : fn_e->params) inner_locals.insert(p);
+                collect_free_vars(*fn_e->body, inner_locals, free_vars);
+            }
+            // Recurse into statements and expressions
+            if (auto* block = dynamic_cast<const frontend::BlockStmt*>(&node)) {
+                for (auto& s : block->statements) find_inner_fns(*s);
+            } else if (auto* expr_stmt = dynamic_cast<const frontend::ExpressionStmt*>(&node)) {
+                find_inner_fns(*expr_stmt->expr);
+            } else if (auto* let_s = dynamic_cast<const frontend::LetStmt*>(&node)) {
+                if (let_s->initializer) find_inner_fns(*let_s->initializer);
+            } else if (auto* ret = dynamic_cast<const frontend::ReturnStmt*>(&node)) {
+                if (ret->value) find_inner_fns(*ret->value);
+            } else if (auto* if_s = dynamic_cast<const frontend::IfStmt*>(&node)) {
+                find_inner_fns(*if_s->condition);
+                find_inner_fns(*if_s->then_branch);
+                if (if_s->else_branch) find_inner_fns(*if_s->else_branch);
+            } else if (auto* while_s = dynamic_cast<const frontend::WhileStmt*>(&node)) {
+                find_inner_fns(*while_s->condition);
+                find_inner_fns(*while_s->body);
+            } else if (auto* for_s = dynamic_cast<const frontend::ForStmt*>(&node)) {
+                find_inner_fns(*for_s->iterable);
+                find_inner_fns(*for_s->body);
+            } else if (auto* call = dynamic_cast<const frontend::CallExpr*>(&node)) {
+                find_inner_fns(*call->callee);
+                for (auto& arg : call->arguments) find_inner_fns(*arg);
+            } else if (auto* binary = dynamic_cast<const frontend::BinaryExpr*>(&node)) {
+                find_inner_fns(*binary->left);
+                find_inner_fns(*binary->right);
+            } else if (auto* unary = dynamic_cast<const frontend::UnaryExpr*>(&node)) {
+                find_inner_fns(*unary->right);
+            } else if (auto* assign = dynamic_cast<const frontend::AssignExpr*>(&node)) {
+                find_inner_fns(*assign->value);
+            } else if (auto* grouping = dynamic_cast<const frontend::GroupingExpr*>(&node)) {
+                find_inner_fns(*grouping->expr);
+            }
+        };
+        find_inner_fns(*stmt.body);
+
+        // Only promote variables that are actually defined in THIS function
+        for (auto& fv : free_vars) {
+            if (fn_locals.count(fv)) {
+                promote_to_global(fv);
+            }
+        }
+    }
+
+    // If any args were promoted to globals, emit code to copy them
+    for (size_t i = 0; i < stmt.params.size(); i++) {
+        auto gvar_it = global_vars.find(stmt.params[i]);
+        if (gvar_it != global_vars.end()) {
+            // Load arg from local (set by VM call), store to global
+            current_function->addInstruction(vm::Instruction(vm::Opcode::LOAD_LOCAL, static_cast<uint32_t>(i)));
+            current_function->addInstruction(vm::Instruction(vm::Opcode::STORE_GLOBAL, gvar_it->second));
+        }
+    }
+
     // Visit function body
     stmt.body->accept(*this);
 
     // Implicit return null at end of function
     auto* null_obj = machine.allocate<vm::object::Null>();
     emit_return_constant(null_obj);
-    
+
+    // Copy captured upvalue count for later setup
+    auto captured_upvalues = std::move(upvalues);
+
     // Restore previous state
+    enclosing_stack.pop_back();
     current_function = prev_function;
     scope_stack = std::move(prev_scope_stack);
     next_local_index = prev_next_local;
     args = std::move(prev_args);
     constants = std::move(prev_constants);
     in_top_level = prev_in_top_level;
+    upvalues = std::move(prev_upvalues);
+
+    // If the function captured upvalues, set up the upvalue cells
+    // The upvalue cells are allocated but need to be initialized at runtime
+    // when the enclosing scope provides values
+    for (auto& [name, idx] : captured_upvalues) {
+        auto* upval_cell = machine.allocate<vm::object::Upvalue>(
+            machine.allocate<vm::object::Null>());
+        fn->setUpvalue(idx, upval_cell);
+    }
 }
 
 void BytecodeEmitter::visit([[maybe_unused]] const frontend::EnumStmt& stmt) {
