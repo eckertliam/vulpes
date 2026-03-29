@@ -26,5 +26,8 @@ class Float final : public BaseObject {
   BaseObject* mul(Machine& machine, BaseObject* other) override;
   BaseObject* div(Machine& machine, BaseObject* other) override;
   BaseObject* mod(Machine& machine, BaseObject* other) override;
+
+  BaseObject* eq(Machine& machine, BaseObject* other) override;
+  BaseObject* lt(Machine& machine, BaseObject* other) override;
 };
 }  // namespace vulpes::vm::object

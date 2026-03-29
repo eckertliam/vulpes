@@ -53,6 +53,14 @@ class NativeFunction final : public BaseObject {
   BaseObject* mod([[maybe_unused]] Machine& machine, [[maybe_unused]] BaseObject* other) override {
     return nullptr;
   }
+
+  BaseObject* eq([[maybe_unused]] Machine& machine, [[maybe_unused]] BaseObject* other) override {
+    return nullptr;
+  }
+
+  BaseObject* lt([[maybe_unused]] Machine& machine, [[maybe_unused]] BaseObject* other) override {
+    return nullptr;
+  }
 };
 
 }  // namespace vulpes::vm::object

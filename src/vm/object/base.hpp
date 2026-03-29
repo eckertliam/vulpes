@@ -48,8 +48,8 @@ class BaseObject {
   virtual BaseObject* div(vulpes::vm::Machine& machine, BaseObject* other) = 0;
   virtual BaseObject* mod(vulpes::vm::Machine& machine, BaseObject* other) = 0;
 
-  // TODO: add comparison operations
-  // TODO: add logical operations
-  // TODO: add truthiness
+  // comparison — returns a Boolean allocated on the machine
+  virtual BaseObject* eq(vulpes::vm::Machine& machine, BaseObject* other) = 0;
+  virtual BaseObject* lt(vulpes::vm::Machine& machine, BaseObject* other) = 0;
 };
 }  // namespace vulpes::vm::object

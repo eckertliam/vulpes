@@ -85,6 +85,7 @@ cc_test(
     name = "vulpes_tests",
     srcs = [
         "tests/test_booleans.cpp",
+        "tests/test_comparisons.cpp",
         "tests/test_helpers.hpp",
         "tests/test_lexer.cpp",
         "tests/test_parser.cpp",

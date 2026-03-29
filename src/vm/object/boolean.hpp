@@ -1,6 +1,7 @@
 #pragma once
 
 #include "base.hpp"
+#include "../machine.hpp"
 
 #include <string>
 
@@ -35,6 +36,17 @@ class Boolean final : public BaseObject {
     return nullptr;
   }
   BaseObject* mod([[maybe_unused]] Machine& machine, [[maybe_unused]] BaseObject* other) override {
+    return nullptr;
+  }
+
+  BaseObject* eq(Machine& machine, BaseObject* other) override {
+    if (other->type() == ObjectType::Boolean) {
+      return machine.allocate<Boolean>(value_ == dynamic_cast<Boolean*>(other)->value());
+    }
+    return machine.allocate<Boolean>(false);
+  }
+
+  BaseObject* lt([[maybe_unused]] Machine& machine, [[maybe_unused]] BaseObject* other) override {
     return nullptr;
   }
 };

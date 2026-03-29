@@ -6,6 +6,7 @@
 #include "instruction.hpp"
 #include "object/integer.hpp"
 #include "object/native_function.hpp"
+#include "object/boolean.hpp"
 #include "object/null.hpp"
 #include "object/string.hpp"
 
@@ -259,6 +260,72 @@ static inline void pop(Machine& machine, [[maybe_unused]] const Instruction& ins
   machine.pop();
 }
 
+static inline void eq(Machine& machine, const Instruction& instruction) {
+  const auto rhs = machine.pop();
+  const auto lhs = machine.pop();
+  const auto result = lhs->eq(machine, rhs);
+  if (result == nullptr) {
+    throwWithLocation("Invalid operand type for ==", instruction.src_loc);
+  }
+  machine.push(result);
+}
+
+static inline void neq(Machine& machine, const Instruction& instruction) {
+  const auto rhs = machine.pop();
+  const auto lhs = machine.pop();
+  auto* eq_result = lhs->eq(machine, rhs);
+  if (eq_result == nullptr) {
+    throwWithLocation("Invalid operand type for !=", instruction.src_loc);
+  }
+  auto* bool_result = dynamic_cast<Boolean*>(eq_result);
+  machine.push(machine.allocate<Boolean>(!bool_result->value()));
+}
+
+static inline void lt(Machine& machine, const Instruction& instruction) {
+  const auto rhs = machine.pop();
+  const auto lhs = machine.pop();
+  const auto result = lhs->lt(machine, rhs);
+  if (result == nullptr) {
+    throwWithLocation("Invalid operand type for <", instruction.src_loc);
+  }
+  machine.push(result);
+}
+
+static inline void gt(Machine& machine, const Instruction& instruction) {
+  // a > b  is  b < a
+  const auto rhs = machine.pop();
+  const auto lhs = machine.pop();
+  const auto result = rhs->lt(machine, lhs);
+  if (result == nullptr) {
+    throwWithLocation("Invalid operand type for >", instruction.src_loc);
+  }
+  machine.push(result);
+}
+
+static inline void lte(Machine& machine, const Instruction& instruction) {
+  // a <= b  is  !(b < a)
+  const auto rhs = machine.pop();
+  const auto lhs = machine.pop();
+  auto* gt_result = rhs->lt(machine, lhs);
+  if (gt_result == nullptr) {
+    throwWithLocation("Invalid operand type for <=", instruction.src_loc);
+  }
+  auto* bool_result = dynamic_cast<Boolean*>(gt_result);
+  machine.push(machine.allocate<Boolean>(!bool_result->value()));
+}
+
+static inline void gte(Machine& machine, const Instruction& instruction) {
+  // a >= b  is  !(a < b)
+  const auto rhs = machine.pop();
+  const auto lhs = machine.pop();
+  auto* lt_result = lhs->lt(machine, rhs);
+  if (lt_result == nullptr) {
+    throwWithLocation("Invalid operand type for >=", instruction.src_loc);
+  }
+  auto* bool_result = dynamic_cast<Boolean*>(lt_result);
+  machine.push(machine.allocate<Boolean>(!bool_result->value()));
+}
+
 using InstructionHandler = void (*)(Machine&, const Instruction&);
 static std::unordered_map<Opcode, InstructionHandler> instruction_handlers = {
     {Opcode::LOAD_GLOBAL, loadGlobal},
@@ -275,7 +342,13 @@ static std::unordered_map<Opcode, InstructionHandler> instruction_handlers = {
     {Opcode::MUL, mul},
     {Opcode::DIV, div},
     {Opcode::MOD, mod},
-    {Opcode::POP, pop}};
+    {Opcode::POP, pop},
+    {Opcode::EQ, eq},
+    {Opcode::NEQ, neq},
+    {Opcode::LT, lt},
+    {Opcode::GT, gt},
+    {Opcode::LTE, lte},
+    {Opcode::GTE, gte}};
 
 void Machine::executeInstruction(const Instruction& instruction) {
   const auto handler = instruction_handlers.at(instruction.opcode);

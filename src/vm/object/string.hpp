@@ -1,6 +1,8 @@
 #pragma once
 
 #include "base.hpp"
+#include "boolean.hpp"
+#include "../machine.hpp"
 
 #include <string>
 #include <utility>
@@ -34,6 +36,20 @@ class String final : public BaseObject {
     return nullptr;
   }
   BaseObject* mod([[maybe_unused]] vulpes::vm::Machine& machine, [[maybe_unused]] BaseObject* other) override {
+    return nullptr;
+  }
+
+  BaseObject* eq(vulpes::vm::Machine& machine, BaseObject* other) override {
+    if (other->type() == ObjectType::String) {
+      return machine.allocate<Boolean>(value_ == dynamic_cast<String*>(other)->value());
+    }
+    return machine.allocate<Boolean>(false);
+  }
+
+  BaseObject* lt(vulpes::vm::Machine& machine, BaseObject* other) override {
+    if (other->type() == ObjectType::String) {
+      return machine.allocate<Boolean>(value_ < dynamic_cast<String*>(other)->value());
+    }
     return nullptr;
   }
 };

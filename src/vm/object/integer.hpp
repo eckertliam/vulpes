@@ -23,5 +23,8 @@ class Integer final : public BaseObject {
   BaseObject* mul(vulpes::vm::Machine& machine, BaseObject* other) override;
   BaseObject* div(vulpes::vm::Machine& machine, BaseObject* other) override;
   BaseObject* mod(vulpes::vm::Machine& machine, BaseObject* other) override;
+
+  BaseObject* eq(vulpes::vm::Machine& machine, BaseObject* other) override;
+  BaseObject* lt(vulpes::vm::Machine& machine, BaseObject* other) override;
 };
 }  // namespace vulpes::vm::object

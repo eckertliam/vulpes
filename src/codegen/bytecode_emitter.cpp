@@ -86,8 +86,19 @@ void BytecodeEmitter::emit_binary_op(const frontend::Token& op) {
         current_function->addInstruction(vm::Instruction(vm::Opcode::DIV));
     } else if (op.lexeme() == "%") {
         current_function->addInstruction(vm::Instruction(vm::Opcode::MOD));
+    } else if (op.lexeme() == "==") {
+        current_function->addInstruction(vm::Instruction(vm::Opcode::EQ));
+    } else if (op.lexeme() == "!=") {
+        current_function->addInstruction(vm::Instruction(vm::Opcode::NEQ));
+    } else if (op.lexeme() == "<") {
+        current_function->addInstruction(vm::Instruction(vm::Opcode::LT));
+    } else if (op.lexeme() == ">") {
+        current_function->addInstruction(vm::Instruction(vm::Opcode::GT));
+    } else if (op.lexeme() == "<=") {
+        current_function->addInstruction(vm::Instruction(vm::Opcode::LTE));
+    } else if (op.lexeme() == ">=") {
+        current_function->addInstruction(vm::Instruction(vm::Opcode::GTE));
     }
-    // TODO: Implement comparison operators
 }
 
 void BytecodeEmitter::emit_unary_op([[maybe_unused]] const frontend::Token& op) {

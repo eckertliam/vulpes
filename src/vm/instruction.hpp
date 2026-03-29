@@ -57,6 +57,13 @@ enum class Opcode : uint8_t {
   // Pop a value from the stack and discard it
   // Imm: none
   POP,
+  // Comparison operators — pop two values, push Boolean result
+  EQ,
+  NEQ,
+  LT,
+  GT,
+  LTE,
+  GTE,
 };
 
 // Instruction is a struct that represents a single instruction in the VM.

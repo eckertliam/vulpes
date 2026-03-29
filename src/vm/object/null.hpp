@@ -1,6 +1,8 @@
 #pragma once
 
 #include "base.hpp"
+#include "boolean.hpp"
+#include "../machine.hpp"
 
 
 namespace vulpes::vm::object {
@@ -34,6 +36,17 @@ class Null : public BaseObject {
   }
 
   BaseObject* mod([[maybe_unused]] vulpes::vm::Machine& machine, [[maybe_unused]] BaseObject* other) override {
+    return nullptr;
+  }
+
+  BaseObject* eq(vulpes::vm::Machine& machine, BaseObject* other) override {
+    if (other->type() == ObjectType::Null) {
+      return machine.allocate<Boolean>(true);
+    }
+    return machine.allocate<Boolean>(false);
+  }
+
+  BaseObject* lt([[maybe_unused]] vulpes::vm::Machine& machine, [[maybe_unused]] BaseObject* other) override {
     return nullptr;
   }
 };
