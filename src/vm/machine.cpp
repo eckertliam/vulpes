@@ -14,6 +14,8 @@
 #include "object/vec.hpp"
 #include "object/map.hpp"
 #include "object/upvalue.hpp"
+#include "object/byte.hpp"
+#include "object/list.hpp"
 
 namespace vulpes::vm {
 
@@ -672,11 +674,14 @@ void Machine::registerBuiltins() {
                      case ObjectType::String: name = "string"; break;
                      case ObjectType::Char: name = "char"; break;
                      case ObjectType::Boolean: name = "bool"; break;
+                     case ObjectType::Byte: name = "byte"; break;
                      case ObjectType::Null: name = "null"; break;
                      case ObjectType::Object: name = "object"; break;
                      case ObjectType::Vec: name = "vec"; break;
                      case ObjectType::Map: name = "map"; break;
+                     case ObjectType::List: name = "list"; break;
                      case ObjectType::Upvalue: name = "upvalue"; break;
+                     case ObjectType::Thunk: name = "thunk"; break;
                      case ObjectType::Function:
                      case ObjectType::NativeFunction: name = "function"; break;
                      default: name = "unknown"; break;
@@ -714,6 +719,13 @@ void Machine::registerBuiltins() {
                      return machine.allocate<Integer>(
                          static_cast<int64_t>(dynamic_cast<Map*>(obj)->length()));
                    }
+                   if (obj->type() == ObjectType::List) {
+                     return machine.allocate<Integer>(
+                         static_cast<int64_t>(dynamic_cast<ListNode*>(obj)->length()));
+                   }
+                   if (obj->type() == ObjectType::Null) {
+                     return machine.allocate<Integer>(0);  // empty list
+                   }
                    throw std::runtime_error("TypeError: len() not supported for this type");
                  });
 
@@ -734,6 +746,54 @@ void Machine::registerBuiltins() {
                      throw std::runtime_error("TypeError: pop() requires a vec");
                    }
                    return dynamic_cast<Vec*>(fn_args[0])->pop();
+                 });
+
+  registerNative("byte", 1,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   if (fn_args[0]->type() == ObjectType::Integer) {
+                     auto val = dynamic_cast<Integer*>(fn_args[0])->value();
+                     return machine.allocate<Byte>(static_cast<uint8_t>(val & 0xFF));
+                   }
+                   throw std::runtime_error("TypeError: byte() expects an integer");
+                 });
+
+  registerNative("list", 0,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   if (fn_args.empty()) {
+                     return machine.allocate<Null>();
+                   }
+                   // Build linked list from args (right to left)
+                   BaseObject* tail = machine.allocate<Null>();
+                   for (auto it = fn_args.rbegin(); it != fn_args.rend(); ++it) {
+                     tail = machine.allocate<ListNode>(*it, tail);
+                   }
+                   return tail;
+                 });
+
+  registerNative("head", 1,
+                 []([[maybe_unused]] Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   if (fn_args[0]->type() != ObjectType::List) {
+                     throw std::runtime_error("TypeError: head() requires a list");
+                   }
+                   return dynamic_cast<ListNode*>(fn_args[0])->head();
+                 });
+
+  registerNative("tail", 1,
+                 []([[maybe_unused]] Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   if (fn_args[0]->type() != ObjectType::List) {
+                     throw std::runtime_error("TypeError: tail() requires a list");
+                   }
+                   return dynamic_cast<ListNode*>(fn_args[0])->tail();
+                 });
+
+  registerNative("cons", 2,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   return machine.allocate<ListNode>(fn_args[0], fn_args[1]);
                  });
 
   registerNative("throw_err", 1,

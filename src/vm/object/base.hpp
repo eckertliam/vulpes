@@ -14,19 +14,22 @@ enum class ObjectType : uint8_t {
   String,
   Char,
   Boolean,
+  Byte,
   Null,
   Object,
   Vec,
   Map,
+  List,
   Upvalue,
+  Thunk,
   Function,
   NativeFunction,
 };
 
 static constexpr const char* ObjectTypeNames[] = {
-    "Integer", "Float",    "String",         "Char",     "Boolean",
-    "Null",    "Object",   "Vec",            "Map",      "Upvalue",
-    "Function", "NativeFunction",
+    "Integer",  "Float",    "String",   "Char",     "Boolean",
+    "Byte",     "Null",     "Object",   "Vec",      "Map",
+    "List",     "Upvalue",  "Thunk",    "Function", "NativeFunction",
 };
 
 class BaseObject {

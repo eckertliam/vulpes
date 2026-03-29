@@ -17,12 +17,15 @@ BaseObject* Float::add(vulpes::vm::Machine& machine, BaseObject* other) {
                                      static_cast<double>(dynamic_cast<Integer*>(other)->value()));
     case ObjectType::String:
     case ObjectType::Char:
+    case ObjectType::Byte:
     case ObjectType::Boolean:
     case ObjectType::Null:
     case ObjectType::Object:
     case ObjectType::Vec:
     case ObjectType::Map:
+    case ObjectType::List:
     case ObjectType::Upvalue:
+    case ObjectType::Thunk:
     case ObjectType::Function:
     case ObjectType::NativeFunction:
     default:
@@ -40,12 +43,15 @@ BaseObject* Float::sub(vulpes::vm::Machine& machine, BaseObject* other) {
                                      static_cast<double>(dynamic_cast<Integer*>(other)->value()));
     case ObjectType::String:
     case ObjectType::Char:
+    case ObjectType::Byte:
     case ObjectType::Boolean:
     case ObjectType::Null:
     case ObjectType::Object:
     case ObjectType::Vec:
     case ObjectType::Map:
+    case ObjectType::List:
     case ObjectType::Upvalue:
+    case ObjectType::Thunk:
     case ObjectType::Function:
     case ObjectType::NativeFunction:
     default:
@@ -63,12 +69,15 @@ BaseObject* Float::mul(vulpes::vm::Machine& machine, BaseObject* other) {
                                      static_cast<double>(dynamic_cast<Integer*>((other))->value()));
     case ObjectType::String:
     case ObjectType::Char:
+    case ObjectType::Byte:
     case ObjectType::Boolean:
     case ObjectType::Null:
     case ObjectType::Object:
     case ObjectType::Vec:
     case ObjectType::Map:
+    case ObjectType::List:
     case ObjectType::Upvalue:
+    case ObjectType::Thunk:
     case ObjectType::Function:
     case ObjectType::NativeFunction:
     default:
@@ -94,12 +103,15 @@ BaseObject* Float::div(vulpes::vm::Machine& machine, BaseObject* other) {
     }
     case ObjectType::String:
     case ObjectType::Char:
+    case ObjectType::Byte:
     case ObjectType::Boolean:
     case ObjectType::Null:
     case ObjectType::Object:
     case ObjectType::Vec:
     case ObjectType::Map:
+    case ObjectType::List:
     case ObjectType::Upvalue:
+    case ObjectType::Thunk:
     case ObjectType::Function:
     case ObjectType::NativeFunction:
     default:
@@ -163,12 +175,15 @@ BaseObject* Float::eq(vulpes::vm::Machine& machine, BaseObject* other) {
     }
     case ObjectType::String:
     case ObjectType::Char:
+    case ObjectType::Byte:
     case ObjectType::Boolean:
     case ObjectType::Null:
     case ObjectType::Object:
     case ObjectType::Vec:
     case ObjectType::Map:
+    case ObjectType::List:
     case ObjectType::Upvalue:
+    case ObjectType::Thunk:
     case ObjectType::Function:
     case ObjectType::NativeFunction:
     default:
@@ -186,12 +201,15 @@ BaseObject* Float::lt(vulpes::vm::Machine& machine, BaseObject* other) {
                                        static_cast<double>(dynamic_cast<Integer*>(other)->value()));
     case ObjectType::String:
     case ObjectType::Char:
+    case ObjectType::Byte:
     case ObjectType::Boolean:
     case ObjectType::Null:
     case ObjectType::Object:
     case ObjectType::Vec:
     case ObjectType::Map:
+    case ObjectType::List:
     case ObjectType::Upvalue:
+    case ObjectType::Thunk:
     case ObjectType::Function:
     case ObjectType::NativeFunction:
     default:
