@@ -24,6 +24,9 @@ class Integer final : public BaseObject {
   BaseObject* div(vulpes::vm::Machine& machine, BaseObject* other) override;
   BaseObject* mod(vulpes::vm::Machine& machine, BaseObject* other) override;
 
+  [[nodiscard]] bool isTruthy() const override;
+  BaseObject* negate(vulpes::vm::Machine& machine) override;
+
   BaseObject* eq(vulpes::vm::Machine& machine, BaseObject* other) override;
   BaseObject* lt(vulpes::vm::Machine& machine, BaseObject* other) override;
 };

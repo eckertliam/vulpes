@@ -92,6 +92,9 @@ class Function : public BaseObject {
     return nullptr;
   }
 
+  [[nodiscard]] bool isTruthy() const override { return true; }
+  BaseObject* negate([[maybe_unused]] Machine& machine) override { return nullptr; }
+
   BaseObject* lt([[maybe_unused]] Machine& machine, [[maybe_unused]] BaseObject* other) override {
     return nullptr;
   }

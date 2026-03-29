@@ -205,7 +205,7 @@ std::unique_ptr<Expr> Parser::factor() {
 }
 
 std::unique_ptr<Expr> Parser::unary() {
-  if (match({TokenKind::Bang, TokenKind::Minus})) {
+  if (match({TokenKind::Bang, TokenKind::Minus, TokenKind::Plus})) {
     Token op = previous();
     auto right = unary();
     return std::make_unique<UnaryExpr>(op, std::move(right));

@@ -46,6 +46,9 @@ class Null : public BaseObject {
     return machine.allocate<Boolean>(false);
   }
 
+  [[nodiscard]] bool isTruthy() const override { return false; }
+  BaseObject* negate([[maybe_unused]] vulpes::vm::Machine& machine) override { return nullptr; }
+
   BaseObject* lt([[maybe_unused]] vulpes::vm::Machine& machine, [[maybe_unused]] BaseObject* other) override {
     return nullptr;
   }

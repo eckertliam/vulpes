@@ -125,4 +125,10 @@ BaseObject* Float::lt(vulpes::vm::Machine& machine, BaseObject* other) {
   }
 }
 
+bool Float::isTruthy() const { return !(value_ >= 0.0 && value_ <= 0.0); }
+
+BaseObject* Float::negate(vulpes::vm::Machine& machine) {
+  return machine.allocate<Float>(-value_);
+}
+
 }  // namespace vulpes::vm::object

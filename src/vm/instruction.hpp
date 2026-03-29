@@ -58,6 +58,10 @@ enum class Opcode : uint8_t {
   // Imm: none
   POP,
   // Comparison operators — pop two values, push Boolean result
+  // Unary operators
+  NEGATE,
+  NOT,
+  // Comparison operators — pop two values, push Boolean result
   EQ,
   NEQ,
   LT,

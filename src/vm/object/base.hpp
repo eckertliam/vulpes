@@ -48,6 +48,11 @@ class BaseObject {
   virtual BaseObject* div(vulpes::vm::Machine& machine, BaseObject* other) = 0;
   virtual BaseObject* mod(vulpes::vm::Machine& machine, BaseObject* other) = 0;
 
+  // truthiness — used by if/while/!/&&/||
+  [[nodiscard]] virtual bool isTruthy() const = 0;
+  // unary negate — returns nullptr if not supported
+  virtual BaseObject* negate(vulpes::vm::Machine& machine) = 0;
+
   // comparison — returns a Boolean allocated on the machine
   virtual BaseObject* eq(vulpes::vm::Machine& machine, BaseObject* other) = 0;
   virtual BaseObject* lt(vulpes::vm::Machine& machine, BaseObject* other) = 0;

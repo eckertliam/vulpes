@@ -260,6 +260,20 @@ static inline void pop(Machine& machine, [[maybe_unused]] const Instruction& ins
   machine.pop();
 }
 
+static inline void negate(Machine& machine, const Instruction& instruction) {
+  auto* operand = machine.pop();
+  auto* result = operand->negate(machine);
+  if (result == nullptr) {
+    throwWithLocation("Cannot negate this type", instruction.src_loc);
+  }
+  machine.push(result);
+}
+
+static inline void logicalNot(Machine& machine, [[maybe_unused]] const Instruction& instruction) {
+  auto* operand = machine.pop();
+  machine.push(machine.allocate<Boolean>(!operand->isTruthy()));
+}
+
 static inline void eq(Machine& machine, const Instruction& instruction) {
   const auto rhs = machine.pop();
   const auto lhs = machine.pop();
@@ -343,6 +357,8 @@ static std::unordered_map<Opcode, InstructionHandler> instruction_handlers = {
     {Opcode::DIV, div},
     {Opcode::MOD, mod},
     {Opcode::POP, pop},
+    {Opcode::NEGATE, negate},
+    {Opcode::NOT, logicalNot},
     {Opcode::EQ, eq},
     {Opcode::NEQ, neq},
     {Opcode::LT, lt},

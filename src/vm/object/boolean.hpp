@@ -46,6 +46,9 @@ class Boolean final : public BaseObject {
     return machine.allocate<Boolean>(false);
   }
 
+  [[nodiscard]] bool isTruthy() const override { return value_; }
+  BaseObject* negate([[maybe_unused]] Machine& machine) override { return nullptr; }
+
   BaseObject* lt([[maybe_unused]] Machine& machine, [[maybe_unused]] BaseObject* other) override {
     return nullptr;
   }

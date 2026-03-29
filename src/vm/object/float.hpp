@@ -27,6 +27,9 @@ class Float final : public BaseObject {
   BaseObject* div(Machine& machine, BaseObject* other) override;
   BaseObject* mod(Machine& machine, BaseObject* other) override;
 
+  [[nodiscard]] bool isTruthy() const override;
+  BaseObject* negate(Machine& machine) override;
+
   BaseObject* eq(Machine& machine, BaseObject* other) override;
   BaseObject* lt(Machine& machine, BaseObject* other) override;
 };

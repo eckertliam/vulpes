@@ -128,4 +128,10 @@ BaseObject* Integer::lt(vulpes::vm::Machine& machine, BaseObject* other) {
   }
 }
 
+bool Integer::isTruthy() const { return value_ != 0; }
+
+BaseObject* Integer::negate(vulpes::vm::Machine& machine) {
+  return machine.allocate<Integer>(-value_);
+}
+
 }  // namespace vulpes::vm::object

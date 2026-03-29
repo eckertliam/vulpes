@@ -46,6 +46,9 @@ class String final : public BaseObject {
     return machine.allocate<Boolean>(false);
   }
 
+  [[nodiscard]] bool isTruthy() const override { return !value_.empty(); }
+  BaseObject* negate([[maybe_unused]] vulpes::vm::Machine& machine) override { return nullptr; }
+
   BaseObject* lt(vulpes::vm::Machine& machine, BaseObject* other) override {
     if (other->type() == ObjectType::String) {
       return machine.allocate<Boolean>(value_ < dynamic_cast<String*>(other)->value());

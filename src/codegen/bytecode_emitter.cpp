@@ -101,9 +101,13 @@ void BytecodeEmitter::emit_binary_op(const frontend::Token& op) {
     }
 }
 
-void BytecodeEmitter::emit_unary_op([[maybe_unused]] const frontend::Token& op) {
-    // TODO: Implement unary operators (negate, not)
-    // Current instruction set doesn't support these
+void BytecodeEmitter::emit_unary_op(const frontend::Token& op) {
+    if (op.lexeme() == "-") {
+        current_function->addInstruction(vm::Instruction(vm::Opcode::NEGATE));
+    } else if (op.lexeme() == "!") {
+        current_function->addInstruction(vm::Instruction(vm::Opcode::NOT));
+    }
+    // unary + is a no-op
 }
 
 void BytecodeEmitter::emit_jump([[maybe_unused]] size_t offset) {
