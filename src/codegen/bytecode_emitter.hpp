@@ -13,6 +13,8 @@ namespace vulpes::codegen {
 struct LoopContext {
   uint32_t continue_target;                  // instruction index for continue
   std::vector<uint32_t> break_patches;       // JUMP indices to patch when loop ends
+  std::vector<uint32_t> continue_patches;    // JUMP indices to patch for continue
+  bool needs_continue_patching = false;      // true for for-loops where continue target is deferred
 };
 
 class BytecodeEmitter : public frontend::AstVisitor {
@@ -28,6 +30,10 @@ class BytecodeEmitter : public frontend::AstVisitor {
 
   // Track whether we're in the top-level entry function
   bool in_top_level = false;
+  // Counter for unique for-loop variable names
+  uint32_t for_loop_counter = 0;
+  // Persistent storage for synthetic variable names (for-loop internals)
+  std::vector<std::unique_ptr<std::string>> synthetic_names;
   // Top-level global variable name -> global index mapping
   std::unordered_map<std::string_view, uint32_t> global_vars;
 

@@ -512,7 +512,7 @@ void BytecodeEmitter::visit(const frontend::WhileStmt& stmt) {
     auto loop_start = current_function->instructionCount();
 
     // Push loop context
-    loop_stack.push_back({loop_start, {}});
+    loop_stack.push_back({loop_start, {}, {}, false});
 
     // Emit condition
     stmt.condition->accept(*this);
@@ -539,8 +539,74 @@ void BytecodeEmitter::visit(const frontend::WhileStmt& stmt) {
     loop_stack.pop_back();
 }
 
-void BytecodeEmitter::visit([[maybe_unused]] const frontend::ForStmt& stmt) {
-    // TODO: Implement for loop
+void BytecodeEmitter::visit(const frontend::ForStmt& stmt) {
+    // for x in expr { body }
+    // Compiled as: let __iter_N = 0; let __limit_N = expr; while __iter_N < __limit_N { let x = __iter_N; body; __iter_N = __iter_N + 1; }
+
+    // Unique names for this for-loop to support nesting
+    auto id = for_loop_counter++;
+    // Store names persistently so string_views remain valid
+    synthetic_names.push_back(std::make_unique<std::string>("__for_limit_" + std::to_string(id)));
+    synthetic_names.push_back(std::make_unique<std::string>("__for_iter_" + std::to_string(id)));
+    std::string_view limit_name = *synthetic_names[synthetic_names.size() - 2];
+    std::string_view iter_name = *synthetic_names[synthetic_names.size() - 1];
+
+    // Evaluate the iterable (upper bound for integer ranges)
+    stmt.iterable->accept(*this);
+    emit_declare_local(limit_name);
+
+    // Initialize counter to 0
+    auto* zero = machine.allocate<vm::object::Integer>(0);
+    emit_constant(zero);
+    emit_declare_local(iter_name);
+
+    // Loop start (condition check)
+    auto loop_start = current_function->instructionCount();
+    // continue_target will be patched after we know where increment starts
+    loop_stack.push_back({0, {}, {}, true});
+
+    // Condition: __for_iter_N < __for_limit_N
+    emit_load_local(iter_name);
+    emit_load_local(limit_name);
+    current_function->addInstruction(vm::Instruction(vm::Opcode::LT));
+
+    auto exit_jump = current_function->instructionCount();
+    current_function->addInstruction(vm::Instruction(vm::Opcode::JUMP_IF_FALSE, 0));
+
+    // Bind loop variable: let x = __for_iter_N
+    scope_stack.emplace_back();
+    emit_load_local(iter_name);
+    emit_declare_local(stmt.variable_name);
+
+    // Body
+    stmt.body->accept(*this);
+    scope_stack.pop_back();
+
+    // Increment: __for_iter_N = __for_iter_N + 1
+    // This is the continue target
+    auto increment_start = current_function->instructionCount();
+    loop_stack.back().continue_target = increment_start;
+    emit_load_local(iter_name);
+    auto* one = machine.allocate<vm::object::Integer>(1);
+    emit_constant(one);
+    current_function->addInstruction(vm::Instruction(vm::Opcode::ADD));
+    emit_store_local(iter_name);
+
+    // Jump back to condition
+    current_function->addInstruction(vm::Instruction(vm::Opcode::JUMP, loop_start));
+
+    // Patch exit
+    auto loop_end = current_function->instructionCount();
+    current_function->patchInstruction(exit_jump, loop_end);
+
+    for (auto break_idx : loop_stack.back().break_patches) {
+        current_function->patchInstruction(break_idx, loop_end);
+    }
+    // Patch continue jumps to point to the increment step
+    for (auto continue_idx : loop_stack.back().continue_patches) {
+        current_function->patchInstruction(continue_idx, increment_start);
+    }
+    loop_stack.pop_back();
 }
 
 void BytecodeEmitter::visit([[maybe_unused]] const frontend::BreakStmt& stmt) {
@@ -551,9 +617,16 @@ void BytecodeEmitter::visit([[maybe_unused]] const frontend::BreakStmt& stmt) {
 }
 
 void BytecodeEmitter::visit([[maybe_unused]] const frontend::ContinueStmt& stmt) {
-    // Jump back to loop condition
-    current_function->addInstruction(
-        vm::Instruction(vm::Opcode::JUMP, loop_stack.back().continue_target));
+    if (loop_stack.back().needs_continue_patching) {
+        // For for-loops: emit placeholder jump, will be patched to increment
+        auto continue_idx = current_function->instructionCount();
+        current_function->addInstruction(vm::Instruction(vm::Opcode::JUMP, 0));
+        loop_stack.back().continue_patches.push_back(continue_idx);
+    } else {
+        // For while-loops: jump directly to condition
+        current_function->addInstruction(
+            vm::Instruction(vm::Opcode::JUMP, loop_stack.back().continue_target));
+    }
 }
 
 void BytecodeEmitter::visit(const frontend::ReturnStmt& stmt) {

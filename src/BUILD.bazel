@@ -90,6 +90,7 @@ cc_test(
         "tests/test_comparisons.cpp",
         "tests/test_control_flow.cpp",
         "tests/test_enums.cpp",
+        "tests/test_for_loop.cpp",
         "tests/test_functions.cpp",
         "tests/test_globals.cpp",
         "tests/test_helpers.hpp",
