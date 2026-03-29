@@ -160,7 +160,7 @@ static inline void callFunction(Machine& machine,
   }
 
   if (functionObj->type() != ObjectType::Function) {
-    throwWithLocation("Expected function object", instruction.src_loc);
+    throwWithLocation("TypeError: expected function object", instruction.src_loc);
   }
   const auto function = dynamic_cast<Function*>(functionObj);
   const auto arity = function->getArity();
@@ -218,7 +218,7 @@ static inline void add(Machine& machine, const Instruction& instruction) {
   const auto lhs = machine.pop();
   const auto result = lhs->add(machine, rhs);
   if (result == nullptr) {
-    throwWithLocation("Invalid operand type", instruction.src_loc);
+    throwWithLocation("TypeError: invalid operand type", instruction.src_loc);
   }
   machine.push(result);
 }
@@ -228,7 +228,7 @@ static inline void sub(Machine& machine, const Instruction& instruction) {
   const auto lhs = machine.pop();
   const auto result = lhs->sub(machine, rhs);
   if (result == nullptr) {
-    throwWithLocation("Invalid operand type", instruction.src_loc);
+    throwWithLocation("TypeError: invalid operand type", instruction.src_loc);
   }
   machine.push(result);
 }
@@ -238,7 +238,7 @@ static inline void mul(Machine& machine, const Instruction& instruction) {
   const auto lhs = machine.pop();
   const auto result = lhs->mul(machine, rhs);
   if (result == nullptr) {
-    throwWithLocation("Invalid operand type", instruction.src_loc);
+    throwWithLocation("TypeError: invalid operand type", instruction.src_loc);
   }
   machine.push(result);
 }
@@ -248,7 +248,7 @@ static inline void div(Machine& machine, const Instruction& instruction) {
   const auto lhs = machine.pop();
   const auto result = lhs->div(machine, rhs);
   if (result == nullptr) {
-    throwWithLocation("Invalid operand type", instruction.src_loc);
+    throwWithLocation("TypeError: invalid operand type", instruction.src_loc);
   }
   machine.push(result);
 }
@@ -258,7 +258,7 @@ static inline void mod(Machine& machine, const Instruction& instruction) {
   const auto lhs = machine.pop();
   const auto result = lhs->mod(machine, rhs);
   if (result == nullptr) {
-    throwWithLocation("Invalid operand type", instruction.src_loc);
+    throwWithLocation("TypeError: invalid operand type", instruction.src_loc);
   }
   machine.push(result);
 }
@@ -450,7 +450,7 @@ static inline void negate(Machine& machine, const Instruction& instruction) {
   auto* operand = machine.pop();
   auto* result = operand->negate(machine);
   if (result == nullptr) {
-    throwWithLocation("Cannot negate this type", instruction.src_loc);
+    throwWithLocation("TypeError: cannot negate this type", instruction.src_loc);
   }
   machine.push(result);
 }
