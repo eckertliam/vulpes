@@ -92,6 +92,7 @@ cc_test(
         "tests/test_logical.cpp",
         "tests/test_lexer.cpp",
         "tests/test_parser.cpp",
+        "tests/test_scoping.cpp",
         "tests/test_vm.cpp",
     ],
     copts = VULPES_COPTS,

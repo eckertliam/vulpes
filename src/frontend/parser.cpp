@@ -100,6 +100,12 @@ std::unique_ptr<Stmt> Parser::statement() {
     return return_statement();
   }
 
+  if (match({TokenKind::LBrace})) {
+    auto block = block_statement();
+    consume(TokenKind::RBrace, "Expect '}' after block.");
+    return block;
+  }
+
   if (match({TokenKind::If})) {
     return if_statement();
   }

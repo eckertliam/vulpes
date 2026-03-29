@@ -3,6 +3,7 @@
 #include "frontend/ast.hpp"
 #include "vm/machine.hpp"
 #include "vm/object/function.hpp"
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -20,17 +21,22 @@ class BytecodeEmitter : public frontend::AstVisitor {
   vm::object::Function* current_function;
 
   // Symbol tables for code generation
-  std::unordered_map<std::string_view, uint32_t> locals;
+  std::vector<std::unordered_map<std::string_view, uint32_t>> scope_stack;
+  uint32_t next_local_index = 0;
   std::unordered_map<std::string_view, uint32_t> args;
   std::unordered_map<std::string_view, uint32_t> constants;
 
   // Loop context stack for break/continue
   std::vector<LoopContext> loop_stack;
   
+  // Scope helpers
+  [[nodiscard]] std::optional<uint32_t> find_local(std::string_view name) const;
+
   // Helper methods for bytecode generation
   void emit_constant(vm::object::BaseObject* value);
   void emit_load_local(std::string_view name);
   void emit_store_local(std::string_view name);
+  void emit_declare_local(std::string_view name);
   void emit_load_arg(std::string_view name);
   void emit_store_arg(std::string_view name);
   void emit_binary_op(const frontend::Token& op);

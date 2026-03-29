@@ -11,6 +11,9 @@ namespace vulpes::codegen {
 
 vm::object::Function* BytecodeEmitter::emit_program(const std::vector<std::unique_ptr<frontend::Stmt>>& statements) {
     current_function = machine.buildFunction("__entry__", 0);
+    scope_stack.clear();
+    scope_stack.emplace_back();
+    next_local_index = 0;
 
     for (const auto& stmt : statements) {
         stmt->accept(*this);
@@ -36,25 +39,40 @@ void BytecodeEmitter::emit_constant(vm::object::BaseObject* value) {
     current_function->addInstruction(vm::Instruction(vm::Opcode::LOAD_CONST, constant_index));
 }
 
+// Look up a local variable in the scope stack (innermost first)
+std::optional<uint32_t> BytecodeEmitter::find_local(std::string_view name) const {
+    for (auto it = scope_stack.rbegin(); it != scope_stack.rend(); ++it) {
+        auto found = it->find(name);
+        if (found != it->end()) {
+            return found->second;
+        }
+    }
+    return std::nullopt;
+}
+
 void BytecodeEmitter::emit_load_local(std::string_view name) {
-    auto it = locals.find(name);
-    if (it != locals.end()) {
-        current_function->addInstruction(vm::Instruction(vm::Opcode::LOAD_LOCAL, it->second));
+    auto index = find_local(name);
+    if (index) {
+        current_function->addInstruction(vm::Instruction(vm::Opcode::LOAD_LOCAL, *index));
     } else {
         // TODO: Handle undefined variable error
     }
 }
 
 void BytecodeEmitter::emit_store_local(std::string_view name) {
-    auto it = locals.find(name);
-    if (it != locals.end()) {
-        current_function->addInstruction(vm::Instruction(vm::Opcode::STORE_LOCAL, it->second));
+    auto index = find_local(name);
+    if (index) {
+        current_function->addInstruction(vm::Instruction(vm::Opcode::STORE_LOCAL, *index));
     } else {
-        // Allocate new local
-        uint32_t local_index = static_cast<uint32_t>(locals.size());
-        locals[name] = local_index;
-        current_function->addInstruction(vm::Instruction(vm::Opcode::STORE_LOCAL, local_index));
+        emit_declare_local(name);
     }
+}
+
+void BytecodeEmitter::emit_declare_local(std::string_view name) {
+    // Always allocate a new slot in the current (innermost) scope
+    uint32_t new_index = next_local_index++;
+    scope_stack.back()[name] = new_index;
+    current_function->addInstruction(vm::Instruction(vm::Opcode::STORE_LOCAL, new_index));
 }
 
 void BytecodeEmitter::emit_load_arg(std::string_view name) {
@@ -139,9 +157,9 @@ void BytecodeEmitter::emit_return_constant(vm::object::BaseObject* value) {
 }
 
 void BytecodeEmitter::emit_return_local(std::string_view name) {
-    auto it = locals.find(name);
-    if (it != locals.end()) {
-        current_function->addInstruction(vm::Instruction(vm::Opcode::RETURN_LOCAL, it->second));
+    auto it = find_local(name);
+    if (it) {
+        current_function->addInstruction(vm::Instruction(vm::Opcode::RETURN_LOCAL, *it));
     } else {
         // Fall back to RETURN_VALUE if local not found
         emit_return();
@@ -234,33 +252,28 @@ void BytecodeEmitter::visit(const frontend::GroupingExpr& expr) {
 }
 
 void BytecodeEmitter::visit(const frontend::VarExpr& expr) {
-    // Try to load from locals first, then args, then globals
-    auto local_it = locals.find(expr.name);
-    if (local_it != locals.end()) {
+    // Try locals (scope stack), then args, then globals
+    auto local_idx = find_local(expr.name);
+    if (local_idx) {
         emit_load_local(expr.name);
     } else {
         auto arg_it = args.find(expr.name);
         if (arg_it != args.end()) {
             emit_load_arg(expr.name);
         } else {
-            // Check if it's a global function
             auto global_it = machine.getFunctionTable().find(std::string(expr.name));
             if (global_it != machine.getFunctionTable().end()) {
-                // Load the function from global table
                 current_function->addInstruction(vm::Instruction(vm::Opcode::LOAD_GLOBAL, global_it->second));
-            } else {
-                // TODO: Handle undefined variable error
             }
         }
     }
 }
 
 void BytecodeEmitter::visit(const frontend::AssignExpr& expr) {
-    // Visit the value expression first
     expr.value->accept(*this);
-    // Then store to the variable and reload (assignment is an expression)
-    auto local_it = locals.find(expr.name);
-    if (local_it != locals.end()) {
+    // Store and reload (assignment is an expression that leaves value on stack)
+    auto local_idx = find_local(expr.name);
+    if (local_idx) {
         emit_store_local(expr.name);
         emit_load_local(expr.name);
     } else {
@@ -269,7 +282,6 @@ void BytecodeEmitter::visit(const frontend::AssignExpr& expr) {
             emit_store_arg(expr.name);
             emit_load_arg(expr.name);
         } else {
-            // Create new local
             emit_store_local(expr.name);
             emit_load_local(expr.name);
         }
@@ -350,7 +362,7 @@ void BytecodeEmitter::visit(const frontend::LetStmt& stmt) {
         auto* null_obj = machine.allocate<vm::object::Null>();
         emit_constant(null_obj);
     }
-    emit_store_local(stmt.name);
+    emit_declare_local(stmt.name);
 }
 
 void BytecodeEmitter::visit(const frontend::ConstStmt& stmt) {
@@ -361,13 +373,15 @@ void BytecodeEmitter::visit(const frontend::ConstStmt& stmt) {
         auto* null_obj = machine.allocate<vm::object::Null>();
         emit_constant(null_obj);
     }
-    emit_store_local(stmt.name);
+    emit_declare_local(stmt.name);
 }
 
 void BytecodeEmitter::visit(const frontend::BlockStmt& stmt) {
+    scope_stack.emplace_back();
     for (const auto& statement : stmt.statements) {
         statement->accept(*this);
     }
+    scope_stack.pop_back();
 }
 
 void BytecodeEmitter::visit(const frontend::IfStmt& stmt) {
@@ -460,9 +474,8 @@ void BytecodeEmitter::visit(const frontend::ReturnStmt& stmt) {
         
         // Check if the value is a simple variable reference
         if (auto* var_expr = dynamic_cast<const frontend::VarExpr*>(stmt.value.get())) {
-            // Check if it's a local variable
-            auto local_it = locals.find(var_expr->name);
-            if (local_it != locals.end()) {
+            auto local_idx = find_local(var_expr->name);
+            if (local_idx) {
                 emit_return_local(var_expr->name);
                 return;
             }
@@ -482,15 +495,20 @@ void BytecodeEmitter::visit(const frontend::FunctionStmt& stmt) {
     // Create a new function
     vm::object::Function* fn = machine.buildFunction(stmt.name, stmt.params.size());
     
-    // Save current function and switch to new one
+    // Save current state and switch to new function
     vm::object::Function* prev_function = current_function;
+    auto prev_scope_stack = std::move(scope_stack);
+    auto prev_next_local = next_local_index;
+    auto prev_args = std::move(args);
+    auto prev_constants = std::move(constants);
+
     current_function = fn;
-    
-    // Clear symbol tables for new function
-    locals.clear();
+    scope_stack.clear();
+    scope_stack.emplace_back();
+    next_local_index = 0;
     args.clear();
     constants.clear();
-    
+
     // Set up argument mapping
     for (size_t i = 0; i < stmt.params.size(); i++) {
         args[stmt.params[i]] = static_cast<uint32_t>(i);
@@ -503,8 +521,12 @@ void BytecodeEmitter::visit(const frontend::FunctionStmt& stmt) {
     auto* null_obj = machine.allocate<vm::object::Null>();
     emit_return_constant(null_obj);
     
-    // Restore previous function
+    // Restore previous state
     current_function = prev_function;
+    scope_stack = std::move(prev_scope_stack);
+    next_local_index = prev_next_local;
+    args = std::move(prev_args);
+    constants = std::move(prev_constants);
 }
 
 void BytecodeEmitter::visit(const frontend::ClassStmt& stmt) {
