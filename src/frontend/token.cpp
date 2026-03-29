@@ -108,6 +108,20 @@ const char* token_kind_to_string(TokenKind kind) {
       return "&&";
     case TokenKind::BarBar:
       return "||";
+    case TokenKind::StarStar:
+      return "**";
+    case TokenKind::LessLess:
+      return "<<";
+    case TokenKind::GreaterGreater:
+      return ">>";
+    case TokenKind::Amp:
+      return "&";
+    case TokenKind::Caret:
+      return "^";
+    case TokenKind::Bar:
+      return "|";
+    case TokenKind::Match:
+      return "Match";
     case TokenKind::Error:
       return "Error";
     case TokenKind::Eof:

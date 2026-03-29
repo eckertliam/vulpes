@@ -33,6 +33,7 @@ enum class TokenKind {
   From,
   Import,
   Export,
+  Match,
   True,
   False,
   Null,
@@ -66,6 +67,12 @@ enum class TokenKind {
   GreaterEq,
   AmpAmp,
   BarBar,
+  StarStar,
+  LessLess,
+  GreaterGreater,
+  Amp,
+  Caret,
+  Bar,
 
   // Special
   Error,

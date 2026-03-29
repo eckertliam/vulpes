@@ -26,6 +26,7 @@ static const std::unordered_map<std::string_view, TokenKind> keywords = {
     {"export", TokenKind::Export},
     {"true", TokenKind::True},
     {"false", TokenKind::False},
+    {"match", TokenKind::Match},
     {"null", TokenKind::Null},
     {"type", TokenKind::Type},
 };
@@ -75,7 +76,7 @@ Token Lexer::next_token() {
     case '-':
       return make_token(TokenKind::Minus);
     case '*':
-      return make_token(TokenKind::Star);
+      return make_token(match('*') ? TokenKind::StarStar : TokenKind::Star);
     case '/':
       return make_token(TokenKind::Slash);
     case '%':
@@ -85,28 +86,24 @@ Token Lexer::next_token() {
     case '!':
       return make_token(match('=') ? TokenKind::BangEq : TokenKind::Bang);
     case '<':
+      if (match('<')) return make_token(TokenKind::LessLess);
       return make_token(match('=') ? TokenKind::LessEq : TokenKind::Less);
     case '>':
+      if (match('>')) return make_token(TokenKind::GreaterGreater);
       return make_token(match('=') ? TokenKind::GreaterEq : TokenKind::Greater);
     case '&':
-      if (match('&')) {
-        return make_token(TokenKind::AmpAmp);
-      }
-      break;
+      return make_token(match('&') ? TokenKind::AmpAmp : TokenKind::Amp);
     case '|':
-      if (match('|')) {
-        return make_token(TokenKind::BarBar);
-      }
-      break;
+      return make_token(match('|') ? TokenKind::BarBar : TokenKind::Bar);
+    case '^':
+      return make_token(TokenKind::Caret);
     case '"':
       return string();
     case '\'':
       return character();
     default:
-      throw std::runtime_error("Unexpected character.");
+      return error_token("Unexpected character.");
   }
-
-  return error_token("Unexpected character.");
 }
 
 Token Lexer::make_token(const TokenKind type) const {
@@ -213,13 +210,31 @@ Token Lexer::character() {
 }
 
 Token Lexer::number() {
-  while (std::isdigit(peek())) {
+  // Check for hex (0x) or binary (0b) prefix
+  if (m_source[m_start] == '0' && m_current < m_source.length()) {
+    if (peek() == 'x' || peek() == 'X') {
+      advance();  // consume 'x'
+      while (std::isxdigit(peek()) || peek() == '_') {
+        advance();
+      }
+      return make_token(TokenKind::Integer);
+    }
+    if (peek() == 'b' || peek() == 'B') {
+      advance();  // consume 'b'
+      while (peek() == '0' || peek() == '1' || peek() == '_') {
+        advance();
+      }
+      return make_token(TokenKind::Integer);
+    }
+  }
+
+  while (std::isdigit(peek()) || peek() == '_') {
     advance();
   }
 
   if (peek() == '.' && std::isdigit(peek_next())) {
     advance();
-    while (std::isdigit(peek())) {
+    while (std::isdigit(peek()) || peek() == '_') {
       advance();
     }
     return make_token(TokenKind::Float);

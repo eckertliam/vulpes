@@ -88,8 +88,21 @@ struct IntegerLiteral final : Expr {
 
   explicit IntegerLiteral(const Token& token) {
     const std::string_view lexeme = token.lexeme();
-    // TODO: handle binary and hex formats
-    value = std::stoll(std::string(lexeme));
+    // Strip underscores
+    std::string cleaned;
+    cleaned.reserve(lexeme.size());
+    for (char c : lexeme) {
+      if (c != '_') cleaned += c;
+    }
+    if (cleaned.size() > 2 && cleaned[0] == '0' &&
+        (cleaned[1] == 'x' || cleaned[1] == 'X')) {
+      value = std::stoll(cleaned, nullptr, 16);
+    } else if (cleaned.size() > 2 && cleaned[0] == '0' &&
+               (cleaned[1] == 'b' || cleaned[1] == 'B')) {
+      value = std::stoll(cleaned.substr(2), nullptr, 2);
+    } else {
+      value = std::stoll(cleaned);
+    }
     location = token.location;
   }
 
@@ -101,7 +114,12 @@ struct FloatLiteral final : Expr {
 
   explicit FloatLiteral(const Token& token) {
     const std::string_view lexeme = token.lexeme();
-    value = std::stod(std::string(lexeme));
+    std::string cleaned;
+    cleaned.reserve(lexeme.size());
+    for (char c : lexeme) {
+      if (c != '_') cleaned += c;
+    }
+    value = std::stod(cleaned);
     location = token.location;
   }
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
