@@ -47,6 +47,12 @@ class BaseObject {
   virtual BaseObject* mul(vulpes::vm::Machine& machine, BaseObject* other) = 0;
   virtual BaseObject* div(vulpes::vm::Machine& machine, BaseObject* other) = 0;
   virtual BaseObject* mod(vulpes::vm::Machine& machine, BaseObject* other) = 0;
+  virtual BaseObject* pow(vulpes::vm::Machine& machine, BaseObject* other) = 0;
+  virtual BaseObject* shl(vulpes::vm::Machine& machine, BaseObject* other) = 0;
+  virtual BaseObject* shr(vulpes::vm::Machine& machine, BaseObject* other) = 0;
+  virtual BaseObject* bit_and(vulpes::vm::Machine& machine, BaseObject* other) = 0;
+  virtual BaseObject* bit_xor(vulpes::vm::Machine& machine, BaseObject* other) = 0;
+  virtual BaseObject* bit_or(vulpes::vm::Machine& machine, BaseObject* other) = 0;
 
   // truthiness — used by if/while/!/&&/||
   [[nodiscard]] virtual bool isTruthy() const = 0;

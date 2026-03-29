@@ -67,6 +67,14 @@ enum class Opcode : uint8_t {
   // Pop value, jump if falsy
   // Imm: instruction index to jump to
   JUMP_IF_FALSE,
+  // Power
+  POW,
+  // Bitwise operators
+  SHL,
+  SHR,
+  BIT_AND,
+  BIT_XOR,
+  BIT_OR,
   // Comparison operators — pop two values, push Boolean result
   EQ,
   NEQ,

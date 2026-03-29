@@ -3,6 +3,8 @@
 #include "integer.hpp"
 #include "../machine.hpp"
 
+#include <cmath>
+
 namespace vulpes::vm::object {
 
 BaseObject* Float::add(vulpes::vm::Machine& machine, BaseObject* other) {
@@ -81,7 +83,43 @@ BaseObject* Float::div(vulpes::vm::Machine& machine, BaseObject* other) {
   }
 }
 
-BaseObject* Float::mod([[maybe_unused]] vulpes::vm::Machine& machine, [[maybe_unused]] BaseObject* other) {
+BaseObject* Float::mod(vulpes::vm::Machine& machine, BaseObject* other) {
+  if (other->type() == ObjectType::Float) {
+    return machine.allocate<Float>(std::fmod(value_, dynamic_cast<Float*>(other)->value()));
+  }
+  if (other->type() == ObjectType::Integer) {
+    return machine.allocate<Float>(std::fmod(value_, static_cast<double>(dynamic_cast<Integer*>(other)->value())));
+  }
+  return nullptr;
+}
+
+BaseObject* Float::pow(vulpes::vm::Machine& machine, BaseObject* other) {
+  if (other->type() == ObjectType::Float) {
+    return machine.allocate<Float>(std::pow(value_, dynamic_cast<Float*>(other)->value()));
+  }
+  if (other->type() == ObjectType::Integer) {
+    return machine.allocate<Float>(std::pow(value_, static_cast<double>(dynamic_cast<Integer*>(other)->value())));
+  }
+  return nullptr;
+}
+
+BaseObject* Float::shl([[maybe_unused]] vulpes::vm::Machine& machine, [[maybe_unused]] BaseObject* other) {
+  return nullptr;
+}
+
+BaseObject* Float::shr([[maybe_unused]] vulpes::vm::Machine& machine, [[maybe_unused]] BaseObject* other) {
+  return nullptr;
+}
+
+BaseObject* Float::bit_and([[maybe_unused]] vulpes::vm::Machine& machine, [[maybe_unused]] BaseObject* other) {
+  return nullptr;
+}
+
+BaseObject* Float::bit_xor([[maybe_unused]] vulpes::vm::Machine& machine, [[maybe_unused]] BaseObject* other) {
+  return nullptr;
+}
+
+BaseObject* Float::bit_or([[maybe_unused]] vulpes::vm::Machine& machine, [[maybe_unused]] BaseObject* other) {
   return nullptr;
 }
 

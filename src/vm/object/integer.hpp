@@ -23,6 +23,12 @@ class Integer final : public BaseObject {
   BaseObject* mul(vulpes::vm::Machine& machine, BaseObject* other) override;
   BaseObject* div(vulpes::vm::Machine& machine, BaseObject* other) override;
   BaseObject* mod(vulpes::vm::Machine& machine, BaseObject* other) override;
+  BaseObject* pow(vulpes::vm::Machine& machine, BaseObject* other) override;
+  BaseObject* shl(vulpes::vm::Machine& machine, BaseObject* other) override;
+  BaseObject* shr(vulpes::vm::Machine& machine, BaseObject* other) override;
+  BaseObject* bit_and(vulpes::vm::Machine& machine, BaseObject* other) override;
+  BaseObject* bit_xor(vulpes::vm::Machine& machine, BaseObject* other) override;
+  BaseObject* bit_or(vulpes::vm::Machine& machine, BaseObject* other) override;
 
   [[nodiscard]] bool isTruthy() const override;
   BaseObject* negate(vulpes::vm::Machine& machine) override;

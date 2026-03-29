@@ -3,6 +3,8 @@
 #include "float.hpp"
 #include "../machine.hpp"
 
+#include <cmath>
+
 namespace vulpes::vm::object {
 
 BaseObject* Integer::add(vulpes::vm::Machine& machine, BaseObject* other) {
@@ -87,6 +89,55 @@ BaseObject* Integer::mod(vulpes::vm::Machine& machine, BaseObject* other) {
   }
   return machine.allocate<Integer>(value_ %
                                    dynamic_cast<Integer*>(other)->value_);
+}
+
+BaseObject* Integer::pow(vulpes::vm::Machine& machine, BaseObject* other) {
+  if (other->type() == ObjectType::Integer) {
+    auto exp = dynamic_cast<Integer*>(other)->value_;
+    int64_t result = 1;
+    int64_t base = value_;
+    bool negative_exp = exp < 0;
+    if (negative_exp) exp = -exp;
+    while (exp > 0) {
+      if (exp & 1) result *= base;
+      base *= base;
+      exp >>= 1;
+    }
+    if (negative_exp) {
+      return machine.allocate<Float>(1.0 / static_cast<double>(result));
+    }
+    return machine.allocate<Integer>(result);
+  }
+  if (other->type() == ObjectType::Float) {
+    return machine.allocate<Float>(
+        std::pow(static_cast<double>(value_), dynamic_cast<Float*>(other)->value()));
+  }
+  return nullptr;
+}
+
+BaseObject* Integer::shl(vulpes::vm::Machine& machine, BaseObject* other) {
+  if (other->type() != ObjectType::Integer) return nullptr;
+  return machine.allocate<Integer>(value_ << dynamic_cast<Integer*>(other)->value_);
+}
+
+BaseObject* Integer::shr(vulpes::vm::Machine& machine, BaseObject* other) {
+  if (other->type() != ObjectType::Integer) return nullptr;
+  return machine.allocate<Integer>(value_ >> dynamic_cast<Integer*>(other)->value_);
+}
+
+BaseObject* Integer::bit_and(vulpes::vm::Machine& machine, BaseObject* other) {
+  if (other->type() != ObjectType::Integer) return nullptr;
+  return machine.allocate<Integer>(value_ & dynamic_cast<Integer*>(other)->value_);
+}
+
+BaseObject* Integer::bit_xor(vulpes::vm::Machine& machine, BaseObject* other) {
+  if (other->type() != ObjectType::Integer) return nullptr;
+  return machine.allocate<Integer>(value_ ^ dynamic_cast<Integer*>(other)->value_);
+}
+
+BaseObject* Integer::bit_or(vulpes::vm::Machine& machine, BaseObject* other) {
+  if (other->type() != ObjectType::Integer) return nullptr;
+  return machine.allocate<Integer>(value_ | dynamic_cast<Integer*>(other)->value_);
 }
 
 BaseObject* Integer::eq(vulpes::vm::Machine& machine, BaseObject* other) {

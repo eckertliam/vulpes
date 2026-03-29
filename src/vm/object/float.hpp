@@ -26,6 +26,12 @@ class Float final : public BaseObject {
   BaseObject* mul(Machine& machine, BaseObject* other) override;
   BaseObject* div(Machine& machine, BaseObject* other) override;
   BaseObject* mod(Machine& machine, BaseObject* other) override;
+  BaseObject* pow(Machine& machine, BaseObject* other) override;
+  BaseObject* shl(Machine& machine, BaseObject* other) override;
+  BaseObject* shr(Machine& machine, BaseObject* other) override;
+  BaseObject* bit_and(Machine& machine, BaseObject* other) override;
+  BaseObject* bit_xor(Machine& machine, BaseObject* other) override;
+  BaseObject* bit_or(Machine& machine, BaseObject* other) override;
 
   [[nodiscard]] bool isTruthy() const override;
   BaseObject* negate(Machine& machine) override;

@@ -116,6 +116,18 @@ void BytecodeEmitter::emit_binary_op(const frontend::Token& op) {
         current_function->addInstruction(vm::Instruction(vm::Opcode::LTE));
     } else if (op.lexeme() == ">=") {
         current_function->addInstruction(vm::Instruction(vm::Opcode::GTE));
+    } else if (op.lexeme() == "**") {
+        current_function->addInstruction(vm::Instruction(vm::Opcode::POW));
+    } else if (op.lexeme() == "<<") {
+        current_function->addInstruction(vm::Instruction(vm::Opcode::SHL));
+    } else if (op.lexeme() == ">>") {
+        current_function->addInstruction(vm::Instruction(vm::Opcode::SHR));
+    } else if (op.lexeme() == "&") {
+        current_function->addInstruction(vm::Instruction(vm::Opcode::BIT_AND));
+    } else if (op.lexeme() == "^") {
+        current_function->addInstruction(vm::Instruction(vm::Opcode::BIT_XOR));
+    } else if (op.lexeme() == "|") {
+        current_function->addInstruction(vm::Instruction(vm::Opcode::BIT_OR));
     }
 }
 

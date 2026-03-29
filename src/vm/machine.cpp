@@ -250,6 +250,66 @@ static inline void mod(Machine& machine, const Instruction& instruction) {
   machine.push(result);
 }
 
+static inline void power(Machine& machine, const Instruction& instruction) {
+  const auto rhs = machine.pop();
+  const auto lhs = machine.pop();
+  const auto result = lhs->pow(machine, rhs);
+  if (result == nullptr) {
+    throwWithLocation("Invalid operand type for **", instruction.src_loc);
+  }
+  machine.push(result);
+}
+
+static inline void shl(Machine& machine, const Instruction& instruction) {
+  const auto rhs = machine.pop();
+  const auto lhs = machine.pop();
+  const auto result = lhs->shl(machine, rhs);
+  if (result == nullptr) {
+    throwWithLocation("Invalid operand type for <<", instruction.src_loc);
+  }
+  machine.push(result);
+}
+
+static inline void shr(Machine& machine, const Instruction& instruction) {
+  const auto rhs = machine.pop();
+  const auto lhs = machine.pop();
+  const auto result = lhs->shr(machine, rhs);
+  if (result == nullptr) {
+    throwWithLocation("Invalid operand type for >>", instruction.src_loc);
+  }
+  machine.push(result);
+}
+
+static inline void bitAnd(Machine& machine, const Instruction& instruction) {
+  const auto rhs = machine.pop();
+  const auto lhs = machine.pop();
+  const auto result = lhs->bit_and(machine, rhs);
+  if (result == nullptr) {
+    throwWithLocation("Invalid operand type for &", instruction.src_loc);
+  }
+  machine.push(result);
+}
+
+static inline void bitXor(Machine& machine, const Instruction& instruction) {
+  const auto rhs = machine.pop();
+  const auto lhs = machine.pop();
+  const auto result = lhs->bit_xor(machine, rhs);
+  if (result == nullptr) {
+    throwWithLocation("Invalid operand type for ^", instruction.src_loc);
+  }
+  machine.push(result);
+}
+
+static inline void bitOr(Machine& machine, const Instruction& instruction) {
+  const auto rhs = machine.pop();
+  const auto lhs = machine.pop();
+  const auto result = lhs->bit_or(machine, rhs);
+  if (result == nullptr) {
+    throwWithLocation("Invalid operand type for |", instruction.src_loc);
+  }
+  machine.push(result);
+}
+
 static inline void pop(Machine& machine, [[maybe_unused]] const Instruction& instruction) {
   machine.pop();
 }
@@ -362,6 +422,12 @@ static std::unordered_map<Opcode, InstructionHandler> instruction_handlers = {
     {Opcode::DIV, div},
     {Opcode::MOD, mod},
     {Opcode::POP, pop},
+    {Opcode::POW, power},
+    {Opcode::SHL, shl},
+    {Opcode::SHR, shr},
+    {Opcode::BIT_AND, bitAnd},
+    {Opcode::BIT_XOR, bitXor},
+    {Opcode::BIT_OR, bitOr},
     {Opcode::NEGATE, negate},
     {Opcode::NOT, logicalNot},
     {Opcode::JUMP, jump},
