@@ -9,6 +9,7 @@
 #include "object/boolean.hpp"
 #include "object/null.hpp"
 #include "object/string.hpp"
+#include "object/base.hpp"
 
 namespace vulpes::vm {
 
@@ -533,6 +534,32 @@ void Machine::registerBuiltins() {
                      std::cout << arg->toString();
                    }
                    return machine.allocate<Null>();
+                 });
+
+  registerNative("type", 1,
+                 [](Machine& machine,
+                    const std::vector<BaseObject*>& args) -> BaseObject* {
+                   const auto* obj = args[0];
+                   // Map internal names to spec names
+                   std::string name;
+                   switch (obj->type()) {
+                     case ObjectType::Integer: name = "int"; break;
+                     case ObjectType::Float: name = "float"; break;
+                     case ObjectType::String: name = "string"; break;
+                     case ObjectType::Boolean: name = "bool"; break;
+                     case ObjectType::Null: name = "null"; break;
+                     case ObjectType::Object: name = "object"; break;
+                     case ObjectType::Function:
+                     case ObjectType::NativeFunction: name = "function"; break;
+                     default: name = "unknown"; break;
+                   }
+                   return machine.allocate<String>(std::move(name));
+                 });
+
+  registerNative("throw_err", 1,
+                 []([[maybe_unused]] Machine& machine,
+                    const std::vector<BaseObject*>& args) -> BaseObject* {
+                   throw std::runtime_error(args[0]->toString());
                  });
 }
 
