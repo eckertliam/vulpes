@@ -339,6 +339,14 @@ void BytecodeEmitter::visit(const frontend::CallExpr& expr) {
     emit_call(expr.arguments.size());
 }
 
+void BytecodeEmitter::visit([[maybe_unused]] const frontend::IndexExpr& expr) {
+    // TODO: Implement index access
+}
+
+void BytecodeEmitter::visit([[maybe_unused]] const frontend::IndexSetExpr& expr) {
+    // TODO: Implement index assignment
+}
+
 void BytecodeEmitter::visit([[maybe_unused]] const frontend::GetExpr& expr) {
     // TODO: Implement property access
 }
@@ -527,6 +535,27 @@ void BytecodeEmitter::visit(const frontend::FunctionStmt& stmt) {
     next_local_index = prev_next_local;
     args = std::move(prev_args);
     constants = std::move(prev_constants);
+}
+
+void BytecodeEmitter::visit([[maybe_unused]] const frontend::EnumStmt& stmt) {
+    // Enums are backed by integers: each tag gets an integer value starting at 0
+    for (size_t i = 0; i < stmt.tags.size(); i++) {
+        auto* int_obj = machine.allocate<vm::object::Integer>(static_cast<int64_t>(i));
+        emit_constant(int_obj);
+        emit_declare_local(stmt.tags[i]);
+    }
+}
+
+void BytecodeEmitter::visit([[maybe_unused]] const frontend::StructStmt& stmt) {
+    // TODO: Implement struct definition
+}
+
+void BytecodeEmitter::visit([[maybe_unused]] const frontend::ImportStmt& stmt) {
+    // TODO: Implement module imports
+}
+
+void BytecodeEmitter::visit([[maybe_unused]] const frontend::ExportStmt& stmt) {
+    // TODO: Implement module exports
 }
 
 void BytecodeEmitter::visit(const frontend::ClassStmt& stmt) {

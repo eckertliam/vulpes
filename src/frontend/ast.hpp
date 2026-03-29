@@ -25,6 +25,8 @@ struct VarExpr;
 struct AssignExpr;
 struct LogicalExpr;
 struct CallExpr;
+struct IndexExpr;
+struct IndexSetExpr;
 struct GetExpr;
 struct SetExpr;
 struct ExpressionStmt;
@@ -38,6 +40,10 @@ struct ReturnStmt;
 struct BreakStmt;
 struct ContinueStmt;
 struct FunctionStmt;
+struct EnumStmt;
+struct StructStmt;
+struct ImportStmt;
+struct ExportStmt;
 struct ClassStmt;
 
 struct AstVisitor {
@@ -55,6 +61,8 @@ struct AstVisitor {
   virtual void visit(const AssignExpr& expr) = 0;
   virtual void visit(const LogicalExpr& expr) = 0;
   virtual void visit(const CallExpr& expr) = 0;
+  virtual void visit(const IndexExpr& expr) = 0;
+  virtual void visit(const IndexSetExpr& expr) = 0;
   virtual void visit(const GetExpr& expr) = 0;
   virtual void visit(const SetExpr& expr) = 0;
   virtual void visit(const ExpressionStmt& stmt) = 0;
@@ -68,6 +76,10 @@ struct AstVisitor {
   virtual void visit(const BreakStmt& stmt) = 0;
   virtual void visit(const ContinueStmt& stmt) = 0;
   virtual void visit(const FunctionStmt& stmt) = 0;
+  virtual void visit(const EnumStmt& stmt) = 0;
+  virtual void visit(const StructStmt& stmt) = 0;
+  virtual void visit(const ImportStmt& stmt) = 0;
+  virtual void visit(const ExportStmt& stmt) = 0;
   virtual void visit(const ClassStmt& stmt) = 0;
 };
 
@@ -260,6 +272,39 @@ struct CallExpr final : Expr {
     location = this->callee->location;
     location.end_line = paren.location.end_line;
     location.end_column = paren.location.end_column;
+  }
+
+  void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
+};
+
+struct IndexExpr final : Expr {
+  std::unique_ptr<Expr> object;
+  std::unique_ptr<Expr> index;
+
+  IndexExpr(std::unique_ptr<Expr> object, const Token& bracket,
+            std::unique_ptr<Expr> index)
+      : object(std::move(object)), index(std::move(index)) {
+    location = this->object->location;
+    location.end_line = bracket.location.end_line;
+    location.end_column = bracket.location.end_column;
+  }
+
+  void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
+};
+
+struct IndexSetExpr final : Expr {
+  std::unique_ptr<Expr> object;
+  std::unique_ptr<Expr> index;
+  std::unique_ptr<Expr> value;
+
+  IndexSetExpr(std::unique_ptr<Expr> object, std::unique_ptr<Expr> index,
+               std::unique_ptr<Expr> value)
+      : object(std::move(object)),
+        index(std::move(index)),
+        value(std::move(value)) {
+    location = this->object->location;
+    location.end_line = this->value->location.end_line;
+    location.end_column = this->value->location.end_column;
   }
 
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
@@ -462,18 +507,76 @@ struct FunctionStmt final : Stmt {
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
 };
 
+struct EnumStmt final : Stmt {
+  std::string_view name;
+  std::vector<std::string_view> tags;
+
+  EnumStmt(const Token& name_tok, std::vector<std::string_view> tags)
+      : name(name_tok.lexeme()), tags(std::move(tags)) {
+    location = name_tok.location;
+  }
+
+  void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
+};
+
+struct StructField {
+  std::string_view name;
+  std::string_view type_ann;
+};
+
+struct StructStmt final : Stmt {
+  std::string_view name;
+  std::vector<StructField> fields;
+
+  StructStmt(const Token& name_tok, std::vector<StructField> fields)
+      : name(name_tok.lexeme()), fields(std::move(fields)) {
+    location = name_tok.location;
+  }
+
+  void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
+};
+
+struct ImportStmt final : Stmt {
+  std::string_view module_path;
+  std::vector<std::string_view> names;
+
+  ImportStmt(const Token& from_tok, std::string_view module_path,
+             std::vector<std::string_view> names)
+      : module_path(module_path), names(std::move(names)) {
+    location = from_tok.location;
+  }
+
+  void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
+};
+
+struct ExportStmt final : Stmt {
+  std::vector<std::string_view> names;
+
+  ExportStmt(const Token& export_tok, std::vector<std::string_view> names)
+      : names(std::move(names)) {
+    location = export_tok.location;
+  }
+
+  void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
+};
+
+struct ClassField {
+  bool is_pub;
+  std::string_view name;
+  std::string_view type_ann;
+};
+
 struct ClassStmt final : Stmt {
   std::string_view name;
+  std::vector<ClassField> fields;
   std::vector<std::unique_ptr<FunctionStmt>> methods;
 
-  ClassStmt(const Token& name_tok,
+  ClassStmt(const Token& name_tok, std::vector<ClassField> fields,
             std::vector<std::unique_ptr<FunctionStmt>> methods)
-      : name(name_tok.lexeme()), methods(std::move(methods)) {
+      : name(name_tok.lexeme()),
+        fields(std::move(fields)),
+        methods(std::move(methods)) {
     location = name_tok.location;
-    if (!this->methods.empty()) {
-      location.end_line = this->methods.back()->location.end_line;
-      location.end_column = this->methods.back()->location.end_column;
-    }
   }
 
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
