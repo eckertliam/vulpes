@@ -380,6 +380,53 @@ void BytecodeEmitter::visit([[maybe_unused]] const frontend::SetExpr& expr) {
     // TODO: Implement property assignment
 }
 
+void BytecodeEmitter::visit(const frontend::FunctionExpr& expr) {
+    // Generate a unique anonymous function name
+    static uint32_t anon_counter = 0;
+    std::string name = "__anon_" + std::to_string(anon_counter++);
+
+    vm::object::Function* fn = machine.buildFunction(name, expr.params.size());
+
+    // Save current state and switch to new function
+    vm::object::Function* prev_function = current_function;
+    auto prev_scope_stack = std::move(scope_stack);
+    auto prev_next_local = next_local_index;
+    auto prev_args = std::move(args);
+    auto prev_constants = std::move(constants);
+    auto prev_in_top_level = in_top_level;
+
+    current_function = fn;
+    scope_stack.clear();
+    scope_stack.emplace_back();
+    next_local_index = 0;
+    args.clear();
+    constants.clear();
+    in_top_level = false;
+
+    for (size_t i = 0; i < expr.params.size(); i++) {
+        args[expr.params[i]] = static_cast<uint32_t>(i);
+    }
+
+    expr.body->accept(*this);
+
+    auto* null_obj = machine.allocate<vm::object::Null>();
+    emit_return_constant(null_obj);
+
+    // Restore previous state
+    current_function = prev_function;
+    scope_stack = std::move(prev_scope_stack);
+    next_local_index = prev_next_local;
+    args = std::move(prev_args);
+    constants = std::move(prev_constants);
+    in_top_level = prev_in_top_level;
+
+    // Load the function object onto the stack
+    auto global_it = machine.getFunctionTable().find(name);
+    if (global_it != machine.getFunctionTable().end()) {
+        current_function->addInstruction(vm::Instruction(vm::Opcode::LOAD_GLOBAL, global_it->second));
+    }
+}
+
 // Statement visitors
 void BytecodeEmitter::visit(const frontend::ExpressionStmt& stmt) {
     stmt.expr->accept(*this);
@@ -540,13 +587,14 @@ void BytecodeEmitter::visit(const frontend::ReturnStmt& stmt) {
 void BytecodeEmitter::visit(const frontend::FunctionStmt& stmt) {
     // Create a new function
     vm::object::Function* fn = machine.buildFunction(stmt.name, stmt.params.size());
-    
+
     // Save current state and switch to new function
     vm::object::Function* prev_function = current_function;
     auto prev_scope_stack = std::move(scope_stack);
     auto prev_next_local = next_local_index;
     auto prev_args = std::move(args);
     auto prev_constants = std::move(constants);
+    auto prev_in_top_level = in_top_level;
 
     current_function = fn;
     scope_stack.clear();
@@ -554,6 +602,7 @@ void BytecodeEmitter::visit(const frontend::FunctionStmt& stmt) {
     next_local_index = 0;
     args.clear();
     constants.clear();
+    in_top_level = false;
 
     // Set up argument mapping
     for (size_t i = 0; i < stmt.params.size(); i++) {
@@ -573,6 +622,7 @@ void BytecodeEmitter::visit(const frontend::FunctionStmt& stmt) {
     next_local_index = prev_next_local;
     args = std::move(prev_args);
     constants = std::move(prev_constants);
+    in_top_level = prev_in_top_level;
 }
 
 void BytecodeEmitter::visit([[maybe_unused]] const frontend::EnumStmt& stmt) {

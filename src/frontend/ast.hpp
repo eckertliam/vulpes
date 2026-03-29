@@ -39,6 +39,7 @@ struct ForStmt;
 struct ReturnStmt;
 struct BreakStmt;
 struct ContinueStmt;
+struct FunctionExpr;
 struct FunctionStmt;
 struct EnumStmt;
 struct StructStmt;
@@ -75,6 +76,7 @@ struct AstVisitor {
   virtual void visit(const ReturnStmt& stmt) = 0;
   virtual void visit(const BreakStmt& stmt) = 0;
   virtual void visit(const ContinueStmt& stmt) = 0;
+  virtual void visit(const FunctionExpr& expr) = 0;
   virtual void visit(const FunctionStmt& stmt) = 0;
   virtual void visit(const EnumStmt& stmt) = 0;
   virtual void visit(const StructStmt& stmt) = 0;
@@ -482,6 +484,24 @@ struct BreakStmt final : Stmt {
 
 struct ContinueStmt final : Stmt {
   explicit ContinueStmt(const Token& keyword) { location = keyword.location; }
+  void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
+};
+
+struct FunctionExpr final : Expr {
+  std::vector<std::string_view> params;
+  std::unique_ptr<BlockStmt> body;
+
+  FunctionExpr(const Token& fn_tok,
+               const std::vector<std::string_view>& params,
+               std::unique_ptr<BlockStmt> body)
+      : params(params), body(std::move(body)) {
+    location = fn_tok.location;
+    if (!this->body->empty()) {
+      location.end_line = this->body->back()->location.end_line;
+      location.end_column = this->body->back()->location.end_column;
+    }
+  }
+
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
 };
 

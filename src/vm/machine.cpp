@@ -157,11 +157,16 @@ static inline void callFunction(Machine& machine,
   }
   const auto function = dynamic_cast<Function*>(functionObj);
   const auto arity = function->getArity();
+  // Collect args from stack first
+  std::vector<BaseObject*> call_args(arity);
   for (size_t i = 0; i < arity; i++) {
-    const auto arg = machine.pop();
-    machine.getCurrentFunction()->addLocal(arg);
+    call_args[i] = machine.pop();
   }
+  // Push call frame, then store args in the callee's locals
   machine.pushCallFrame(function);
+  for (size_t i = 0; i < arity; i++) {
+    function->setLocal(static_cast<uint32_t>(i), call_args[i]);
+  }
 }
 
 static inline void returnConst(Machine& machine,

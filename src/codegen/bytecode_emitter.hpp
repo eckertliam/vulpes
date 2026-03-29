@@ -82,6 +82,7 @@ class BytecodeEmitter : public frontend::AstVisitor {
   void visit(const frontend::IndexSetExpr& expr) override;
   void visit(const frontend::GetExpr& expr) override;
   void visit(const frontend::SetExpr& expr) override;
+  void visit(const frontend::FunctionExpr& expr) override;
   
   // AstVisitor implementation - Statement visitors
   void visit(const frontend::ExpressionStmt& stmt) override;

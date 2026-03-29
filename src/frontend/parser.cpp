@@ -504,6 +504,28 @@ std::unique_ptr<Expr> Parser::primary() {
     return std::make_unique<VarExpr>(previous());
   }
 
+  if (match({TokenKind::Fn})) {
+    Token fn_tok = previous();
+    consume(TokenKind::LParen, "Expect '(' after 'fn' in anonymous function.");
+    std::vector<std::string_view> params;
+    while (!check(TokenKind::RParen) && !is_at_end()) {
+      auto param = consume(TokenKind::Identifier, "Expect parameter name.");
+      params.push_back(param.lexeme());
+      if (match({TokenKind::Colon})) {
+        consume(TokenKind::Identifier, "Expect type annotation.");
+      }
+      if (!match({TokenKind::Comma})) break;
+    }
+    consume(TokenKind::RParen, "Expect ')' after parameters.");
+    if (match({TokenKind::Colon})) {
+      consume(TokenKind::Identifier, "Expect return type.");
+    }
+    consume(TokenKind::LBrace, "Expect '{' before function body.");
+    auto body = block_statement();
+    consume(TokenKind::RBrace, "Expect '}' after function body.");
+    return std::make_unique<FunctionExpr>(fn_tok, params, std::move(body));
+  }
+
   if (match({TokenKind::LParen})) {
     auto expr = expression();
     consume(TokenKind::RParen, "Expect ')' after expression.");
