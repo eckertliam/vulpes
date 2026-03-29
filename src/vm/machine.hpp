@@ -53,6 +53,7 @@ class Machine {
 
   void pushCallFrame(Function* function);
   void popCallFrame();
+  void setIP(size_t ip);
 
   void registerBuiltins();
   void registerNative(const std::string& name, size_t arity, object::NativeFn fn);

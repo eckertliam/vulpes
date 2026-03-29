@@ -61,6 +61,12 @@ enum class Opcode : uint8_t {
   // Unary operators
   NEGATE,
   NOT,
+  // Control flow
+  // Imm: instruction index to jump to
+  JUMP,
+  // Pop value, jump if falsy
+  // Imm: instruction index to jump to
+  JUMP_IF_FALSE,
   // Comparison operators — pop two values, push Boolean result
   EQ,
   NEQ,

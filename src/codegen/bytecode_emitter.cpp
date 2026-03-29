@@ -258,17 +258,20 @@ void BytecodeEmitter::visit(const frontend::VarExpr& expr) {
 void BytecodeEmitter::visit(const frontend::AssignExpr& expr) {
     // Visit the value expression first
     expr.value->accept(*this);
-    // Then store to the variable
+    // Then store to the variable and reload (assignment is an expression)
     auto local_it = locals.find(expr.name);
     if (local_it != locals.end()) {
         emit_store_local(expr.name);
+        emit_load_local(expr.name);
     } else {
         auto arg_it = args.find(expr.name);
         if (arg_it != args.end()) {
             emit_store_arg(expr.name);
+            emit_load_arg(expr.name);
         } else {
             // Create new local
             emit_store_local(expr.name);
+            emit_load_local(expr.name);
         }
     }
 }
@@ -331,9 +334,34 @@ void BytecodeEmitter::visit(const frontend::BlockStmt& stmt) {
     }
 }
 
-void BytecodeEmitter::visit([[maybe_unused]] const frontend::IfStmt& stmt) {
-    // TODO: Implement conditional jumps
-    // Current instruction set doesn't support conditional jumps
+void BytecodeEmitter::visit(const frontend::IfStmt& stmt) {
+    // Emit condition
+    stmt.condition->accept(*this);
+
+    // Emit JUMP_IF_FALSE with placeholder
+    auto jump_if_false_idx = current_function->instructionCount();
+    current_function->addInstruction(vm::Instruction(vm::Opcode::JUMP_IF_FALSE, 0));
+
+    // Emit then branch
+    stmt.then_branch->accept(*this);
+
+    if (stmt.else_branch) {
+        // Emit JUMP to skip else branch (placeholder)
+        auto jump_over_else_idx = current_function->instructionCount();
+        current_function->addInstruction(vm::Instruction(vm::Opcode::JUMP, 0));
+
+        // Patch JUMP_IF_FALSE to jump here (start of else)
+        current_function->patchInstruction(jump_if_false_idx, current_function->instructionCount());
+
+        // Emit else branch
+        stmt.else_branch->accept(*this);
+
+        // Patch JUMP to skip past else
+        current_function->patchInstruction(jump_over_else_idx, current_function->instructionCount());
+    } else {
+        // Patch JUMP_IF_FALSE to jump past then
+        current_function->patchInstruction(jump_if_false_idx, current_function->instructionCount());
+    }
 }
 
 void BytecodeEmitter::visit([[maybe_unused]] const frontend::WhileStmt& stmt) {

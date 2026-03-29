@@ -86,6 +86,7 @@ cc_test(
     srcs = [
         "tests/test_booleans.cpp",
         "tests/test_comparisons.cpp",
+        "tests/test_control_flow.cpp",
         "tests/test_unary.cpp",
         "tests/test_helpers.hpp",
         "tests/test_lexer.cpp",

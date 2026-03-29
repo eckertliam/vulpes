@@ -33,6 +33,14 @@ class Function : public BaseObject {
       
   void addInstruction(const Instruction& instruction) { instructions_.push_back(instruction); }
 
+  [[nodiscard]] uint32_t instructionCount() const {
+    return static_cast<uint32_t>(instructions_.size());
+  }
+
+  void patchInstruction(uint32_t index, uint32_t new_imm) {
+    instructions_[index].imm = new_imm;
+  }
+
   uint32_t addConstant(BaseObject* constant) {
     constants_.push_back(constant);
     return static_cast<uint32_t>(constants_.size() - 1);
@@ -59,6 +67,13 @@ class Function : public BaseObject {
   uint32_t addLocal(BaseObject* value) {
     locals_.push_back(value);
     return static_cast<uint32_t>(locals_.size() - 1);
+  }
+
+  void setLocal(uint32_t index, BaseObject* value) {
+    if (index >= locals_.size()) {
+      locals_.resize(index + 1, nullptr);
+    }
+    locals_[index] = value;
   }
 
   uint32_t addArg(BaseObject* arg) {

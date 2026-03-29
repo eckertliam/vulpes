@@ -20,6 +20,7 @@ class Parser {
   std::unique_ptr<BlockStmt> block_statement();
   std::unique_ptr<Stmt> function_declaration();
   std::unique_ptr<Stmt> return_statement();
+  std::unique_ptr<Stmt> if_statement();
   std::unique_ptr<Stmt> statement();
   std::unique_ptr<Stmt> expression_statement();
   std::unique_ptr<Expr> expression();

@@ -100,9 +100,28 @@ std::unique_ptr<Stmt> Parser::statement() {
     return return_statement();
   }
 
-  // TODO: implement handling for all statement types
+  if (match({TokenKind::If})) {
+    return if_statement();
+  }
 
   return expression_statement();
+}
+
+std::unique_ptr<Stmt> Parser::if_statement() {
+  auto condition = expression();
+  consume(TokenKind::LBrace, "Expect '{' after if condition.");
+  auto then_branch = block_statement();
+  consume(TokenKind::RBrace, "Expect '}' after if body.");
+
+  std::unique_ptr<Stmt> else_branch = nullptr;
+  if (match({TokenKind::Else})) {
+    consume(TokenKind::LBrace, "Expect '{' after 'else'.");
+    auto else_block = block_statement();
+    consume(TokenKind::RBrace, "Expect '}' after else body.");
+    else_branch = std::move(else_block);
+  }
+
+  return std::make_unique<IfStmt>(std::move(condition), std::move(then_branch), std::move(else_branch));
 }
 
 std::unique_ptr<Stmt> Parser::expression_statement() {

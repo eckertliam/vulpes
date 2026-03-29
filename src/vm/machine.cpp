@@ -117,15 +117,9 @@ static inline void loadConst(Machine& machine, const Instruction& instruction) {
 }
 
 static inline void storeLocal(Machine& machine,
-                              [[maybe_unused]] const Instruction& instruction) {
-  // pop the value from the stack
+                              const Instruction& instruction) {
   const auto value = machine.pop();
-  // store the value at the local index
-  auto local_index = machine.getCurrentFunction()->addLocal(value);
-  // allocate the local index as an integer
-  const auto local_index_obj = machine.allocate<Integer>(local_index);
-  // push the local index to the stack
-  machine.push(local_index_obj);
+  machine.getCurrentFunction()->setLocal(instruction.imm, value);
 }
 
 static inline void loadLocal(Machine& machine, const Instruction& instruction) {
@@ -260,6 +254,17 @@ static inline void pop(Machine& machine, [[maybe_unused]] const Instruction& ins
   machine.pop();
 }
 
+static inline void jump(Machine& machine, const Instruction& instruction) {
+  machine.setIP(instruction.imm);
+}
+
+static inline void jumpIfFalse(Machine& machine, const Instruction& instruction) {
+  auto* value = machine.pop();
+  if (!value->isTruthy()) {
+    machine.setIP(instruction.imm);
+  }
+}
+
 static inline void negate(Machine& machine, const Instruction& instruction) {
   auto* operand = machine.pop();
   auto* result = operand->negate(machine);
@@ -359,6 +364,8 @@ static std::unordered_map<Opcode, InstructionHandler> instruction_handlers = {
     {Opcode::POP, pop},
     {Opcode::NEGATE, negate},
     {Opcode::NOT, logicalNot},
+    {Opcode::JUMP, jump},
+    {Opcode::JUMP_IF_FALSE, jumpIfFalse},
     {Opcode::EQ, eq},
     {Opcode::NEQ, neq},
     {Opcode::LT, lt},
@@ -428,6 +435,10 @@ void Machine::pushCallFrame(Function* function) {
 
 void Machine::popCallFrame() {
   call_frames_.pop_back();
+}
+
+void Machine::setIP(size_t ip) {
+  call_frames_.back().ip = ip;
 }
 
 void Machine::registerNative(const std::string& name, size_t arity,
