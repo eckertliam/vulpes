@@ -1,9 +1,15 @@
-VULPES_COPTS = [
-    "-Weverything",
-    "-Wno-c++98-compat",
-    "-Wno-c++98-compat-pedantic",
-    "-Wno-padded",
-]
+VULPES_COPTS = select({
+    "@platforms//os:macos": [
+        "-Weverything",
+        "-Wno-c++98-compat",
+        "-Wno-c++98-compat-pedantic",
+        "-Wno-padded",
+    ],
+    "//conditions:default": [
+        "-Wall",
+        "-Wextra",
+    ],
+})
 
 cc_library(
     name = "frontend",
