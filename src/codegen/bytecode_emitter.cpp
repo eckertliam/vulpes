@@ -28,7 +28,7 @@ vm::object::Function* BytecodeEmitter::emit_program(const std::vector<std::uniqu
     auto main_it = machine.getFunctionTable().find("main");
     if (main_it != machine.getFunctionTable().end()) {
         current_function->addInstruction(vm::Instruction(vm::Opcode::LOAD_GLOBAL, main_it->second));
-        current_function->addInstruction(vm::Instruction(vm::Opcode::CALL));
+        current_function->addInstruction(vm::Instruction(vm::Opcode::CALL, 0u));
         current_function->addInstruction(vm::Instruction(vm::Opcode::POP));
     }
 
@@ -155,10 +155,9 @@ void BytecodeEmitter::emit_jump_if_false([[maybe_unused]] size_t offset) {
     // Current instruction set doesn't support conditional jumps
 }
 
-void BytecodeEmitter::emit_call([[maybe_unused]] size_t arg_count) {
-    // Emit CALL instruction - function object should already be on stack
-    // The VM will pop the function object and arguments from the stack
-    current_function->addInstruction(vm::Instruction(vm::Opcode::CALL));
+void BytecodeEmitter::emit_call(size_t arg_count) {
+    // Emit CALL instruction with arg count as immediate
+    current_function->addInstruction(vm::Instruction(vm::Opcode::CALL, static_cast<uint32_t>(arg_count)));
 }
 
 void BytecodeEmitter::emit_return() {
@@ -290,6 +289,9 @@ void BytecodeEmitter::visit(const frontend::VarExpr& expr) {
 }
 
 void BytecodeEmitter::visit(const frontend::AssignExpr& expr) {
+    if (const_vars.count(expr.name)) {
+        throw std::runtime_error("Cannot assign to const variable '" + std::string(expr.name) + "'");
+    }
     expr.value->accept(*this);
     // Store and reload (assignment is an expression that leaves value on stack)
     auto local_idx = find_local(expr.name);
@@ -472,6 +474,7 @@ void BytecodeEmitter::visit(const frontend::ConstStmt& stmt) {
         auto* null_obj = machine.allocate<vm::object::Null>();
         emit_constant(null_obj);
     }
+    const_vars.insert(stmt.name);
     if (in_top_level && scope_stack.size() == 1) {
         auto* null_placeholder = machine.allocate<vm::object::Null>();
         auto idx = machine.addGlobal(null_placeholder);

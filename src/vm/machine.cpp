@@ -140,12 +140,13 @@ static inline void callFunction(Machine& machine,
 
   if (functionObj->type() == ObjectType::NativeFunction) {
     auto* native = dynamic_cast<NativeFunction*>(functionObj);
-    const auto arity = native->getArity();
-    std::vector<BaseObject*> args(arity);
-    for (size_t i = 0; i < arity; i++) {
-      args[i] = machine.pop();
+    // Use the actual arg count from the CALL instruction
+    const auto arg_count = instruction.imm;
+    std::vector<BaseObject*> native_args(arg_count);
+    for (uint32_t i = 0; i < arg_count; i++) {
+      native_args[i] = machine.pop();
     }
-    auto* result = native->call(machine, args);
+    auto* result = native->call(machine, native_args);
     if (result == nullptr) {
       result = machine.allocate<Null>();
     }
@@ -555,8 +556,8 @@ void Machine::registerNative(const std::string& name, size_t arity,
 void Machine::registerBuiltins() {
   registerNative("println", 1,
                  [](Machine& machine,
-                    const std::vector<BaseObject*>& args) -> BaseObject* {
-                   for (const auto* arg : args) {
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   for (const auto* arg : fn_args) {
                      std::cout << arg->toString();
                    }
                    std::cout << "\n";
@@ -565,8 +566,8 @@ void Machine::registerBuiltins() {
 
   registerNative("print", 1,
                  [](Machine& machine,
-                    const std::vector<BaseObject*>& args) -> BaseObject* {
-                   for (const auto* arg : args) {
+                    const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   for (const auto* arg : fn_args) {
                      std::cout << arg->toString();
                    }
                    return machine.allocate<Null>();

@@ -5,6 +5,7 @@
 #include "vm/object/function.hpp"
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace vulpes::codegen {
@@ -36,6 +37,8 @@ class BytecodeEmitter : public frontend::AstVisitor {
   std::vector<std::unique_ptr<std::string>> synthetic_names;
   // Top-level global variable name -> global index mapping
   std::unordered_map<std::string_view, uint32_t> global_vars;
+  // Track which variable names are const (immutable)
+  std::unordered_set<std::string_view> const_vars;
 
   // Loop context stack for break/continue
   std::vector<LoopContext> loop_stack;
