@@ -12,6 +12,7 @@
 #include "object/base.hpp"
 #include "object/instance.hpp"
 #include "object/vec.hpp"
+#include "object/map.hpp"
 
 namespace vulpes::vm {
 
@@ -372,6 +373,14 @@ static inline void indexGet(Machine& machine, const Instruction& instruction) {
       throwWithLocation("IndexOutOfBounds", instruction.src_loc);
     }
     machine.push(machine.allocate<String>(std::string(1, str->value()[static_cast<size_t>(idx)])));
+  } else if (obj->type() == ObjectType::Map) {
+    auto* map = dynamic_cast<Map*>(obj);
+    auto* value = map->get(machine, index);
+    if (value == nullptr) {
+      machine.push(machine.allocate<Null>());
+    } else {
+      machine.push(value);
+    }
   } else if (obj->type() == ObjectType::Null) {
     throwWithLocation("NullAccess: cannot index null", instruction.src_loc);
   } else {
@@ -390,6 +399,10 @@ static inline void indexSet(Machine& machine, const Instruction& instruction) {
     }
     auto idx = dynamic_cast<Integer*>(index)->value();
     vec->set(idx, value);
+    machine.push(value);
+  } else if (obj->type() == ObjectType::Map) {
+    auto* map = dynamic_cast<Map*>(obj);
+    map->set(machine, index, value);
     machine.push(value);
   } else if (obj->type() == ObjectType::Null) {
     throwWithLocation("NullAccess: cannot index null", instruction.src_loc);
@@ -658,6 +671,12 @@ void Machine::registerBuiltins() {
                    return v;
                  });
 
+  registerNative("map", 0,
+                 [](Machine& machine,
+                    [[maybe_unused]] const std::vector<BaseObject*>& fn_args) -> BaseObject* {
+                   return machine.allocate<Map>();
+                 });
+
   registerNative("len", 1,
                  [](Machine& machine,
                     const std::vector<BaseObject*>& fn_args) -> BaseObject* {
@@ -669,6 +688,10 @@ void Machine::registerBuiltins() {
                    if (obj->type() == ObjectType::String) {
                      return machine.allocate<Integer>(
                          static_cast<int64_t>(dynamic_cast<String*>(obj)->value().size()));
+                   }
+                   if (obj->type() == ObjectType::Map) {
+                     return machine.allocate<Integer>(
+                         static_cast<int64_t>(dynamic_cast<Map*>(obj)->length()));
                    }
                    throw std::runtime_error("TypeError: len() not supported for this type");
                  });
