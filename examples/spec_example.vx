@@ -1,0 +1,9 @@
+// file: hello.vx
+export { main };
+
+const GREETING = "Hello";
+
+fn main() {
+    let name = "World";
+    println(GREETING + ", " + name + "!");
+}

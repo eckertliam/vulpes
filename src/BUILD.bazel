@@ -46,6 +46,7 @@ cc_library(
         "vm/machine.hpp",
         "vm/object/base.hpp",
         "vm/object/boolean.hpp",
+        "vm/object/char.hpp",
         "vm/object/float.hpp",
         "vm/object/function.hpp",
         "vm/object/integer.hpp",

@@ -6,6 +6,7 @@
 #include "vm/object/function.hpp"
 #include "vm/object/string.hpp"
 #include "vm/object/boolean.hpp"
+#include "vm/object/char.hpp"
 
 namespace vulpes::codegen {
 
@@ -14,10 +15,13 @@ vm::object::Function* BytecodeEmitter::emit_program(const std::vector<std::uniqu
     scope_stack.clear();
     scope_stack.emplace_back();
     next_local_index = 0;
+    in_top_level = true;
 
     for (const auto& stmt : statements) {
         stmt->accept(*this);
     }
+
+    in_top_level = false;
 
     // Auto-call main() if it was defined
     auto main_it = machine.getFunctionTable().find("main");
@@ -200,9 +204,8 @@ vm::object::BaseObject* BytecodeEmitter::try_get_constant(const frontend::Expr& 
     if (auto* string_lit = dynamic_cast<const frontend::StringLiteral*>(&expr)) {
         return machine.allocate<vm::object::String>(std::string(string_lit->value));
     }
-    if (dynamic_cast<const frontend::CharLiteral*>(&expr)) {
-        // TODO: Implement char objects
-        return machine.allocate<vm::object::Null>();
+    if (auto* char_lit = dynamic_cast<const frontend::CharLiteral*>(&expr)) {
+        return machine.allocate<vm::object::Char>(char_lit->value);
     }
     
     // For now, only simple literals are considered constants
@@ -226,10 +229,9 @@ void BytecodeEmitter::visit(const frontend::StringLiteral& expr) {
     emit_constant(str_obj);
 }
 
-void BytecodeEmitter::visit([[maybe_unused]] const frontend::CharLiteral& expr) {
-    // TODO: Implement char literal emission
-    auto* null_obj = machine.allocate<vm::object::Null>();
-    emit_constant(null_obj);
+void BytecodeEmitter::visit(const frontend::CharLiteral& expr) {
+    auto* char_obj = machine.allocate<vm::object::Char>(expr.value);
+    emit_constant(char_obj);
 }
 
 void BytecodeEmitter::visit(const frontend::BoolLiteral& expr) {
@@ -264,7 +266,7 @@ void BytecodeEmitter::visit(const frontend::GroupingExpr& expr) {
 }
 
 void BytecodeEmitter::visit(const frontend::VarExpr& expr) {
-    // Try locals (scope stack), then args, then globals
+    // Try locals (scope stack), then args, then global vars, then function table
     auto local_idx = find_local(expr.name);
     if (local_idx) {
         emit_load_local(expr.name);
@@ -273,9 +275,14 @@ void BytecodeEmitter::visit(const frontend::VarExpr& expr) {
         if (arg_it != args.end()) {
             emit_load_arg(expr.name);
         } else {
-            auto global_it = machine.getFunctionTable().find(std::string(expr.name));
-            if (global_it != machine.getFunctionTable().end()) {
-                current_function->addInstruction(vm::Instruction(vm::Opcode::LOAD_GLOBAL, global_it->second));
+            auto gvar_it = global_vars.find(expr.name);
+            if (gvar_it != global_vars.end()) {
+                current_function->addInstruction(vm::Instruction(vm::Opcode::LOAD_GLOBAL, gvar_it->second));
+            } else {
+                auto global_it = machine.getFunctionTable().find(std::string(expr.name));
+                if (global_it != machine.getFunctionTable().end()) {
+                    current_function->addInstruction(vm::Instruction(vm::Opcode::LOAD_GLOBAL, global_it->second));
+                }
             }
         }
     }
@@ -294,8 +301,14 @@ void BytecodeEmitter::visit(const frontend::AssignExpr& expr) {
             emit_store_arg(expr.name);
             emit_load_arg(expr.name);
         } else {
-            emit_store_local(expr.name);
-            emit_load_local(expr.name);
+            auto gvar_it = global_vars.find(expr.name);
+            if (gvar_it != global_vars.end()) {
+                current_function->addInstruction(vm::Instruction(vm::Opcode::STORE_GLOBAL, gvar_it->second));
+                current_function->addInstruction(vm::Instruction(vm::Opcode::LOAD_GLOBAL, gvar_it->second));
+            } else {
+                emit_store_local(expr.name);
+                emit_load_local(expr.name);
+            }
         }
     }
 }
@@ -378,22 +391,35 @@ void BytecodeEmitter::visit(const frontend::LetStmt& stmt) {
     if (stmt.initializer) {
         stmt.initializer->accept(*this);
     } else {
-        // Initialize with null
         auto* null_obj = machine.allocate<vm::object::Null>();
         emit_constant(null_obj);
     }
-    emit_declare_local(stmt.name);
+    if (in_top_level && scope_stack.size() == 1) {
+        // Store as a global so functions can access it
+        auto* null_placeholder = machine.allocate<vm::object::Null>();
+        auto idx = machine.addGlobal(null_placeholder);
+        global_vars[stmt.name] = idx;
+        current_function->addInstruction(vm::Instruction(vm::Opcode::STORE_GLOBAL, idx));
+    } else {
+        emit_declare_local(stmt.name);
+    }
 }
 
 void BytecodeEmitter::visit(const frontend::ConstStmt& stmt) {
     if (stmt.initializer) {
         stmt.initializer->accept(*this);
     } else {
-        // TODO: Error - const must be initialized
         auto* null_obj = machine.allocate<vm::object::Null>();
         emit_constant(null_obj);
     }
-    emit_declare_local(stmt.name);
+    if (in_top_level && scope_stack.size() == 1) {
+        auto* null_placeholder = machine.allocate<vm::object::Null>();
+        auto idx = machine.addGlobal(null_placeholder);
+        global_vars[stmt.name] = idx;
+        current_function->addInstruction(vm::Instruction(vm::Opcode::STORE_GLOBAL, idx));
+    } else {
+        emit_declare_local(stmt.name);
+    }
 }
 
 void BytecodeEmitter::visit(const frontend::BlockStmt& stmt) {

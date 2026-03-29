@@ -546,6 +546,7 @@ void Machine::registerBuiltins() {
                      case ObjectType::Integer: name = "int"; break;
                      case ObjectType::Float: name = "float"; break;
                      case ObjectType::String: name = "string"; break;
+                     case ObjectType::Char: name = "char"; break;
                      case ObjectType::Boolean: name = "bool"; break;
                      case ObjectType::Null: name = "null"; break;
                      case ObjectType::Object: name = "object"; break;

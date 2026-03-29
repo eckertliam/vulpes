@@ -16,6 +16,7 @@ BaseObject* Integer::add(vulpes::vm::Machine& machine, BaseObject* other) {
       return machine.allocate<Float>(static_cast<double>(value_) +
                                      dynamic_cast<Float*>(other)->value());
     case ObjectType::String:
+    case ObjectType::Char:
     case ObjectType::Boolean:
     case ObjectType::Null:
     case ObjectType::Object:
@@ -35,6 +36,7 @@ BaseObject* Integer::sub(vulpes::vm::Machine& machine, BaseObject* other) {
       return machine.allocate<Float>(static_cast<double>(value_) -
                                      dynamic_cast<Float*>(other)->value());
     case ObjectType::String:
+    case ObjectType::Char:
     case ObjectType::Boolean:
     case ObjectType::Null:
     case ObjectType::Object:
@@ -54,6 +56,7 @@ BaseObject* Integer::mul(vulpes::vm::Machine& machine, BaseObject* other) {
       return machine.allocate<Float>(static_cast<double>(value_) *
                                      dynamic_cast<Float*>(other)->value());
     case ObjectType::String:
+    case ObjectType::Char:
     case ObjectType::Boolean:
     case ObjectType::Null:
     case ObjectType::Object:
@@ -73,6 +76,7 @@ BaseObject* Integer::div(vulpes::vm::Machine& machine, BaseObject* other) {
       return machine.allocate<Float>(static_cast<double>(value_) /
                                      dynamic_cast<Float*>(other)->value());
     case ObjectType::String:
+    case ObjectType::Char:
     case ObjectType::Boolean:
     case ObjectType::Null:
     case ObjectType::Object:
@@ -150,6 +154,7 @@ BaseObject* Integer::eq(vulpes::vm::Machine& machine, BaseObject* other) {
       return machine.allocate<Boolean>(diff <= 0.0 && diff >= 0.0);
     }
     case ObjectType::String:
+    case ObjectType::Char:
     case ObjectType::Boolean:
     case ObjectType::Null:
     case ObjectType::Object:
@@ -169,6 +174,7 @@ BaseObject* Integer::lt(vulpes::vm::Machine& machine, BaseObject* other) {
       return machine.allocate<Boolean>(static_cast<double>(value_) <
                                        dynamic_cast<Float*>(other)->value());
     case ObjectType::String:
+    case ObjectType::Char:
     case ObjectType::Boolean:
     case ObjectType::Null:
     case ObjectType::Object:

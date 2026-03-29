@@ -26,6 +26,11 @@ class BytecodeEmitter : public frontend::AstVisitor {
   std::unordered_map<std::string_view, uint32_t> args;
   std::unordered_map<std::string_view, uint32_t> constants;
 
+  // Track whether we're in the top-level entry function
+  bool in_top_level = false;
+  // Top-level global variable name -> global index mapping
+  std::unordered_map<std::string_view, uint32_t> global_vars;
+
   // Loop context stack for break/continue
   std::vector<LoopContext> loop_stack;
   
