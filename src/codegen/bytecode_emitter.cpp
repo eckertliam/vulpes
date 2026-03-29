@@ -5,6 +5,7 @@
 #include "vm/object/float.hpp"
 #include "vm/object/function.hpp"
 #include "vm/object/string.hpp"
+#include "vm/object/boolean.hpp"
 
 namespace vulpes::codegen {
 
@@ -148,9 +149,8 @@ vm::object::BaseObject* BytecodeEmitter::try_get_constant(const frontend::Expr& 
     if (dynamic_cast<const frontend::NullLiteral*>(&expr)) {
         return machine.allocate<vm::object::Null>();
     }
-    if (dynamic_cast<const frontend::BoolLiteral*>(&expr)) {
-        // TODO: Implement boolean objects
-        return machine.allocate<vm::object::Null>();
+    if (auto* bool_lit = dynamic_cast<const frontend::BoolLiteral*>(&expr)) {
+        return machine.allocate<vm::object::Boolean>(bool_lit->value);
     }
     if (auto* string_lit = dynamic_cast<const frontend::StringLiteral*>(&expr)) {
         return machine.allocate<vm::object::String>(std::string(string_lit->value));
@@ -187,10 +187,9 @@ void BytecodeEmitter::visit([[maybe_unused]] const frontend::CharLiteral& expr) 
     emit_constant(null_obj);
 }
 
-void BytecodeEmitter::visit([[maybe_unused]] const frontend::BoolLiteral& expr) {
-    // TODO: Implement boolean literal emission
-    auto* null_obj = machine.allocate<vm::object::Null>();
-    emit_constant(null_obj);
+void BytecodeEmitter::visit(const frontend::BoolLiteral& expr) {
+    auto* bool_obj = machine.allocate<vm::object::Boolean>(expr.value);
+    emit_constant(bool_obj);
 }
 
 void BytecodeEmitter::visit([[maybe_unused]] const frontend::NullLiteral& expr) {

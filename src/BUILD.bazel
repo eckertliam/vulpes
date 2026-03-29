@@ -45,6 +45,7 @@ cc_library(
         "vm/instruction.hpp",
         "vm/machine.hpp",
         "vm/object/base.hpp",
+        "vm/object/boolean.hpp",
         "vm/object/float.hpp",
         "vm/object/function.hpp",
         "vm/object/integer.hpp",
@@ -83,6 +84,8 @@ cc_binary(
 cc_test(
     name = "vulpes_tests",
     srcs = [
+        "tests/test_booleans.cpp",
+        "tests/test_helpers.hpp",
         "tests/test_lexer.cpp",
         "tests/test_parser.cpp",
         "tests/test_vm.cpp",
