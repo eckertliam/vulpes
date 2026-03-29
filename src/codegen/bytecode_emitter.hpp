@@ -4,18 +4,28 @@
 #include "vm/machine.hpp"
 #include "vm/object/function.hpp"
 #include <unordered_map>
+#include <vector>
 
 namespace vulpes::codegen {
+
+// Tracks break/continue jump targets for the current loop
+struct LoopContext {
+  uint32_t continue_target;                  // instruction index for continue
+  std::vector<uint32_t> break_patches;       // JUMP indices to patch when loop ends
+};
 
 class BytecodeEmitter : public frontend::AstVisitor {
  private:
   vm::Machine& machine;
   vm::object::Function* current_function;
-  
+
   // Symbol tables for code generation
   std::unordered_map<std::string_view, uint32_t> locals;
   std::unordered_map<std::string_view, uint32_t> args;
   std::unordered_map<std::string_view, uint32_t> constants;
+
+  // Loop context stack for break/continue
+  std::vector<LoopContext> loop_stack;
   
   // Helper methods for bytecode generation
   void emit_constant(vm::object::BaseObject* value);
@@ -69,6 +79,8 @@ class BytecodeEmitter : public frontend::AstVisitor {
   void visit(const frontend::WhileStmt& stmt) override;
   void visit(const frontend::ForStmt& stmt) override;
   void visit(const frontend::ReturnStmt& stmt) override;
+  void visit(const frontend::BreakStmt& stmt) override;
+  void visit(const frontend::ContinueStmt& stmt) override;
   void visit(const frontend::FunctionStmt& stmt) override;
   void visit(const frontend::ClassStmt& stmt) override;
 };

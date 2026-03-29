@@ -364,13 +364,53 @@ void BytecodeEmitter::visit(const frontend::IfStmt& stmt) {
     }
 }
 
-void BytecodeEmitter::visit([[maybe_unused]] const frontend::WhileStmt& stmt) {
-    // TODO: Implement while loops
-    // Current instruction set doesn't support jumps
+void BytecodeEmitter::visit(const frontend::WhileStmt& stmt) {
+    // Loop start — condition is re-evaluated here
+    auto loop_start = current_function->instructionCount();
+
+    // Push loop context
+    loop_stack.push_back({loop_start, {}});
+
+    // Emit condition
+    stmt.condition->accept(*this);
+
+    // Jump past body if false
+    auto exit_jump = current_function->instructionCount();
+    current_function->addInstruction(vm::Instruction(vm::Opcode::JUMP_IF_FALSE, 0));
+
+    // Emit body
+    stmt.body->accept(*this);
+
+    // Jump back to condition
+    current_function->addInstruction(vm::Instruction(vm::Opcode::JUMP, loop_start));
+
+    // Patch exit jump
+    auto loop_end = current_function->instructionCount();
+    current_function->patchInstruction(exit_jump, loop_end);
+
+    // Patch all break jumps
+    for (auto break_idx : loop_stack.back().break_patches) {
+        current_function->patchInstruction(break_idx, loop_end);
+    }
+
+    loop_stack.pop_back();
 }
 
 void BytecodeEmitter::visit([[maybe_unused]] const frontend::ForStmt& stmt) {
     // TODO: Implement for loop
+}
+
+void BytecodeEmitter::visit([[maybe_unused]] const frontend::BreakStmt& stmt) {
+    // Emit a JUMP placeholder — will be patched when loop ends
+    auto break_idx = current_function->instructionCount();
+    current_function->addInstruction(vm::Instruction(vm::Opcode::JUMP, 0));
+    loop_stack.back().break_patches.push_back(break_idx);
+}
+
+void BytecodeEmitter::visit([[maybe_unused]] const frontend::ContinueStmt& stmt) {
+    // Jump back to loop condition
+    current_function->addInstruction(
+        vm::Instruction(vm::Opcode::JUMP, loop_stack.back().continue_target));
 }
 
 void BytecodeEmitter::visit(const frontend::ReturnStmt& stmt) {

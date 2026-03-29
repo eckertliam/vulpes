@@ -35,6 +35,8 @@ struct IfStmt;
 struct WhileStmt;
 struct ForStmt;
 struct ReturnStmt;
+struct BreakStmt;
+struct ContinueStmt;
 struct FunctionStmt;
 struct ClassStmt;
 
@@ -63,6 +65,8 @@ struct AstVisitor {
   virtual void visit(const WhileStmt& stmt) = 0;
   virtual void visit(const ForStmt& stmt) = 0;
   virtual void visit(const ReturnStmt& stmt) = 0;
+  virtual void visit(const BreakStmt& stmt) = 0;
+  virtual void visit(const ContinueStmt& stmt) = 0;
   virtual void visit(const FunctionStmt& stmt) = 0;
   virtual void visit(const ClassStmt& stmt) = 0;
 };
@@ -405,6 +409,16 @@ struct ReturnStmt final : Stmt {
     }
   }
 
+  void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
+};
+
+struct BreakStmt final : Stmt {
+  explicit BreakStmt(const Token& keyword) { location = keyword.location; }
+  void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
+};
+
+struct ContinueStmt final : Stmt {
+  explicit ContinueStmt(const Token& keyword) { location = keyword.location; }
   void accept(AstVisitor& visitor) const override { visitor.visit(*this); }
 };
 

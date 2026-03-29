@@ -104,6 +104,22 @@ std::unique_ptr<Stmt> Parser::statement() {
     return if_statement();
   }
 
+  if (match({TokenKind::While})) {
+    return while_statement();
+  }
+
+  if (match({TokenKind::Break})) {
+    Token keyword = previous();
+    consume(TokenKind::Semicolon, "Expect ';' after 'break'.");
+    return std::make_unique<BreakStmt>(keyword);
+  }
+
+  if (match({TokenKind::Continue})) {
+    Token keyword = previous();
+    consume(TokenKind::Semicolon, "Expect ';' after 'continue'.");
+    return std::make_unique<ContinueStmt>(keyword);
+  }
+
   return expression_statement();
 }
 
@@ -122,6 +138,14 @@ std::unique_ptr<Stmt> Parser::if_statement() {
   }
 
   return std::make_unique<IfStmt>(std::move(condition), std::move(then_branch), std::move(else_branch));
+}
+
+std::unique_ptr<Stmt> Parser::while_statement() {
+  auto condition = expression();
+  consume(TokenKind::LBrace, "Expect '{' after while condition.");
+  auto body = block_statement();
+  consume(TokenKind::RBrace, "Expect '}' after while body.");
+  return std::make_unique<WhileStmt>(std::move(condition), std::move(body));
 }
 
 std::unique_ptr<Stmt> Parser::expression_statement() {
